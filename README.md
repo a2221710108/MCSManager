@@ -84,8 +84,9 @@ Go to: [https://mcsmanager.com/](https://mcsmanager.com/)
 ```bash
 sudo su -c "wget -qO- https://script.mcsmanager.com/setup.sh | bash"
 ```
+```bash
 sudo su -c "wget -qO- https://raw.githubusercontent.com/a2221710108/Script/refs/heads/master/setup.sh | bash"
-
+```
 
 **Usage**
 
