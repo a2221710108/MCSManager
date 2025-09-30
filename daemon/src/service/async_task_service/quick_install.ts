@@ -154,7 +154,7 @@ export class QuickInstallTask extends AsyncTask {
 
     this.downloadProgress.percentage = 100;
     this.downloadProgress.downloadedBytes = this.downloadProgress.totalBytes;
-    this.instance.println("INFO", `下載 "${this.title}" 完成!!!`);
+    this.instance.println("INFO", `下載完成!`);
   }
 
   async onStart() {
