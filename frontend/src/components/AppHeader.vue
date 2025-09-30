@@ -296,7 +296,7 @@ const openPhoneMenu = (b = false) => {
 };
 
 const onClickIcon = () => {
-  window.open("https://github.com/MCSManager/MCSManager", "_blank");
+  window.open("https://github.com/LazyCloud-sudo/LazyCloud-config", "_blank");
 };
 </script>
 
