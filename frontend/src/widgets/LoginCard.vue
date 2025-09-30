@@ -173,9 +173,9 @@ onMounted(async () => {
                   class="global-markdown-html"
                   v-html="markdownToHTML(pageInfoResult?.loginInfo || '')"
                 ></div>
-                Powered by
-                <a href="https://mcsmanager.com" target="_blank" rel="noopener noreferrer">
-                  MCSManager
+                
+                <a href="" target="_blank" rel="noopener noreferrer">
+                  
                 </a>
               </div>
               <div v-else></div>
