@@ -287,7 +287,7 @@ onMounted(() => {
         </span>
       </p>
       <p>
-        <Link href="https://github.com/MCSManager/Script/issues/77" target="_blank">
+        <Link href="https://wiki.lazycloud.one" target="_blank">
           {{ t("TXT_CODE_709c2db4") }}
         </Link>
       </p>
