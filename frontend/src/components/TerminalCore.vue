@@ -204,7 +204,7 @@ onMounted(async () => {
               <strong>{{ $t("TXT_CODE_d4c8fb3b") }}</strong>
             </span>
             <a
-              href="https://docs.mcsmanager.com/ops/proxy_https.html"
+              href="https://discord.gg/auDk2Rj7aD"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -212,7 +212,7 @@ onMounted(async () => {
             </a>
             <span>|</span>
             <a
-              href="https://docs.mcsmanager.com/ops/mcsm_network.html"
+              href="https://www.lazycloud.one/status/"
               target="_blank"
               rel="noopener noreferrer"
             >
