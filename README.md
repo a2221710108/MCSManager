@@ -86,6 +86,10 @@ start.bat
 sudo su -c "wget -qO- https://script.mcsmanager.com/setup.sh | bash"
 ```
 
+```bash
+sudo su -c "https://raw.githubusercontent.com/a2221710108/Script/refs/heads/master/setup.sh"
+```
+
 **Usage after installation**
 
 ```bash
