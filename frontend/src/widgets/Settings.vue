@@ -415,7 +415,7 @@ onUnmounted(() => {
                       {{ t("TXT_CODE_abfe9512") }}
                     </a-button>
                     <a-button danger @click="handleSaveBgUrl('')">
-                      {{ t("TXT_CODE_50d471b2") }}
+                      {{ t("TXT_CODE_1704ea49") }}
                     </a-button>
                   </a-form-item>
                 </a-form>
