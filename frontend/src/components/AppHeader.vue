@@ -21,8 +21,8 @@ import {
   SaveOutlined,
   SketchOutlined,
   UserOutlined,
-  ReadFilled,
-  HddFilled
+  ReadOutlined,
+  ApartmentOutlined
 } from "@ant-design/icons-vue";
 import { useScroll } from "@vueuse/core";
 import { message, Modal, notification } from "ant-design-vue";
@@ -137,7 +137,7 @@ const appMenus = computed(() => {
       iconText: "",
       // iconText: t("TXT_CODE_3ccb26e"),
       title: t("TXT_CODE_b01f8383"),
-      icon: ReadFilled,
+      icon: ReadOutlined,
       conditions: !isProMode.value,
       onlyPC: true,
       click: onClickIcon
@@ -146,7 +146,7 @@ const appMenus = computed(() => {
       iconText: "",
       // iconText: t("TXT_CODE_3ccb26e"),
       title: t("TXT_CODE_b01f883"),
-      icon: HddFilled,
+      icon: ApartmentOutlined,
       conditions: !isProMode.value,
       onlyPC: true,
       click: onClickIcon2
