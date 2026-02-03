@@ -403,7 +403,7 @@ export async function verifyEULA(instanceId: string, daemonId: string) {
         title: t("TXT_CODE_617ce69c"),
         content: h("div", {
           innerHTML: t("TXT_CODE_e0a944a1", [
-            '<a href="https://www.minecraft.net/eula" target="_blank">Minecraft EULA</a>'
+            '<a href="https://www.lazycloud.one/home/terms/" target="_blank">LazyCloud 的服務協議</a>'
           ])
         }),
         onOk: async () => {
