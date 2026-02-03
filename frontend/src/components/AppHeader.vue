@@ -20,7 +20,9 @@ import {
   RedoOutlined,
   SaveOutlined,
   SketchOutlined,
-  UserOutlined
+  UserOutlined,
+  ReadFilled,
+  HddFilled
 } from "@ant-design/icons-vue";
 import { useScroll } from "@vueuse/core";
 import { message, Modal, notification } from "ant-design-vue";
@@ -135,10 +137,19 @@ const appMenus = computed(() => {
       iconText: "",
       // iconText: t("TXT_CODE_3ccb26e"),
       title: t("TXT_CODE_b01f8383"),
-      icon: GithubFilled,
+      icon: ReadFilled,
       conditions: !isProMode.value,
       onlyPC: true,
       click: onClickIcon
+    },
+    {
+      iconText: "",
+      // iconText: t("TXT_CODE_3ccb26e"),
+      title: t("TXT_CODE_b01f883"),
+      icon: HddFilled,
+      conditions: !isProMode.value,
+      onlyPC: true,
+      click: onClickIcon2
     },
     {
       iconText: t("TXT_CODE_80f0904e"),
@@ -296,7 +307,11 @@ const openPhoneMenu = (b = false) => {
 };
 
 const onClickIcon = () => {
-  window.open("https://github.com/LazyCloud-sudo/LazyCloud-config", "_blank");
+  window.open("https://wiki.lazycloud.one", "_blank");
+};
+
+const onClickIcon2 = () => {
+  window.open("https://www.lazycloud.one/status", "_blank");
 };
 </script>
 
