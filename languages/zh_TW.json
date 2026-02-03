@@ -1734,7 +1734,7 @@
   "TXT_CODE_auth_router.disconnect": "會話 {{id}}({{address}}) 因長時間未驗證身分而中斷連線",
   "TXT_CODE_auth_router.illegalAccess": "未經允許的存取",
   "TXT_CODE_auth_router.notAccess": "會話 {{id}}({{address}}) 試圖無權限存取 {{event}} 現已封鎖.",
-  "TXT_CODE_b01f8383": "配置檔案",
+  "TXT_CODE_b01f8383": "知識庫",
   "TXT_CODE_b026be33": "雙重登入驗證 (TOTP) 時間漂移容忍度",
   "TXT_CODE_b029a155": "到期後實例將無法啟動",
   "TXT_CODE_b02f295d": "伺服器預設設定檔路徑",
