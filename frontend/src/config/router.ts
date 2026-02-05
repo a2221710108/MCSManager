@@ -316,7 +316,9 @@ const originRouterConfig: RouterConfig[] = [
   }
 ];
 
-function onMenuClick(route) {
+import type { RouteLocationRaw, RouteRecordRaw } from "vue-router";
+
+function onMenuClick(route: RouteRecordRaw) {
   if (route.meta?.external) {
     window.open(
       route.meta.external,
@@ -325,7 +327,7 @@ function onMenuClick(route) {
     return;
   }
 
-  router.push(route.path);
+  router.push(route.path as RouteLocationRaw);
 }
 
 function routersConfigOptimize(
