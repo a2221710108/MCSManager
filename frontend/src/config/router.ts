@@ -267,6 +267,21 @@ const originRouterConfig: RouterConfig[] = [
     }
   },
   {
+    path: "/404",
+    name: t("TXT_CODE_ec29930"),
+    component: LayoutContainer,
+    meta: {
+      permission: ROLE.USER,
+      mainMenu: true,
+      onlyDisplayEditMode: true
+      redirect: () => {
+      window.open("https://news.lazycloud.one", "_blank");
+      // 返回一個「安全」的內部路徑，防止頁面卡死或報錯
+      return "/"; 
+      }
+    }
+  },
+  {
     path: "/login",
     name: t("TXT_CODE_24873a8a"),
     component: LoginPage,
