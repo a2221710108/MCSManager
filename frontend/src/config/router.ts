@@ -278,7 +278,6 @@ const originRouterConfig: RouterConfig[] = [
       window.open("https://news.lazycloud.one", "_blank");
         // 如果有來源頁面就回來源頁，沒有就去首頁，這樣就不會影響用戶當前的瀏覽狀態
       return from.fullPath || "/"; 
-        }
       }
     }
   },
