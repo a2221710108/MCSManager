@@ -31,6 +31,8 @@ export interface RouterMetaInfo {
     mainMenu?: boolean;
     permission: number;
   }>;
+  external?: string;       // 外部網址
+  externalTarget?: "_blank" | "_self";
 }
 
 export interface RouterConfig {
@@ -274,11 +276,8 @@ const originRouterConfig: RouterConfig[] = [
       permission: ROLE.USER,
       mainMenu: true,
       onlyDisplayEditMode: true,
-      redirect: () => {
-      window.open("https://news.lazycloud.one", "_blank");
-      // 返回一個「安全」的內部路徑，防止頁面卡死或報錯
-      return "/"; 
-      }
+      external: "https://news.lazycloud.one",
+      externalTarget: "_blank"
     }
   },
   {
@@ -316,6 +315,18 @@ const originRouterConfig: RouterConfig[] = [
     }
   }
 ];
+
+function onMenuClick(route) {
+  if (route.meta?.external) {
+    window.open(
+      route.meta.external,
+      route.meta.externalTarget ?? "_blank"
+    );
+    return;
+  }
+
+  router.push(route.path);
+}
 
 function routersConfigOptimize(
   config: RouterConfig[],
