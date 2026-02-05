@@ -267,13 +267,13 @@ const originRouterConfig: RouterConfig[] = [
     }
   },
   {
-    path: "/404",
+    path: "/news",
     name: t("TXT_CODE_ec29930"),
     component: LayoutContainer,
     meta: {
       permission: ROLE.USER,
       mainMenu: true,
-      onlyDisplayEditMode: true
+      onlyDisplayEditMode: true,
       redirect: () => {
       window.open("https://news.lazycloud.one", "_blank");
       // 返回一個「安全」的內部路徑，防止頁面卡死或報錯
