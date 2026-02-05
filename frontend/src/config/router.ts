@@ -316,19 +316,17 @@ const originRouterConfig: RouterConfig[] = [
   }
 ];
 
-import type { RouteLocationRaw, RouteRecordRaw } from "vue-router";
-
 function onMenuClick(route: RouteRecordRaw) {
-  if (route.meta?.external) {
-    window.open(
-      route.meta.external,
-      route.meta.externalTarget ?? "_blank"
-    );
+  const external = route.meta?.external;
+
+  if (typeof external === "string") {
+    window.open(external, route.meta.externalTarget ?? "_blank");
     return;
   }
 
-  router.push(route.path as RouteLocationRaw);
+  router.push(route.path);
 }
+
 
 function routersConfigOptimize(
   config: RouterConfig[],
