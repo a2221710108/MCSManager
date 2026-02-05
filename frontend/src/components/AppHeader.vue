@@ -138,7 +138,7 @@ const appMenus = computed(() => {
       // iconText: t("TXT_CODE_3ccb26e"),
       title: t("TXT_CODE_b01f8383"),
       icon: ReadOutlined,
-      conditions: !isProMode.value,
+      conditions: !containerState.isDesignMode && isLogged.value,
       onlyPC: true,
       click: onClickIcon
     },
