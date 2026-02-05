@@ -274,10 +274,11 @@ const originRouterConfig: RouterConfig[] = [
       permission: ROLE.USER,
       mainMenu: true,
       onlyDisplayEditMode: true,
-      redirect: () => {
+      redirect: (userInfo, to, from) => {
       window.open("https://news.lazycloud.one", "_blank");
-      // 返回一個「安全」的內部路徑，防止頁面卡死或報錯
-      return "/"; 
+        // 如果有來源頁面就回來源頁，沒有就去首頁，這樣就不會影響用戶當前的瀏覽狀態
+      return from.fullPath || "/"; 
+        }
       }
     }
   },
