@@ -292,14 +292,13 @@ const originRouterConfig: RouterConfig[] = [
     }
   },
   {
-    path: "/_open_page",
+    path: "/ai",
     name: t("TXT_CODE_2cf59872"),
     component: LayoutContainer,
     meta: {
-      permission: ROLE.ADMIN, // open page without permission
+      permission: ROLE.USER, // open page without permission
       mainMenu: true,
-      onlyDisplayEditMode: true,
-      customClass: ["nav-button-warning"]
+      customClass: ["nav-button-success"]
     }
   },
   {
