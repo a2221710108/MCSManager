@@ -292,7 +292,7 @@ const originRouterConfig: RouterConfig[] = [
     }
   },
   {
-    path: "/ai",
+    path: "/_open_page",
     name: t("TXT_CODE_2cf59872"),
     component: LayoutContainer,
     meta: {
