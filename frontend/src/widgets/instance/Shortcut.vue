@@ -23,6 +23,7 @@ import {
   CheckCircleOutlined,
   CloseOutlined,
   CloudDownloadOutlined,
+  CloudUploadOutlined,
   CodeOutlined,
   DeleteOutlined,
   ExclamationCircleOutlined,
@@ -175,7 +176,7 @@ const instanceOperations = computed(() =>
     },
     {
       title: t("TXT_CODE_40ca4f2"),
-      icon: CloudDownloadOutlined,
+      icon: CloudUploadOutlined,
       click: async (event: MouseEvent) => {
         event.stopPropagation();
         execInstanceAction(event, "update");
