@@ -538,7 +538,7 @@
   "TXT_CODE_40a87804": "上載 HTML 檔案",
   "TXT_CODE_40c2c2ee": "備份之間的間隔（以分鐘為單位）。備份儲存在 tshock/backups 資料夾中",
   "TXT_CODE_40c4894a": "在代理程式上啟用TCP快速開啟支援。要求代理程式在Linux上執行。",
-  "TXT_CODE_40ca4f2": "更新",
+  "TXT_CODE_40ca4f2": "備份",
   "TXT_CODE_40ee4eaf": "產生平行度",
   "TXT_CODE_4126fc53": "是否在持有指南針時透過/指令顯示Bossbar",
   "TXT_CODE_413b9c01": "Node 環境版本",
