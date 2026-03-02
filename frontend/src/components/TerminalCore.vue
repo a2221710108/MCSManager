@@ -212,7 +212,7 @@ onMounted(async () => {
             </a>
             <span>|</span>
             <a
-              href="https://www.lazycloud.one/status/"
+              href="https://news.lazycloud.one/"
               target="_blank"
               rel="noopener noreferrer"
             >
