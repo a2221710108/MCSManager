@@ -3,10 +3,10 @@ import { t } from "@/lang/i18n";
 import { updateAnyInstanceConfig } from "@/services/apis/instance";
 import { reportErrorMsg } from "@/tools/validator";
 import type { InstanceDetail } from "@/types";
-import { CheckOutlined, WarningOutlined } from "@ant-design/icons-vue";
+import { CheckOutlined, FileTextOutlined } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 import _ from "lodash";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 
 const props = defineProps<{
   instanceInfo?: InstanceDetail;
@@ -16,20 +16,29 @@ const props = defineProps<{
 
 const emit = defineEmits(["update"]);
 
-// 定義 Java 版本與對應的啟動指令
+/**
+ * 定義 Java 配置映射
+ * script: 最終寫入數據庫的啟動指令
+ * jarFile: 提示用戶需要準備的啟動檔案名稱
+ */
 const JAVA_VERSIONS = [
-  { label: "Java 6", value: "6", script: "./start_6_mc.sh" },
-  { label: "Java 8", value: "8", script: "./start_8_mc.sh" },
-  { label: "Java 17", value: "17", script: "./start_17_mc.sh" },
-  { label: "Java 21", value: "21", script: "./start_21_mc.sh" },
-  { label: "Java 25", value: "25", script: "./start_25_mc.sh" }
+  { label: "Java 6", value: "6", script: "./start_6_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 8", value: "8", script: "./newstart_8_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 17", value: "17", script: "./newstart_17_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 21", value: "21", script: "./newstart_21_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 21 Forge/NeoForge", value: "21F", script: "./start_21_newforge.sh", jarFile: "run,sh" },
+  { label: "Java 25", value: "25", script: "./start_25_mc.sh", jarFile: "startmc.jar" }
 ];
 
 const open = ref(false);
 const selectedJava = ref<string>("17");
 const { execute, isLoading } = updateAnyInstanceConfig();
 
-// 初始化選擇狀態
+// 計算目前選中的版本完整信息
+const currentSelection = computed(() => {
+  return JAVA_VERSIONS.find((v) => v.value === selectedJava.value);
+});
+
 const initSelection = () => {
   const currentCmd = props.instanceInfo?.config?.startCommand || "";
   const found = JAVA_VERSIONS.find((v) => currentCmd.includes(v.script));
@@ -38,9 +47,8 @@ const initSelection = () => {
 
 const openDialog = () => {
   // 檢查伺服器狀態：假設 status 為 0 代表已停止
-  // 如果你的系統狀態定義不同，請修改此處的判斷邏輯
   if (props.instanceInfo && props.instanceInfo.status !== 0) {
-    return message.error(t("必須先關閉伺服器才能修改啟動指令！"));
+    return message.error(t("必須先關閉伺服器才能修改 Java 版本！"));
   }
   initSelection();
   open.value = true;
@@ -48,17 +56,11 @@ const openDialog = () => {
 
 const submit = async () => {
   try {
-    const targetVersion = JAVA_VERSIONS.find((v) => v.value === selectedJava.value);
-    if (!targetVersion) return;
+    if (!currentSelection.value || !props.instanceInfo?.config) return;
 
-    if (!props.instanceInfo?.config) {
-      throw new Error("Instance configuration is missing.");
-    }
-
-    // 解決 TS2345: 必須傳遞完整的 IGlobalInstanceConfig 對象
-    // 我們克隆目前的完整配置，並僅修改 startCommand 欄位
+    // 克隆完整配置並修改 startCommand
     const postData = _.cloneDeep(props.instanceInfo.config);
-    postData.startCommand = targetVersion.script;
+    postData.startCommand = currentSelection.value.script;
 
     await execute({
       params: {
@@ -68,63 +70,56 @@ const submit = async () => {
       data: postData
     });
 
-    message.success(`${t("已成功切換至")} ${targetVersion.label}`);
+    message.success(`${t("已切換至")} ${currentSelection.value.label}`);
     emit("update");
     open.value = false;
   } catch (error: any) {
-    console.error(error);
-    return reportErrorMsg(error.message || t("修改失敗"));
+    return reportErrorMsg(error.message || t("切換失敗"));
   }
 };
 
-defineExpose({
-  openDialog
-});
+defineExpose({ openDialog });
 </script>
 
 <template>
   <a-modal
     v-model:open="open"
     centered
-    :mask-closable="false"
     :title="t('切換 Java 執行版本')"
     :confirm-loading="isLoading"
-    :ok-text="t('確認修改')"
-    :cancel-text="t('取消')"
     @ok="submit"
   >
-    <div class="java-switch-container">
-      <a-alert type="warning" show-icon style="margin-bottom: 20px">
-        <template #message>
-          {{ t("操作須知") }}
-        </template>
-        <template #description>
-          {{ t("此操作將修改實例的啟動指令，請確保伺服器目錄下存在對應的 .sh 腳本檔案。") }}
-        </template>
-      </a-alert>
+    <div class="java-config-body">
+      <a-typography-paragraph type="secondary">
+        {{ t("請選擇合適的 Java 版本") }}
+      </a-typography-paragraph>
 
-      <div class="selection-area">
-        <a-typography-title :level="5">
-          {{ t("選擇 Java 版本") }}
-        </a-typography-title>
-        
-        <a-radio-group v-model:value="selectedJava" button-style="solid" class="full-width-group">
-          <a-radio-button 
-            v-for="item in JAVA_VERSIONS" 
-            :key="item.value" 
-            :value="item.value"
-            class="version-btn"
-          >
+      <a-radio-group v-model:value="selectedJava" button-style="solid" class="version-grid">
+        <a-radio-button 
+          v-for="item in JAVA_VERSIONS" 
+          :key="item.value" 
+          :value="item.value"
+          class="version-card"
+        >
+          <div class="btn-content">
             <check-outlined v-if="selectedJava === item.value" />
             {{ item.label }}
-          </a-radio-button>
-        </a-radio-group>
-      </div>
+          </div>
+        </a-radio-button>
+      </a-radio-group>
 
-      <div class="command-preview">
-        <div class="preview-label">{{ t("預計執行的啟動指令：") }}</div>
-        <div class="preview-content">
-          <code>{{ JAVA_VERSIONS.find(v => v.value === selectedJava)?.script }}</code>
+      <div v-if="currentSelection" class="info-card">
+        <div class="info-item">
+          <span class="info-label">{{ t("依賴啟動檔案：") }}</span>
+          <span class="info-value highlight">
+            <file-text-outlined /> {{ currentSelection.jarFile }}
+          </span>
+        </div>
+        
+        <a-divider style="margin: 12px 0" />
+        
+        <div class="notice">
+          <small>⚠️ {{ t("提示：切換後請確保伺服器根目錄下已放置上述啟動檔案。") }}</small>
         </div>
       </div>
     </div>
@@ -132,48 +127,65 @@ defineExpose({
 </template>
 
 <style scoped>
-.java-switch-container {
-  padding: 8px 0;
-}
-
-.full-width-group {
+.version-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   width: 100%;
+  margin-bottom: 20px;
 }
 
-.version-btn {
+.version-card {
+  height: 40px;
+  line-height: 38px;
   text-align: center;
   border-radius: 4px !important;
-  border-left-width: 1px !important;
+  border-left: 1px solid #d9d9d9 !important;
 }
 
-.version-btn :deep(span) {
+.btn-content {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
 }
 
-.command-preview {
-  margin-top: 24px;
-  padding: 16px;
-  background-color: #fafafa;
-  border: 1px dashed #d9d9d9;
+.info-card {
+  background: #f8f9fb;
   border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e1e4e8;
 }
 
-.preview-label {
-  font-size: 13px;
-  color: #8c8c8c;
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
 }
 
-.preview-content {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+.info-label {
+  color: #666;
+  font-size: 13px;
+}
+
+.info-value {
   font-weight: 600;
+  color: #2c3e50;
+}
+
+.info-value.highlight {
   color: #1890ff;
-  font-size: 15px;
+}
+
+.info-value.code {
+  background: #eee;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.notice {
+  color: #faad14;
 }
 </style>
