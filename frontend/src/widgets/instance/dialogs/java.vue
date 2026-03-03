@@ -3,8 +3,8 @@ import { ref } from "vue";
 import { t } from "@/lang/i18n";
 import { message } from "ant-design-vue";
 import { reportErrorMsg } from "@/tools/validator";
-// 更改導入：使用基礎的請求工具
-import { request } from "@/services/api";
+// 更改導入：使用現成的實例操作 API 檔案
+import { executeCommand } from "@/services/apis/instance";
 
 const props = defineProps<{
   instanceId?: string;
@@ -26,16 +26,16 @@ const submitJavaSwitch = async (command: string, label: string) => {
 
   try {
     isLoading.value = true;
-    // 使用基礎 request 調用 MCSManager 的指令執行接口
-    await request({
-      method: "POST",
-      url: "/api/protected_instance/command",
+    
+    // 使用 MCSManager 標準的 executeCommand 函數
+    // 它會將請求發送到 /api/protected_instance/command
+    await executeCommand().execute({
       params: { 
         uuid: props.instanceId, 
         remote_uuid: props.daemonId 
       },
       data: {
-        // 這裡對應後端 dispatcher.ts 中的 setPreset 名稱
+        // 這邊的參數名稱需對應後端對 Command 的解析邏輯
         commandName: "javaSwitch", 
         commandParams: {
           startCommand: command
@@ -103,10 +103,6 @@ defineExpose({ openDialog });
           切換至 Java 21
         </a-button>
       </div>
-
-      <p style="font-size: 12px; color: #888; text-align: center; margin-top: 8px;">
-        注意：請確保伺服器目錄下已有對應的 .sh 腳本。
-      </p>
     </div>
   </a-modal>
 </template>
