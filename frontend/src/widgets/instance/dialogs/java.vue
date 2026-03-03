@@ -1,172 +1,127 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { t } from "@/lang/i18n";
-import { updateInstanceConfig } from "@/services/apis/instance";
-import { reportErrorMsg } from "@/tools/validator";
-import type { InstanceDetail } from "@/types";
-import { CheckOutlined, FileTextOutlined, InfoCircleOutlined } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
-import { ref, computed } from "vue";
+import { executeInstanceCommand } from "@/services/apis/instance";
+import { reportErrorMsg } from "@/tools/validator";
 
+// 接收來自父組件的實例 ID 與 守護進程 ID
 const props = defineProps<{
-  instanceInfo?: InstanceDetail;
   instanceId?: string;
   daemonId?: string;
 }>();
 
 const emit = defineEmits(["update"]);
-
-// 定義 Java 配置映射
-const JAVA_VERSIONS = [
-  { label: "Java 6", value: "6", script: "/home/steam/start_6_mc.sh", jarFile: "startmc.jar" },
-  { label: "Java 8", value: "8", script: "/home/steam/newstart_8_mc.sh", jarFile: "startmc.jar" },
-  { label: "Java 17", value: "17", script: "/home/steam/newstart_17_mc.sh", jarFile: "startmc.jar" },
-  { label: "Java 21", value: "21", script: "/home/steam/newstart_21_mc.sh", jarFile: "startmc.jar" },
-  { label: "Forge/NeoForge", value: "21F", script: "/home/steam/start_21_newforge.sh", jarFile: "run.sh" },
-  { label: "Java 25", value: "25", script: "/home/steam/start_25_mc.sh", jarFile: "startmc.jar" }
-];
-
 const open = ref(false);
-const selectedJava = ref<string>("17");
-// 注意：這裡使用針對普通用戶優化的更新接口（如果存在）
-// 如果你的 service 只有 updateAnyInstanceConfig，請確保權限已開放
-const { execute, isLoading } = updateInstanceConfig();
 
-const currentSelection = computed(() => {
-  return JAVA_VERSIONS.find((v) => v.value === selectedJava.value);
-});
+// 使用 MCSManager 內置的 API Hook
+const { execute, isLoading } = executeInstanceCommand();
 
-const initSelection = () => {
-  const currentCmd = props.instanceInfo?.config?.startCommand || "";
-  const found = JAVA_VERSIONS.find((v) => currentCmd.includes(v.script));
-  selectedJava.value = found ? found.value : "17";
-};
-
+// 暴露給父組件（如 instance 詳情頁）調用的開啟方法
 const openDialog = () => {
-  // 根據後端代碼， status 0 是停止。運行中修改可能會觸發後端 Error
-  if (props.instanceInfo && props.instanceInfo.status !== 0) {
-    return message.warning(t("請先停止伺服器後再更換 Java 版本"));
-  }
-  initSelection();
   open.value = true;
 };
 
-const submit = async () => {
+/**
+ * 送出切換指令
+ * @param command 預設的啟動腳本路徑
+ * @param label 顯示給用戶看的版本名稱
+ */
+const submitJavaSwitch = async (command: string, label: string) => {
+  if (!props.instanceId || !props.daemonId) {
+    return message.error("無法獲取實例資訊，請重新整理頁面");
+  }
+
   try {
-    if (!currentSelection.value || !props.instanceInfo?.config) return;
-
-    // --- 重要：最小化發送數據，防止 403 Forbidden ---
-    // 根據後端 Instance.ts 的 parameters 方法，我們只更新必要的字段
-    const postData = {
-      nickname: props.instanceInfo.config.nickname,
-      startCommand: currentSelection.value.script,
-      // 絕對不要發送 docker, processType, type 等字段，否則普通用戶會報權限不足
-    };
-
     await execute({
-      params: {
-        uuid: props.instanceId ?? "",
-        daemonId: props.daemonId ?? ""
+      params: { 
+        uuid: props.instanceId, 
+        daemonId: props.daemonId 
       },
-      data: postData as any
+      data: {
+        // 這裡必須與後端 dispatcher.ts 中 setPreset 的第一個參數完全一致
+        name: "javaSwitch", 
+        params: {
+          startCommand: command
+        }
+      }
     });
-
-    message.success(`${t("已切換至")} ${currentSelection.value.label}`);
-    emit("update");
+    
+    message.success(`${t("指令已發送：")} 正在切換至 ${label}`);
     open.value = false;
+    
+    // 通知父組件更新界面（例如刷新實例日誌或狀態）
+    emit("update");
   } catch (error: any) {
-    console.error("Update failed:", error);
-    return reportErrorMsg(error.message || t("修改失敗：可能是權限不足或實例正在運行"));
+    // 報錯處理（例如伺服器未關閉時後端拋出的 Error）
+    reportErrorMsg(error);
   }
 };
 
+// 必須暴露此方法，否則父組件無法透過 ref 調用 openDialog
 defineExpose({ openDialog });
 </script>
 
 <template>
-  <a-modal
-    v-model:open="open"
-    centered
-    :title="t('切換 Java 版本')"
-    :confirm-loading="isLoading"
-    @ok="submit"
+  <a-modal 
+    v-model:open="open" 
+    :title="t('一鍵切換 Java 版本')" 
+    :footer="null"
+    :mask-closable="!isLoading"
+    :closable="!isLoading"
   >
-
-      <div class="version-selector">
-        <div class="label">{{ t("選擇 Java 版本") }}</div>
-        <a-radio-group v-model:value="selectedJava" button-style="solid" class="version-grid">
-          <a-radio-button 
-            v-for="item in JAVA_VERSIONS" 
-            :key="item.value" 
-            :value="item.value"
-            class="v-btn"
-          >
-            <check-outlined v-if="selectedJava === item.value" />
-            {{ item.label }}
-          </a-radio-button>
-        </a-radio-group>
+    <div style="display: flex; flex-direction: column; gap: 12px; padding: 10px 0;">
+      <a-alert 
+        :message="t('操作須知')" 
+        description="切換 Java 版本前，請務必先停止伺服器。此操作會修改實例的啟動指令。" 
+        type="warning" 
+        show-icon 
+      />
+      
+      <div class="java-button-group">
+        <a-button 
+          type="primary" 
+          ghost 
+          :loading="isLoading" 
+          block 
+          @click="submitJavaSwitch('./start_8_mc.sh', 'Java 8')"
+        >
+          切換至 Java 8 (適用 1.12.2 及以下)
+        </a-button>
+        
+        <a-button 
+          type="primary" 
+          ghost 
+          :loading="isLoading" 
+          block 
+          @click="submitJavaSwitch('./start_17_mc.sh', 'Java 17')"
+        >
+          切換至 Java 17 (適用 1.18.2+)
+        </a-button>
+        
+        <a-button 
+          type="primary" 
+          ghost 
+          :loading="isLoading" 
+          block 
+          @click="submitJavaSwitch('./start_21_mc.sh', 'Java 21')"
+        >
+          切換至 Java 21 (適用 1.20.5+)
+        </a-button>
       </div>
 
-      <div v-if="currentSelection" class="detail-panel">
-        <div class="detail-row">
-          <span class="d-label">{{ t("依賴檔案") }}</span>
-          <span class="d-value jar">
-            <file-text-outlined /> {{ currentSelection.jarFile }}
-          </span>
-        </div>
-        <div class="detail-row">
-          <span class="d-label">{{ t("啟動腳本") }}</span>
-          <code class="d-value cmd">{{ currentSelection.script }}</code>
-        </div>
-      </div>
-
-      <div class="warning-text">
-        {{ t("注意：切換後請確保伺服器目錄下已有對應的啟動檔案。") }}
-      </div>
-
+      <p style="font-size: 12px; color: #888; text-align: center; margin-top: 8px;">
+        提示：若切換後無法啟動，請檢查根目錄是否存在對應腳本。
+      </p>
+    </div>
   </a-modal>
 </template>
 
 <style scoped>
-.java-config-body { padding: 4px 0; }
-.alert-box {
-  background-color: #e6f7ff;
-  border: 1px solid #91d5ff;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 20px;
+.java-button-group {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #0050b3;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
 }
-.version-selector { margin-bottom: 20px; }
-.version-selector .label { margin-bottom: 12px; font-weight: bold; }
-.version-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  width: 100%;
-}
-.v-btn {
-  text-align: center;
-  border-radius: 4px !important;
-  border-left: 1px solid #d9d9d9 !important;
-}
-.detail-panel {
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  padding: 16px;
-}
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.detail-row:last-child { margin-bottom: 0; }
-.d-label { color: #8c8c8c; }
-.d-value { font-weight: 500; }
-.d-value.jar { color: #1890ff; }
-.d-value.cmd { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
-.warning-text { margin-top: 16px; color: #faad14; font-size: 12px; }
 </style>
