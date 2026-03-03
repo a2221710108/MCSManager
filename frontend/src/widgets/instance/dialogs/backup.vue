@@ -191,26 +191,46 @@ defineExpose({ openDialog });
     :width="isPhone ? '100%' : '800px'"
   >
     <div class="backup-container">
+      <div style="margin-bottom: 24px;">
+        <a-typography-paragraph>
+          <a-typography-text type="secondary">
+            {{ t("此處僅顯示處理伺服器內的本地備份。您的所有備份（上限 3 個）均已上載到 LazyCloud 位於新加坡的檔案伺服器。") }}
+          </a-typography-text>
+          <br />
+        </a-typography-paragraph>
+      </div>
+
       <div style="margin-bottom: 16px; text-align: right;">
         <a-button :loading="isLoading" @click="fetchBackupList">
           <template #icon><ReloadOutlined /></template>
           {{ t('重新整理') }}
         </a-button>
       </div>
+
       <a-list :loading="isLoading" bordered :data-source="backupFiles" class="backup-list">
         <template #renderItem="{ item }">
           <a-list-item>
             <a-list-item-meta>
               <template #title>{{ item.name }}</template>
-              <template #description>{{ (item.size / 1024 / 1024).toFixed(2) }} MB | {{ item.time }}</template>
+              <template #description>
+                {{ (item.size / 1024 / 1024).toFixed(2) }} MB | {{ item.time }}
+              </template>
               <template #avatar>
-                <a-avatar style="background-color: #1890ff"><template #icon><FileZipOutlined /></template></a-avatar>
+                <a-avatar style="background-color: #1890ff">
+                  <template #icon><FileZipOutlined /></template>
+                </a-avatar>
               </template>
             </a-list-item-meta>
             <template #actions>
               <a-space>
-                <a-button size="small" @click="handleDownload(item)"><template #icon><DownloadOutlined /></template>{{ t('下載') }}</a-button>
-                <a-button size="small" danger @click="handleRestore(item)"><template #icon><HistoryOutlined /></template>{{ t('還原') }}</a-button>
+                <a-button size="small" @click="handleDownload(item)">
+                  <template #icon><DownloadOutlined /></template>
+                  {{ t('下載') }}
+                </a-button>
+                <a-button size="small" danger @click="handleRestore(item)">
+                  <template #icon><HistoryOutlined /></template>
+                  {{ t('還原') }}
+                </a-button>
               </a-space>
             </template>
           </a-list-item>
