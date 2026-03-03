@@ -20,7 +20,8 @@ import {
   DashboardOutlined,
   FieldTimeOutlined,
   FolderOpenOutlined,
-  UsergroupDeleteOutlined
+  UsergroupDeleteOutlined,
+  HistoryOutlined
 } from "@ant-design/icons-vue";
 
 import { computed, ref, watch } from "vue";
@@ -35,7 +36,8 @@ import McPingSettings from "./dialogs/McPingSettings.vue";
 import PingConfig from "./dialogs/PingConfig.vue";
 import RconSettings from "./dialogs/RconSettings.vue";
 import TermConfig from "./dialogs/TermConfig.vue";
-
+import backup from "./dialogs/backup.vue";
+  
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
 const mcSettingsDialog = ref<InstanceType<typeof McPingSettings>>();
@@ -43,6 +45,7 @@ const eventConfigDialog = ref<InstanceType<typeof EventConfig>>();
 const pingConfigDialog = ref<InstanceType<typeof PingConfig>>();
 const instanceDetailsDialog = ref<InstanceType<typeof InstanceDetail>>();
 const instanceFundamentalDetailDialog = ref<InstanceType<typeof InstanceFundamentalDetail>>();
+const backupDialog = ref<InstanceType<typeof backup>>();
 
 const { toPage: toOtherPager } = useAppRouters();
 
@@ -122,6 +125,15 @@ const btns = computed(() => {
         mcSettingsDialog.value?.openDialog();
       },
       condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+    },
+    {
+      title: t("備份管理"), // 或者使用對應的 i18n key
+      icon: HistoryOutlined,
+      click: () => {
+        backupDialog.value?.openDialog();
+      },
+      // 權限控制：通常管理員或有文件管理權限的人可以看到
+      condition: () => state.settings.canFileManager || isAdmin.value
     },
     {
       title: t("TXT_CODE_656a85d8"),
@@ -272,6 +284,14 @@ watch(instanceInfo, (cfg, oldCfg) => {
     :daemon-id="daemonId"
     @update="refreshInstanceInfo"
   />
+
+  <backup
+    ref="backupDialog"
+    :instance-id="instanceId ?? ''"
+    :daemon-id="daemonId ?? ''"
+    @save="refreshInstanceInfo"
+  />
+  
 </template>
 
 <style lang="scss" scoped>
