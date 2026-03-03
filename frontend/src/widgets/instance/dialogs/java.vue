@@ -22,12 +22,12 @@ const emit = defineEmits(["update"]);
  * jarFile: 提示用戶需要準備的啟動檔案名稱
  */
 const JAVA_VERSIONS = [
-  { label: "Java 6", value: "6", script: "./start_6_mc.sh", jarFile: "startmc.jar" },
-  { label: "Java 8", value: "8", script: "./newstart_8_mc.sh", jarFile: "startmc.jar" },
-  { label: "Java 17", value: "17", script: "./newstart_17_mc.sh", jarFile: "startmc.jar" },
-  { label: "Java 21", value: "21", script: "./newstart_21_mc.sh", jarFile: "startmc.jar" },
-  { label: "Java 21 Forge/NeoForge", value: "21F", script: "./start_21_newforge.sh", jarFile: "run,sh" },
-  { label: "Java 25", value: "25", script: "./start_25_mc.sh", jarFile: "startmc.jar" }
+  { label: "Java 6", value: "6", script: "/home/steam/start_6_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 8", value: "8", script: "/home/steam/newstart_8_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 17", value: "17", script: "/home/steam/newstart_17_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 21", value: "21", script: "/home/steam/newstart_21_mc.sh", jarFile: "startmc.jar" },
+  { label: "Forge/NeoForge", value: "21F", script: "/home/steam/start_21_newforge.sh", jarFile: "run.sh" },
+  { label: "Java 25", value: "25", script: "/home/steam/start_25_mc.sh", jarFile: "startmc.jar" }
 ];
 
 const open = ref(false);
@@ -48,7 +48,7 @@ const initSelection = () => {
 const openDialog = () => {
   // 檢查伺服器狀態：假設 status 為 0 代表已停止
   if (props.instanceInfo && props.instanceInfo.status !== 0) {
-    return message.error(t("必須先關閉伺服器才能修改 Java 版本！"));
+    return message.error(t("必須先關閉伺服器才能切換 Java 版本！"));
   }
   initSelection();
   open.value = true;
