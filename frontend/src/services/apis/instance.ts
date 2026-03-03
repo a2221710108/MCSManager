@@ -470,3 +470,20 @@ export const reinstallInstance = useDefineApi<
   url: "/api/protected_instance/install_instance",
   method: "POST"
 });
+
+export const executeJavaSwitch = useDefineApi<
+  {
+    params: {
+      uuid: string;
+      daemonId: string;
+    };
+    data: {
+      command: string; // 對應後端需要的指令名
+      params: any;     // 對應後端需要的參數
+    };
+  },
+  boolean
+>({
+  url: "/api/protected_instance/command",
+  method: "POST"
+});
