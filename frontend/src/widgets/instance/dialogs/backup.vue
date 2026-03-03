@@ -3,18 +3,26 @@ import { ref } from "vue";
 import { t } from "@/lang/i18n";
 import { message, Modal } from "ant-design-vue";
 import { reportErrorMsg } from "@/tools/validator";
-import { fileList, fileDownload, fileDecompress, deleteFile } from "@/services/apis/fileManager"; 
+import { 
+  fileList as getFileListApi, 
+  deleteFile as deleteFileApi, 
+  downloadAddress,
+  compressFile as compressFileApi 
+} from "@/services/apis/fileManager";
 import { useScreen } from "@/hooks/useScreen";
-import { FileZipOutlined, ReloadOutlined, DownloadOutlined, HistoryOutlined } from "@ant-design/icons-vue";
+import { FileZipOutlined, ReloadOutlined, DownloadOutlined, HistoryOutlined, ExclamationCircleOutlined } from "@ant-design/icons-vue";
+import { createVNode } from "vue";
+import { parseForwardAddress } from "@/tools/protocol";
 
 const open = ref(false);
 const backupFiles = ref<any[]>([]);
 const backupDir = "LazyCloud_backup"; 
 
 const { isPhone } = useScreen();
-const { state: files, execute: fetchFiles, isLoading } = fileList();
-const { execute: decompress } = fileDecompress();
-const { execute: removeFiles } = deleteFile();
+const { state: files, execute: fetchFiles, isLoading } = getFileListApi();
+const { execute: executeDelete } = deleteFileApi();
+const { execute: getDownloadCfg } = downloadAddress();
+const { execute: executeCompress } = compressFileApi();
 
 const props = defineProps<{
   daemonId: string;
@@ -32,14 +40,13 @@ const fetchBackupList = async () => {
       params: {
         daemonId: props.daemonId,
         uuid: props.instanceId,
-        target: backupDir,
+        target: backupDir + "/",
         page: 0,
         page_size: 100,
         file_name: ""
       }
     });
-
-    const rawData = (files.value as any)?.items || files.value;
+    const rawData = files.value?.items;
     if (Array.isArray(rawData)) {
       backupFiles.value = rawData.filter((file: any) => 
         file.name.toLowerCase().endsWith(".tar.gz")
@@ -50,54 +57,84 @@ const fetchBackupList = async () => {
   }
 };
 
-// --- 功能實作 ---
-
-// 1. 下載功能
-const handleDownload = (file: any) => {
-  // 構建下載 URL，這通常需要 daemonId, uuid 和路徑
-  const path = `${backupDir}/${file.name}`;
-  const url = `/api/files/download?daemonId=${props.daemonId}&uuid=${props.instanceId}&path=${encodeURIComponent(path)}`;
-  window.open(url, "_blank");
-  message.success(t("開始下載..."));
+// --- 1. 下載功能 ---
+const handleDownload = async (file: any) => {
+  try {
+    const fullPath = backupDir + "/" + file.name;
+    const res = await getDownloadCfg({
+      params: {
+        file_name: fullPath,
+        daemonId: props.daemonId,
+        uuid: props.instanceId
+      }
+    });
+    
+    if (res.value) {
+      const link = `${parseForwardAddress(res.value.addr, "http")}/download/${res.value.password}/${file.name}`;
+      window.open(link);
+    }
+  } catch (err: any) {
+    reportErrorMsg(err.message);
+  }
 };
 
-// 2. 還原功能 (核心邏輯)
+// --- 2. 還原功能 ---
 const handleRestore = (file: any) => {
   Modal.confirm({
     title: t("確認還原備份？"),
-    content: t("警告：此操作將刪除伺服器根目錄下除了 LazyCloud_backup 資料夾以外的所有內容，並將備份檔案解壓。此動作不可逆！"),
+    icon: createVNode(ExclamationCircleOutlined),
+    content: createVNode("div", { style: "color:red;" }, t("警告：這將刪除根目錄下除 LazyCloud_backup 資料夾以外的所有東西，並還原此備份檔案！")),
     okText: t("確認還原"),
-    okType: "danger",
     cancelText: t("取消"),
+    okType: "danger",
     onOk: async () => {
+      const msgKey = "restore_task";
       try {
-        message.loading({ content: t("正在執行還原程序..."), key: "restore" });
-        
-        // 第一步：清空目錄 (除了備份資料夾)
-        // 這裡需要根據後端 API 傳遞目標，通常是刪除根目錄內容
-        // 注意：具體的「排除特定資料夾」刪除邏輯取決於後端 API 支援度
-        // 如果後端不支援排除，這裡建議只刪除特定的檔案或調用專門的還原 API
-        await removeFiles({
-          params: { daemonId: props.daemonId, uuid: props.instanceId },
-          data: {
-            targets: ["*"], // 這裡假設後端支援通配符或需傳入清單
-            exclude: [backupDir] 
+        message.loading({ content: t("正在清理伺服器環境..."), key: msgKey });
+
+        // 第一步：獲取根目錄文件列表
+        const rootRes = await fetchFiles({
+          params: {
+            daemonId: props.daemonId,
+            uuid: props.instanceId,
+            target: "/",
+            page: 0,
+            page_size: 200, // 盡量獲取全部
+            file_name: ""
           }
         });
 
-        // 第二步：解壓縮
-        await decompress({
-          params: { daemonId: props.daemonId, uuid: props.instanceId },
+        const targetsToDelete = rootRes.value?.items
+          ?.filter((item: any) => item.name !== backupDir)
+          .map((item: any) => "/" + item.name) || [];
+
+        // 第二步：刪除文件
+        if (targetsToDelete.length > 0) {
+          await executeDelete({
+            params: { daemonId: props.daemonId, uuid: props.instanceId },
+            data: { targets: targetsToDelete }
+          });
+        }
+
+        // 第三步：執行解壓縮 (還原)
+        message.loading({ content: t("正在解壓縮備份檔案..."), key: msgKey });
+        await executeCompress({
+          params: {
+            uuid: props.instanceId,
+            daemonId: props.daemonId
+          },
           data: {
-            target: `${backupDir}/${file.name}`,
-            dest: "." // 解壓到根目錄
+            type: 2, // 2 代表解壓縮
+            code: "utf-8",
+            source: "/" + backupDir + "/" + file.name,
+            targets: "/" // 解壓到根目錄
           }
         });
 
-        message.success({ content: t("還原成功！伺服器已恢復。"), key: "restore" });
+        message.success({ content: t("還原成功！伺服器已恢復。"), key: msgKey });
         open.value = false;
       } catch (err: any) {
-        message.error({ content: t("還原失敗：") + err.message, key: "restore" });
+        message.error({ content: t("還原過程中出錯: ") + err.message, key: msgKey });
       }
     }
   });
@@ -112,11 +149,11 @@ defineExpose({ openDialog });
     :title="t('LazyCloud 備份管理')"
     centered
     :footer="null" 
-    :width="isPhone ? '100%' : '900px'"
+    :width="isPhone ? '100%' : '800px'"
   >
     <div class="backup-container">
       <div style="margin-bottom: 16px; text-align: right;">
-        <a-button type="primary" :loading="isLoading" @click="fetchBackupList">
+        <a-button :loading="isLoading" @click="fetchBackupList">
           <template #icon><ReloadOutlined /></template>
           {{ t('重新整理') }}
         </a-button>
@@ -126,11 +163,9 @@ defineExpose({ openDialog });
         <template #renderItem="{ item }">
           <a-list-item>
             <a-list-item-meta>
-              <template #title>
-                <span class="file-name">{{ item.name }}</span>
-              </template>
+              <template #title>{{ item.name }}</template>
               <template #description>
-                <span>{{ (item.size / 1024 / 1024).toFixed(2) }} MB</span>
+                {{ (item.size / 1024 / 1024).toFixed(2) }} MB | {{ item.time }}
               </template>
               <template #avatar>
                 <a-avatar style="background-color: #1890ff">
@@ -138,7 +173,6 @@ defineExpose({ openDialog });
                 </a-avatar>
               </template>
             </a-list-item-meta>
-            
             <template #actions>
               <a-space>
                 <a-button size="small" @click="handleDownload(item)">
@@ -153,17 +187,11 @@ defineExpose({ openDialog });
             </template>
           </a-list-item>
         </template>
-        
-        <template v-if="!isLoading && backupFiles.length === 0" #loadMore>
-           <a-empty :description="t('找不到 .tar.gz 備份檔案')" style="margin-top: 20px" />
-        </template>
       </a-list>
     </div>
   </a-modal>
 </template>
 
 <style scoped>
-.backup-container { min-height: 300px; }
-.backup-list { max-height: 60vh; overflow-y: auto; }
-.file-name { font-weight: 500; word-break: break-all; }
+.backup-list { max-height: 500px; overflow-y: auto; }
 </style>
