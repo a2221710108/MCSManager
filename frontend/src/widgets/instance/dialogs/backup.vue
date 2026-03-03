@@ -9,6 +9,8 @@ import {
   downloadAddress,
   compressFile as compressFileApi 
 } from "@/services/apis/fileManager";
+// 引入實例詳情 API 用於檢查狀態
+import { instanceInfo } from "@/services/apis/instance";
 import { useScreen } from "@/hooks/useScreen";
 import { FileZipOutlined, ReloadOutlined, DownloadOutlined, HistoryOutlined, ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import { createVNode } from "vue";
@@ -23,6 +25,8 @@ const { state: files, execute: fetchFiles, isLoading } = getFileListApi();
 const { execute: executeDelete } = deleteFileApi();
 const { execute: getDownloadCfg } = downloadAddress();
 const { execute: executeCompress } = compressFileApi();
+// 實例信息 API
+const { execute: fetchInstanceInfo } = instanceInfo();
 
 const props = defineProps<{
   daemonId: string;
@@ -78,7 +82,7 @@ const handleDownload = async (file: any) => {
   }
 };
 
-// --- 2. 還原功能 (方案二：自動處理二次解壓) ---
+// --- 2. 還原功能 (增加狀態檢測) ---
 const handleRestore = (file: any) => {
   Modal.confirm({
     title: t("確認還原備份？"),
@@ -90,6 +94,24 @@ const handleRestore = (file: any) => {
     onOk: async () => {
       const msgKey = "restore_task";
       try {
+        // --- 核心修改：狀態檢測 ---
+        message.loading({ content: t("正在檢查伺服器狀態..."), key: msgKey });
+        const info = await fetchInstanceInfo({
+          params: { daemonId: props.daemonId, uuid: props.instanceId }
+        });
+
+        // 狀態碼說明：通常 0 是停止 (STOPPED)，其他均視為未關閉
+        // 注意：請根據您實際的 API 返回結構調整，這裡假設是 info.value.status
+        const status = info.value?.status;
+        if (status !== 0) {
+          return Modal.warning({
+            title: t("無法執行還原"),
+            content: t("伺服器目前正在運行中或處於異常狀態。為了數據安全，請先關閉伺服器後再嘗試還原操作。"),
+            okText: t("知道了")
+          });
+        }
+        // -----------------------
+
         message.loading({ content: t("正在清理伺服器環境..."), key: msgKey });
 
         // 第一步：獲取根目錄文件列表
@@ -104,7 +126,6 @@ const handleRestore = (file: any) => {
           }
         });
 
-        // 準備刪除名單 (排除備份目錄)
         const targetsToDelete = rootRes.value?.items
           ?.filter((item: any) => item.name !== backupDir)
           .map((item: any) => "/" + item.name) || [];
@@ -129,14 +150,11 @@ const handleRestore = (file: any) => {
           }
         });
 
-        // 第四步：自動處理二次拆包 (針對 .tar.gz 解壓後變 .tar 的情況)
+        // 第四步：自動處理二次拆包
         const tarFileName = file.name.replace(/\.gz$/i, "");
-        
         if (tarFileName.endsWith(".tar")) {
           message.loading({ content: t("正在執行第二階段拆包 (Tar)..."), key: msgKey });
-          
           try {
-            // 執行第二次解壓 (tar -> files)
             await executeCompress({
               params: { uuid: props.instanceId, daemonId: props.daemonId },
               data: {
@@ -146,14 +164,12 @@ const handleRestore = (file: any) => {
                 targets: "/"
               }
             });
-
-            // 第五步：清理中間產物 (.tar 檔案)
             await executeDelete({
               params: { daemonId: props.daemonId, uuid: props.instanceId },
               data: { targets: ["/" + tarFileName] }
             });
           } catch (tarErr) {
-            console.warn("二次解壓失敗或檔案不存在，跳過此步驟", tarErr);
+            console.warn("二次解壓失敗或檔案不存在", tarErr);
           }
         }
 
