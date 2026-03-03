@@ -471,19 +471,18 @@ export const reinstallInstance = useDefineApi<
   method: "POST"
 });
 
-export const executeJavaSwitch = useDefineApi<
-  {
-    params: {
-      uuid: string;
-      daemonId: string;
-    };
-    data: {
-      command: string; // 對應後端需要的指令名
-      params: any;     // 對應後端需要的參數
-    };
-  },
-  boolean
->({
-  url: "/api/protected_instance/command",
+
+// 在 instance.ts 末尾添加
+export const executeCustomCommand = useDefineApi<{
+  params: {
+    uuid: string;
+    daemonId: string;
+  };
+  data: {
+    command: string; // 這裡是關鍵，傳給後端的指令標籤
+    params: any;     // 傳給指令的參數
+  };
+}, any>({
+  url: "/api/protected_instance/command", // 注意：這是指令接口，不是更新配置接口
   method: "POST"
 });
