@@ -194,8 +194,11 @@ defineExpose({ openDialog });
       <div style="margin-bottom: 24px;">
         <a-typography-paragraph>
           <a-typography-text type="secondary">
-            {{ t("此處僅顯示處理伺服器內的本地備份。您的所有備份（上限 3 個）均已上載到 LazyCloud 位於新加坡的檔案伺服器。") }}
+            {{ t("此處僅展示伺服器內的本地備份。") }}
           </a-typography-text>
+          <a-typography-text2 type="secondary2">
+            {{ t("您的所有備份（上限 2 個）均已上載到 LazyCloud 位於新加坡的檔案伺服器。") }}
+          </a-typography-text2>
           <br />
         </a-typography-paragraph>
       </div>
