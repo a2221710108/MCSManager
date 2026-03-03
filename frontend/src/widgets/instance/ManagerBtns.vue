@@ -37,7 +37,6 @@ import PingConfig from "./dialogs/PingConfig.vue";
 import RconSettings from "./dialogs/RconSettings.vue";
 import TermConfig from "./dialogs/TermConfig.vue";
 import backup from "./dialogs/backup.vue";
-import java from "./dialogs/java.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -47,7 +46,6 @@ const pingConfigDialog = ref<InstanceType<typeof PingConfig>>();
 const instanceDetailsDialog = ref<InstanceType<typeof InstanceDetail>>();
 const instanceFundamentalDetailDialog = ref<InstanceType<typeof InstanceFundamentalDetail>>();
 const backupDialog = ref<InstanceType<typeof backup>>();
-const javaDialog = ref<InstanceType<typeof java>>();
 
 const { toPage: toOtherPager } = useAppRouters();
 
@@ -136,15 +134,6 @@ const btns = computed(() => {
       },
       // 權限控制：通常管理員或有文件管理權限的人可以看到
       condition: () => state.settings.canFileManager || isAdmin.value
-    },
-    {
-      title: t("切換 Java 版本"),
-      icon: BuildOutlined, // 或者選一個你喜歡的圖示
-      click: () => {
-        javaDialog.value?.openDialog();
-      },
-      // 條件：必須是 Minecraft Java 版實例才顯示
-      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
     },
     {
       title: t("TXT_CODE_656a85d8"),
