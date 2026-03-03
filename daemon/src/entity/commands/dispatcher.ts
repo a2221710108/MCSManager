@@ -17,6 +17,7 @@ import GeneralInstallCommand from "./general/general_install";
 import PingJavaMinecraftServerCommand from "./minecraft/mc_ping";
 import PingMinecraftServerTask from "./task/mc_players";
 import DockerStatsTask from "./task/docker_stats";
+import JavaSwitchCommand from "./general/java_switch";
 
 // If you add a new "Preset", Please add the definition here.
 export type IPresetCommand =
@@ -28,7 +29,8 @@ export type IPresetCommand =
   | "refreshPlayers"
   | "command"
   | "resize"
-  | "install";
+  | "install"
+  | "javaSwitch";
 
 // Instance function dispatcher
 // Dispatch and assign different functions according to different types
@@ -53,7 +55,8 @@ export default class FunctionDispatcher extends InstanceCommand {
     instance.setPreset("update", new GeneralUpdateCommand());
     instance.setPreset("refreshPlayers", new NullCommand());
     instance.setPreset("install", new GeneralInstallCommand());
-
+    instance.setPreset("javaSwitch", new JavaSwitchCommand());
+    
     // Preset the basic operation mode according to the instance startup type
     if (!instance.config.processType || instance.config.processType === "general") {
       instance.setPreset("start", new GeneralStartCommand());
