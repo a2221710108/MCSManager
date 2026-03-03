@@ -9,14 +9,14 @@ import {
   downloadAddress,
   compressFile as compressFileApi 
 } from "@/services/apis/fileManager";
-
-// 修正後的匯入名稱：getInstanceInfo
 import { getInstanceInfo } from "@/services/apis/instance";
-
 import { useScreen } from "@/hooks/useScreen";
 import { FileZipOutlined, ReloadOutlined, DownloadOutlined, HistoryOutlined, ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import { createVNode } from "vue";
 import { parseForwardAddress } from "@/tools/protocol";
+
+// 定義延遲函數
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const open = ref(false);
 const backupFiles = ref<any[]>([]);
@@ -27,8 +27,6 @@ const { state: files, execute: fetchFiles, isLoading } = getFileListApi();
 const { execute: executeDelete } = deleteFileApi();
 const { execute: getDownloadCfg } = downloadAddress();
 const { execute: executeCompress } = compressFileApi();
-
-// 使用修正後的 API Hook
 const { execute: fetchInstanceInfo } = getInstanceInfo();
 
 const props = defineProps<{
@@ -64,7 +62,6 @@ const fetchBackupList = async () => {
   }
 };
 
-// --- 1. 下載功能 ---
 const handleDownload = async (file: any) => {
   try {
     const fullPath = backupDir + "/" + file.name;
@@ -75,7 +72,6 @@ const handleDownload = async (file: any) => {
         uuid: props.instanceId
       }
     });
-    
     if (res.value) {
       const link = `${parseForwardAddress(res.value.addr, "http")}/download/${res.value.password}/${file.name}`;
       window.open(link);
@@ -85,12 +81,11 @@ const handleDownload = async (file: any) => {
   }
 };
 
-// --- 2. 還原功能 (含狀態檢測) ---
 const handleRestore = (file: any) => {
   Modal.confirm({
     title: t("確認還原備份？"),
     icon: createVNode(ExclamationCircleOutlined),
-    content: createVNode("div", { style: "color:red;" }, t("警告：這將刪除根目錄下除 LazyCloud_backup 資料夾以外的所有內容，並還原此備份！")),
+    content: createVNode("div", { style: "color:red;" }, t("警告：這將刪除伺服器根目錄所有檔案，並還原此備份！")),
     okText: t("確認還原"),
     cancelText: t("取消"),
     okType: "danger",
@@ -98,26 +93,19 @@ const handleRestore = (file: any) => {
       const msgKey = "restore_task";
       try {
         message.loading({ content: t("正在檢查伺服器狀態..."), key: msgKey });
-        
-        // 請求實例詳情
         const info = await fetchInstanceInfo({
           params: { daemonId: props.daemonId, uuid: props.instanceId }
         });
 
-        // 檢測狀態：0 通常代表停止 (Stopped)
-        // 注意：若您的項目 status 定義不同，請在此調整判斷邏輯
-        const status = info.value?.status;
-        if (status !== 0) {
+        if (info.value?.status !== 0) {
           return Modal.warning({
             title: t("無法還原"),
-            content: t("伺服器正在運行中。為了防止數據損壞，請先關閉伺服器後再執行還原。"),
+            content: t("請先關閉伺服器後再執行還原。"),
             okText: t("知道了")
           });
         }
 
         message.loading({ content: t("正在清理伺服器環境..."), key: msgKey });
-
-        // A. 獲取根目錄文件列表
         const rootRes = await fetchFiles({
           params: {
             daemonId: props.daemonId,
@@ -133,7 +121,6 @@ const handleRestore = (file: any) => {
           ?.filter((item: any) => item.name !== backupDir)
           .map((item: any) => "/" + item.name) || [];
 
-        // B. 執行刪除
         if (targetsToDelete.length > 0) {
           await executeDelete({
             params: { daemonId: props.daemonId, uuid: props.instanceId },
@@ -141,7 +128,7 @@ const handleRestore = (file: any) => {
           });
         }
 
-        // C. 第一階段解壓 (gz -> tar)
+        // --- 第一階段：解壓 Gzip ---
         message.loading({ content: t("正在執行第一階段解壓..."), key: msgKey });
         await executeCompress({
           params: { uuid: props.instanceId, daemonId: props.daemonId },
@@ -153,9 +140,12 @@ const handleRestore = (file: any) => {
           }
         });
 
-        // D. 自動處理二次拆包 (tar -> files)
+        // --- 核心改進：等待冷卻期 ---
         const tarFileName = file.name.replace(/\.gz$/i, "");
         if (tarFileName.endsWith(".tar")) {
+          message.loading({ content: t("請稍等..."), key: msgKey });
+          await sleep(3500); // 等待 3.5 秒，確保繞過 2 秒的限制
+
           message.loading({ content: t("正在執行第二階段拆包..."), key: msgKey });
           try {
             await executeCompress({
@@ -167,20 +157,23 @@ const handleRestore = (file: any) => {
                 targets: "/"
               }
             });
-            // 清理中間產物
+
+            // 再次等待 1 秒後刪除臨時檔，防止刪除操作也被冷卻攔截
+            await sleep(1000); 
             await executeDelete({
               params: { daemonId: props.daemonId, uuid: props.instanceId },
               data: { targets: ["/" + tarFileName] }
             });
-          } catch (tarErr) {
-            console.warn("二次解壓跳過或失敗", tarErr);
+          } catch (tarErr: any) {
+            console.error("二次解壓失敗:", tarErr);
+            message.error(t("二次解壓失敗: ") + (tarErr.response?.data || tarErr.message));
           }
         }
 
         message.success({ content: t("還原成功！"), key: msgKey });
         open.value = false;
       } catch (err: any) {
-        message.error({ content: t("還原失敗: ") + err.message, key: msgKey });
+        message.error({ content: t("還原失敗: ") + (err.response?.data || err.message), key: msgKey });
       }
     }
   });
@@ -204,31 +197,20 @@ defineExpose({ openDialog });
           {{ t('重新整理') }}
         </a-button>
       </div>
-
       <a-list :loading="isLoading" bordered :data-source="backupFiles" class="backup-list">
         <template #renderItem="{ item }">
           <a-list-item>
             <a-list-item-meta>
               <template #title>{{ item.name }}</template>
-              <template #description>
-                {{ (item.size / 1024 / 1024).toFixed(2) }} MB | {{ item.time }}
-              </template>
+              <template #description>{{ (item.size / 1024 / 1024).toFixed(2) }} MB | {{ item.time }}</template>
               <template #avatar>
-                <a-avatar style="background-color: #1890ff">
-                  <template #icon><FileZipOutlined /></template>
-                </a-avatar>
+                <a-avatar style="background-color: #1890ff"><template #icon><FileZipOutlined /></template></a-avatar>
               </template>
             </a-list-item-meta>
             <template #actions>
               <a-space>
-                <a-button size="small" @click="handleDownload(item)">
-                  <template #icon><DownloadOutlined /></template>
-                  {{ t('下載') }}
-                </a-button>
-                <a-button size="small" danger @click="handleRestore(item)">
-                  <template #icon><HistoryOutlined /></template>
-                  {{ t('還原') }}
-                </a-button>
+                <a-button size="small" @click="handleDownload(item)"><template #icon><DownloadOutlined /></template>{{ t('下載') }}</a-button>
+                <a-button size="small" danger @click="handleRestore(item)"><template #icon><HistoryOutlined /></template>{{ t('還原') }}</a-button>
               </a-space>
             </template>
           </a-list-item>
@@ -239,6 +221,5 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-.backup-container { min-height: 300px; }
 .backup-list { max-height: 500px; overflow-y: auto; }
 </style>
