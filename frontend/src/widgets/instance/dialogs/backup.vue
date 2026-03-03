@@ -78,7 +78,7 @@ const handleDownload = async (file: any) => {
   }
 };
 
-// --- 2. 還原功能 ---
+// --- 2. 還原功能 (方案二：自動處理二次解壓) ---
 const handleRestore = (file: any) => {
   Modal.confirm({
     title: t("確認還原備份？"),
@@ -99,16 +99,17 @@ const handleRestore = (file: any) => {
             uuid: props.instanceId,
             target: "/",
             page: 0,
-            page_size: 100, // 盡量獲取全部
+            page_size: 100,
             file_name: ""
           }
         });
 
+        // 準備刪除名單 (排除備份目錄)
         const targetsToDelete = rootRes.value?.items
           ?.filter((item: any) => item.name !== backupDir)
           .map((item: any) => "/" + item.name) || [];
 
-        // 第二步：刪除文件
+        // 第二步：刪除現有文件
         if (targetsToDelete.length > 0) {
           await executeDelete({
             params: { daemonId: props.daemonId, uuid: props.instanceId },
@@ -116,20 +117,45 @@ const handleRestore = (file: any) => {
           });
         }
 
-        // 第三步：執行解壓縮 (還原)
-        message.loading({ content: t("正在解壓縮備份檔案..."), key: msgKey });
+        // 第三步：執行第一階段解壓 (gz -> tar)
+        message.loading({ content: t("正在執行第一階段解壓 (Gzip)..."), key: msgKey });
         await executeCompress({
-          params: {
-            uuid: props.instanceId,
-            daemonId: props.daemonId
-          },
+          params: { uuid: props.instanceId, daemonId: props.daemonId },
           data: {
-            type: 2, // 2 代表解壓縮
+            type: 2,
             code: "utf-8",
             source: "/" + backupDir + "/" + file.name,
-            targets: "/" // 解壓到根目錄
+            targets: "/" 
           }
         });
+
+        // 第四步：自動處理二次拆包 (針對 .tar.gz 解壓後變 .tar 的情況)
+        const tarFileName = file.name.replace(/\.gz$/i, "");
+        
+        if (tarFileName.endsWith(".tar")) {
+          message.loading({ content: t("正在執行第二階段拆包 (Tar)..."), key: msgKey });
+          
+          try {
+            // 執行第二次解壓 (tar -> files)
+            await executeCompress({
+              params: { uuid: props.instanceId, daemonId: props.daemonId },
+              data: {
+                type: 2,
+                code: "utf-8",
+                source: "/" + tarFileName,
+                targets: "/"
+              }
+            });
+
+            // 第五步：清理中間產物 (.tar 檔案)
+            await executeDelete({
+              params: { daemonId: props.daemonId, uuid: props.instanceId },
+              data: { targets: ["/" + tarFileName] }
+            });
+          } catch (tarErr) {
+            console.warn("二次解壓失敗或檔案不存在，跳過此步驟", tarErr);
+          }
+        }
 
         message.success({ content: t("還原成功！伺服器已恢復。"), key: msgKey });
         open.value = false;
@@ -193,5 +219,6 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
+.backup-container { min-height: 300px; }
 .backup-list { max-height: 500px; overflow-y: auto; }
 </style>
