@@ -122,7 +122,7 @@ defineExpose({ openDialog });
       <div class="warning-text">
         {{ t("注意：切換後請確保伺服器目錄下已有對應的啟動檔案。") }}
       </div>
-    </div>
+
   </a-modal>
 </template>
 
