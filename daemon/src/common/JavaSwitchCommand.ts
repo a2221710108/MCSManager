@@ -1,7 +1,8 @@
-import { $t } from "../../../i18n";
-import Instance from "../../instance/instance";
-import InstanceCommand from "../base/command";
+import { $t } from "../i18n";
+import Instance from "../entity/instance/instance";
+import InstanceCommand from "../service/instance/command/base/command";
 
+export default class JavaSwitchCommand extends InstanceCommand {
 export default class JavaSwitchCommand extends InstanceCommand {
   constructor() {
     super("JavaSwitchCommand");
