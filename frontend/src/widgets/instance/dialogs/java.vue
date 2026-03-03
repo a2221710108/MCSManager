@@ -3,8 +3,8 @@ import { ref } from "vue";
 import { t } from "@/lang/i18n";
 import { message } from "ant-design-vue";
 import { reportErrorMsg } from "@/tools/validator";
-// 更改導入：使用現成的實例操作 API 檔案
-import { executeCommand } from "@/services/apis/instance";
+// 使用最底層的 axios 實例，這在 MCSManager 前端幾乎所有組件都有引用
+import axios from "axios";
 
 const props = defineProps<{
   instanceId?: string;
@@ -27,19 +27,17 @@ const submitJavaSwitch = async (command: string, label: string) => {
   try {
     isLoading.value = true;
     
-    // 使用 MCSManager 標準的 executeCommand 函數
-    // 它會將請求發送到 /api/protected_instance/command
-    await executeCommand().execute({
-      params: { 
-        uuid: props.instanceId, 
-        remote_uuid: props.daemonId 
-      },
-      data: {
-        // 這邊的參數名稱需對應後端對 Command 的解析邏輯
-        commandName: "javaSwitch", 
-        commandParams: {
-          startCommand: command
-        }
+    // 直接使用 axios 發送請求，跳過那些找不到的導出函數
+    // MCSManager 的 API 前綴通常是 /api
+    await axios.post("/api/protected_instance/command", {
+      commandName: "javaSwitch",
+      commandParams: {
+        startCommand: command
+      }
+    }, {
+      params: {
+        uuid: props.instanceId,
+        remote_uuid: props.daemonId
       }
     });
     
@@ -47,7 +45,9 @@ const submitJavaSwitch = async (command: string, label: string) => {
     open.value = false;
     emit("update");
   } catch (error: any) {
-    reportErrorMsg(error);
+    // 處理 axios 的報錯
+    const errorMsg = error.response?.data?.data || error.message;
+    reportErrorMsg(errorMsg);
   } finally {
     isLoading.value = false;
   }
@@ -67,51 +67,22 @@ defineExpose({ openDialog });
     <div style="display: flex; flex-direction: column; gap: 12px; padding: 10px 0;">
       <a-alert 
         :message="t('操作須知')" 
-        description="切換版本前請務必先停止伺服器。此操作將直接修改啟動指令。" 
+        description="切換版本前請務必先停止伺服器。" 
         type="warning" 
         show-icon 
       />
       
-      <div class="java-button-group">
-        <a-button 
-          type="primary" 
-          ghost 
-          :loading="isLoading" 
-          block 
-          @click="submitJavaSwitch('./start_8_mc.sh', 'Java 8')"
-        >
-          切換至 Java 8
+      <div class="java-button-group" style="display: flex; flex-direction: column; gap: 10px;">
+        <a-button type="primary" ghost :loading="isLoading" block @click="submitJavaSwitch('./start_8_mc.sh', 'Java 8')">
+          Java 8
         </a-button>
-        
-        <a-button 
-          type="primary" 
-          ghost 
-          :loading="isLoading" 
-          block 
-          @click="submitJavaSwitch('./start_17_mc.sh', 'Java 17')"
-        >
-          切換至 Java 17
+        <a-button type="primary" ghost :loading="isLoading" block @click="submitJavaSwitch('./start_17_mc.sh', 'Java 17')">
+          Java 17
         </a-button>
-        
-        <a-button 
-          type="primary" 
-          ghost 
-          :loading="isLoading" 
-          block 
-          @click="submitJavaSwitch('./start_21_mc.sh', 'Java 21')"
-        >
-          切換至 Java 21
+        <a-button type="primary" ghost :loading="isLoading" block @click="submitJavaSwitch('./start_21_mc.sh', 'Java 21')">
+          Java 21
         </a-button>
       </div>
     </div>
   </a-modal>
 </template>
-
-<style scoped>
-.java-button-group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 10px;
-}
-</style>
