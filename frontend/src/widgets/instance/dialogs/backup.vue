@@ -99,7 +99,7 @@ const handleRestore = (file: any) => {
             uuid: props.instanceId,
             target: "/",
             page: 0,
-            page_size: 200, // 盡量獲取全部
+            page_size: 100, // 盡量獲取全部
             file_name: ""
           }
         });
