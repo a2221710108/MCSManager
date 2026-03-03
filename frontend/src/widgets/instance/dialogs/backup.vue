@@ -9,8 +9,10 @@ import {
   downloadAddress,
   compressFile as compressFileApi 
 } from "@/services/apis/fileManager";
-// 引入實例詳情 API 用於檢查狀態
-import { instanceInfo } from "@/services/apis/instance";
+
+// 修正後的匯入名稱：getInstanceInfo
+import { getInstanceInfo } from "@/services/apis/instance";
+
 import { useScreen } from "@/hooks/useScreen";
 import { FileZipOutlined, ReloadOutlined, DownloadOutlined, HistoryOutlined, ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import { createVNode } from "vue";
@@ -25,8 +27,9 @@ const { state: files, execute: fetchFiles, isLoading } = getFileListApi();
 const { execute: executeDelete } = deleteFileApi();
 const { execute: getDownloadCfg } = downloadAddress();
 const { execute: executeCompress } = compressFileApi();
-// 實例信息 API
-const { execute: fetchInstanceInfo } = instanceInfo();
+
+// 使用修正後的 API Hook
+const { execute: fetchInstanceInfo } = getInstanceInfo();
 
 const props = defineProps<{
   daemonId: string;
@@ -82,39 +85,39 @@ const handleDownload = async (file: any) => {
   }
 };
 
-// --- 2. 還原功能 (增加狀態檢測) ---
+// --- 2. 還原功能 (含狀態檢測) ---
 const handleRestore = (file: any) => {
   Modal.confirm({
     title: t("確認還原備份？"),
     icon: createVNode(ExclamationCircleOutlined),
-    content: createVNode("div", { style: "color:red;" }, t("警告：這將刪除根目錄下除 LazyCloud_backup 資料夾以外的所有東西，並還原此備份檔案！")),
+    content: createVNode("div", { style: "color:red;" }, t("警告：這將刪除根目錄下除 LazyCloud_backup 資料夾以外的所有內容，並還原此備份！")),
     okText: t("確認還原"),
     cancelText: t("取消"),
     okType: "danger",
     onOk: async () => {
       const msgKey = "restore_task";
       try {
-        // --- 核心修改：狀態檢測 ---
         message.loading({ content: t("正在檢查伺服器狀態..."), key: msgKey });
+        
+        // 請求實例詳情
         const info = await fetchInstanceInfo({
           params: { daemonId: props.daemonId, uuid: props.instanceId }
         });
 
-        // 狀態碼說明：通常 0 是停止 (STOPPED)，其他均視為未關閉
-        // 注意：請根據您實際的 API 返回結構調整，這裡假設是 info.value.status
+        // 檢測狀態：0 通常代表停止 (Stopped)
+        // 注意：若您的項目 status 定義不同，請在此調整判斷邏輯
         const status = info.value?.status;
         if (status !== 0) {
           return Modal.warning({
-            title: t("無法執行還原"),
-            content: t("伺服器目前正在運行中或處於異常狀態。為了數據安全，請先關閉伺服器後再嘗試還原操作。"),
+            title: t("無法還原"),
+            content: t("伺服器正在運行中。為了防止數據損壞，請先關閉伺服器後再執行還原。"),
             okText: t("知道了")
           });
         }
-        // -----------------------
 
         message.loading({ content: t("正在清理伺服器環境..."), key: msgKey });
 
-        // 第一步：獲取根目錄文件列表
+        // A. 獲取根目錄文件列表
         const rootRes = await fetchFiles({
           params: {
             daemonId: props.daemonId,
@@ -130,7 +133,7 @@ const handleRestore = (file: any) => {
           ?.filter((item: any) => item.name !== backupDir)
           .map((item: any) => "/" + item.name) || [];
 
-        // 第二步：刪除現有文件
+        // B. 執行刪除
         if (targetsToDelete.length > 0) {
           await executeDelete({
             params: { daemonId: props.daemonId, uuid: props.instanceId },
@@ -138,8 +141,8 @@ const handleRestore = (file: any) => {
           });
         }
 
-        // 第三步：執行第一階段解壓 (gz -> tar)
-        message.loading({ content: t("正在執行第一階段解壓 (Gzip)..."), key: msgKey });
+        // C. 第一階段解壓 (gz -> tar)
+        message.loading({ content: t("正在執行第一階段解壓..."), key: msgKey });
         await executeCompress({
           params: { uuid: props.instanceId, daemonId: props.daemonId },
           data: {
@@ -150,10 +153,10 @@ const handleRestore = (file: any) => {
           }
         });
 
-        // 第四步：自動處理二次拆包
+        // D. 自動處理二次拆包 (tar -> files)
         const tarFileName = file.name.replace(/\.gz$/i, "");
         if (tarFileName.endsWith(".tar")) {
-          message.loading({ content: t("正在執行第二階段拆包 (Tar)..."), key: msgKey });
+          message.loading({ content: t("正在執行第二階段拆包..."), key: msgKey });
           try {
             await executeCompress({
               params: { uuid: props.instanceId, daemonId: props.daemonId },
@@ -164,19 +167,20 @@ const handleRestore = (file: any) => {
                 targets: "/"
               }
             });
+            // 清理中間產物
             await executeDelete({
               params: { daemonId: props.daemonId, uuid: props.instanceId },
               data: { targets: ["/" + tarFileName] }
             });
           } catch (tarErr) {
-            console.warn("二次解壓失敗或檔案不存在", tarErr);
+            console.warn("二次解壓跳過或失敗", tarErr);
           }
         }
 
-        message.success({ content: t("還原成功！伺服器已恢復。"), key: msgKey });
+        message.success({ content: t("還原成功！"), key: msgKey });
         open.value = false;
       } catch (err: any) {
-        message.error({ content: t("還原過程中出錯: ") + err.message, key: msgKey });
+        message.error({ content: t("還原失敗: ") + err.message, key: msgKey });
       }
     }
   });
