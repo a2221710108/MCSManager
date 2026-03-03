@@ -3,7 +3,6 @@ import { ref } from "vue";
 import { t } from "@/lang/i18n";
 import { message } from "ant-design-vue";
 import { reportErrorMsg } from "@/tools/validator";
-// 使用最底層的 axios 實例，這在 MCSManager 前端幾乎所有組件都有引用
 import axios from "axios";
 
 const props = defineProps<{
@@ -27,25 +26,33 @@ const submitJavaSwitch = async (command: string, label: string) => {
   try {
     isLoading.value = true;
     
-    // 直接使用 axios 發送請求，跳過那些找不到的導出函數
-    // MCSManager 的 API 前綴通常是 /api
-    await axios.post("/api/protected_instance/command", {
-      commandName: "javaSwitch",
-      commandParams: {
-        startCommand: command
+    /**
+     * 注意：MCSManager 的 API 校驗器要求 
+     * 1. URL 參數 (params) 必須包含 uuid 和 remote_uuid
+     * 2. Body 數據 (data) 必須包含 command 欄位
+     */
+    await axios.post("/api/protected_instance/command", 
+      {
+        // 這是後端 dispatcher.ts 中 setPreset 的標籤
+        command: "javaSwitch", 
+        // 這是傳給 JavaSwitchCommand 中 exec(instance, params) 的 params
+        params: {
+          startCommand: command
+        }
+      }, 
+      {
+        params: {
+          uuid: props.instanceId,
+          remote_uuid: props.daemonId
+        }
       }
-    }, {
-      params: {
-        uuid: props.instanceId,
-        remote_uuid: props.daemonId
-      }
-    });
+    );
     
-    message.success(`${t("指令已發送：")} 正在切換至 ${label}`);
+    message.success(`${t("指令已發送：")} ${label}`);
     open.value = false;
     emit("update");
   } catch (error: any) {
-    // 處理 axios 的報錯
+    // 優先顯示後端回傳的錯誤（例如：請先停止伺服器）
     const errorMsg = error.response?.data?.data || error.message;
     reportErrorMsg(errorMsg);
   } finally {
@@ -64,25 +71,70 @@ defineExpose({ openDialog });
     :mask-closable="!isLoading"
     :closable="!isLoading"
   >
-    <div style="display: flex; flex-direction: column; gap: 12px; padding: 10px 0;">
+    <div class="java-switch-container">
       <a-alert 
         :message="t('操作須知')" 
-        description="切換版本前請務必先停止伺服器。" 
+        description="切換版本前請務必停止伺服器。此操作將修改啟動指令並保存。" 
         type="warning" 
         show-icon 
+        style="margin-bottom: 16px;"
       />
       
-      <div class="java-button-group" style="display: flex; flex-direction: column; gap: 10px;">
-        <a-button type="primary" ghost :loading="isLoading" block @click="submitJavaSwitch('./start_8_mc.sh', 'Java 8')">
-          Java 8
+      <div class="button-list">
+        <a-button 
+          type="primary" 
+          block 
+          ghost
+          size="large"
+          :loading="isLoading" 
+          @click="submitJavaSwitch('./start_8_mc.sh', 'Java 8')"
+        >
+          切換至 Java 8 環境
         </a-button>
-        <a-button type="primary" ghost :loading="isLoading" block @click="submitJavaSwitch('./start_17_mc.sh', 'Java 17')">
-          Java 17
+        
+        <a-button 
+          type="primary" 
+          block 
+          ghost
+          size="large"
+          :loading="isLoading" 
+          @click="submitJavaSwitch('./start_17_mc.sh', 'Java 17')"
+        >
+          切換至 Java 17 環境
         </a-button>
-        <a-button type="primary" ghost :loading="isLoading" block @click="submitJavaSwitch('./start_21_mc.sh', 'Java 21')">
-          Java 21
+        
+        <a-button 
+          type="primary" 
+          block 
+          ghost
+          size="large"
+          :loading="isLoading" 
+          @click="submitJavaSwitch('./start_21_mc.sh', 'Java 21')"
+        >
+          切換至 Java 21 環境
         </a-button>
+      </div>
+
+      <div class="footer-tip">
+        {{ t('提示：切換後請檢查控制台日誌確認結果。') }}
       </div>
     </div>
   </a-modal>
 </template>
+
+<style scoped>
+.java-switch-container {
+  padding: 8px 0;
+}
+.button-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.footer-tip {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+</style>
