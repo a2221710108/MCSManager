@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { useAppRouters } from "@/hooks/useAppRouters";
 import { t } from "@/lang/i18n";
 import { updateAnyInstanceConfig } from "@/services/apis/instance";
 import { reportErrorMsg } from "@/tools/validator";
 import type { InstanceDetail } from "@/types";
-import { CheckOutlined } from "@ant-design/icons-vue";
+import { CheckOutlined, WarningOutlined } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
-import { computed, ref } from "vue";
+import _ from "lodash";
+import { ref } from "vue";
 
 const props = defineProps<{
   instanceInfo?: InstanceDetail;
@@ -16,13 +16,12 @@ const props = defineProps<{
 
 const emit = defineEmits(["update"]);
 
-// 定義 Java 版本與對應指令
+// 定義 Java 版本與對應的啟動指令
 const JAVA_VERSIONS = [
   { label: "Java 6", value: "6", script: "./start_6_mc.sh" },
-  { label: "Java 8", value: "8", script: "./newstart_8_mc.sh" },
-  { label: "Java 17", value: "17", script: "./newstart_17_mc.sh" },
-  { label: "Java 21", value: "21", script: "./newstart_21_mc.sh" },
-  { label: "Java 21 Forge/Neoforge", value: "21", script: "./newstart_21_newforge.sh" },
+  { label: "Java 8", value: "8", script: "./start_8_mc.sh" },
+  { label: "Java 17", value: "17", script: "./start_17_mc.sh" },
+  { label: "Java 21", value: "21", script: "./start_21_mc.sh" },
   { label: "Java 25", value: "25", script: "./start_25_mc.sh" }
 ];
 
@@ -30,18 +29,18 @@ const open = ref(false);
 const selectedJava = ref<string>("17");
 const { execute, isLoading } = updateAnyInstanceConfig();
 
-// 初始化，根據目前的 startCommand 匹配選擇的版本
+// 初始化選擇狀態
 const initSelection = () => {
   const currentCmd = props.instanceInfo?.config?.startCommand || "";
-  const found = JAVA_VERSIONS.find(v => currentCmd.includes(v.script));
+  const found = JAVA_VERSIONS.find((v) => currentCmd.includes(v.script));
   selectedJava.value = found ? found.value : "17";
 };
 
 const openDialog = () => {
-  // 檢查伺服器是否已關閉 (假設 0 為 Stopped)
-  // 注意：這裡的狀態碼請根據你實際的後端定義調整，通常 0 是停止，其他是執行中
-  if (props.instanceInfo?.status !== 0) {
-    return message.error("必須先關閉伺服器才能修改 Java 版本！");
+  // 檢查伺服器狀態：假設 status 為 0 代表已停止
+  // 如果你的系統狀態定義不同，請修改此處的判斷邏輯
+  if (props.instanceInfo && props.instanceInfo.status !== 0) {
+    return message.error(t("必須先關閉伺服器才能修改啟動指令！"));
   }
   initSelection();
   open.value = true;
@@ -49,111 +48,132 @@ const openDialog = () => {
 
 const submit = async () => {
   try {
-    const targetVersion = JAVA_VERSIONS.find(v => v.value === selectedJava.value);
+    const targetVersion = JAVA_VERSIONS.find((v) => v.value === selectedJava.value);
     if (!targetVersion) return;
+
+    if (!props.instanceInfo?.config) {
+      throw new Error("Instance configuration is missing.");
+    }
+
+    // 解決 TS2345: 必須傳遞完整的 IGlobalInstanceConfig 對象
+    // 我們克隆目前的完整配置，並僅修改 startCommand 欄位
+    const postData = _.cloneDeep(props.instanceInfo.config);
+    postData.startCommand = targetVersion.script;
 
     await execute({
       params: {
         uuid: props.instanceId ?? "",
         daemonId: props.daemonId ?? ""
       },
-      data: {
-        // 只更新啟動指令
-        startCommand: targetVersion.script
-      }
+      data: postData
     });
 
-    message.success(`成功切換至 ${targetVersion.label}`);
+    message.success(`${t("已成功切換至")} ${targetVersion.label}`);
     emit("update");
     open.value = false;
   } catch (error: any) {
-    return reportErrorMsg(error.message || "修改失敗");
+    console.error(error);
+    return reportErrorMsg(error.message || t("修改失敗"));
   }
 };
 
-defineExpose({ openDialog });
+defineExpose({
+  openDialog
+});
 </script>
 
 <template>
   <a-modal
     v-model:open="open"
     centered
+    :mask-closable="false"
     :title="t('切換 Java 執行版本')"
     :confirm-loading="isLoading"
+    :ok-text="t('確認修改')"
+    :cancel-text="t('取消')"
     @ok="submit"
   >
     <div class="java-switch-container">
-      <a-alert 
-        type="info" 
-        show-icon 
-        style="margin-bottom: 20px;"
-        message="切換版本將會更改伺服器的啟動指令腳本。"
-      />
+      <a-alert type="warning" show-icon style="margin-bottom: 20px">
+        <template #message>
+          {{ t("操作須知") }}
+        </template>
+        <template #description>
+          {{ t("此操作將修改實例的啟動指令，請確保伺服器目錄下存在對應的 .sh 腳本檔案。") }}
+        </template>
+      </a-alert>
 
-      <a-form layout="vertical">
-        <a-form-item label="選擇 Java 版本">
-          <a-radio-group v-model:value="selectedJava" button-style="solid" class="full-width-group">
-            <a-radio-button 
-              v-for="item in JAVA_VERSIONS" 
-              :key="item.value" 
-              :value="item.value"
-              class="java-radio-btn"
-            >
-              <template v-if="selectedJava === item.value">
-                <check-outlined />
-              </template>
-              {{ item.label }}
-            </a-radio-button>
-          </a-radio-group>
-        </a-form-item>
+      <div class="selection-area">
+        <a-typography-title :level="5">
+          {{ t("選擇 Java 版本") }}
+        </a-typography-title>
+        
+        <a-radio-group v-model:value="selectedJava" button-style="solid" class="full-width-group">
+          <a-radio-button 
+            v-for="item in JAVA_VERSIONS" 
+            :key="item.value" 
+            :value="item.value"
+            class="version-btn"
+          >
+            <check-outlined v-if="selectedJava === item.value" />
+            {{ item.label }}
+          </a-radio-button>
+        </a-radio-group>
+      </div>
 
-        <div class="preview-box">
-          <span class="label">預覽啟動指令：</span>
-          <code class="command-code">
-            {{ JAVA_VERSIONS.find(v => v.value === selectedJava)?.script }}
-          </code>
+      <div class="command-preview">
+        <div class="preview-label">{{ t("預計執行的啟動指令：") }}</div>
+        <div class="preview-content">
+          <code>{{ JAVA_VERSIONS.find(v => v.value === selectedJava)?.script }}</code>
         </div>
-      </a-form>
+      </div>
     </div>
   </a-modal>
 </template>
 
 <style scoped>
 .java-switch-container {
-  padding: 10px 0;
+  padding: 8px 0;
 }
 
 .full-width-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  width: 100%;
 }
 
-.java-radio-btn {
-  flex: 1;
+.version-btn {
   text-align: center;
-  min-width: 100px;
   border-radius: 4px !important;
+  border-left-width: 1px !important;
 }
 
-.preview-box {
+.version-btn :deep(span) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.command-preview {
   margin-top: 24px;
-  padding: 12px;
-  background-color: #f5f5f5;
-  border-radius: 6px;
-  border-left: 4px solid #1890ff;
+  padding: 16px;
+  background-color: #fafafa;
+  border: 1px dashed #d9d9d9;
+  border-radius: 8px;
 }
 
-.preview-box .label {
-  display: block;
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 4px;
+.preview-label {
+  font-size: 13px;
+  color: #8c8c8c;
+  margin-bottom: 8px;
 }
 
-.command-code {
-  font-family: monospace;
-  font-weight: bold;
-  color: #333;
+.preview-content {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-weight: 600;
+  color: #1890ff;
+  font-size: 15px;
 }
 </style>
