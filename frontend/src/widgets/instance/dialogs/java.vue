@@ -3,7 +3,7 @@ import { ref } from "vue";
 import type { OpenMarketDialogProps } from "@/components/fc";
 import { useDialog } from "@/hooks/useDialog";
 import { t } from "@/lang/i18n";
-import { reinstallInstance, getQuickStartTemplates } from "@/services/apis/instance"; 
+import { reinstallInstance } from "@/services/apis/instance"; 
 import { reportErrorMsg } from "@/tools/validator";
 import { Modal, message } from "ant-design-vue";
 
@@ -32,37 +32,34 @@ const handleConfirm = async () => {
   if (!props.instanceId || !props.daemonId) return;
 
   Modal.confirm({
-    title: t("確認安全切換 Java 版本"),
-    content: t("系統將利用現有模板路徑更新啟動指令，此操作不會刪除任何檔案。"),
+    title: t("確認切換 Java 版本"),
+    content: t("系統將透過模板安裝接口更新啟動指令（不影響檔案）。"),
     async onOk() {
       try {
-        // 第一步：獲取一個真實存在的模板標題
-        const templates = await getQuickStartTemplates().execute();
-        const realTemplate = templates[0]; // 隨便取一個合法的模板
-        
-        if (!realTemplate) throw new Error("無法獲取合法模板身份，請檢查網絡");
-
-        // 第二步：發送偽裝請求
-        await reinstallInstance().execute({
+        // 使用 as any 強制跳過前端類型的嚴格檢查
+        // 這樣可以把 setupInfo 成功發送到後端
+        await (reinstallInstance().execute as any)({
           params: {
             daemonId: props.daemonId || "",
             uuid: props.instanceId || ""
           },
           data: {
-            // 關鍵：使用真實存在的 title 通過面板校驗
-            title: realTemplate.title, 
-            // 關鍵：將 targetUrl 設為空，防止 Daemon 執行下載/刪除操作
+            // 使用你提供的合法模板標題
+            title: "Cobblemon Official Modpack", 
+            description: "Quick update via java-selector",
             targetUrl: "", 
-            // 關鍵：注入我們想要的啟動指令
-            startCommand: targetShell,
+            // 這裡是重點：Daemon 會讀取 setupInfo 裡的配置
             setupInfo: {
-              ...realTemplate.setupInfo,
-              startCommand: targetShell // 覆蓋為我們需要的 Java 腳本
+              type: "minecraft/java",
+              startCommand: targetShell,
+              stopCommand: "stop",
+              ie: "utf-8",
+              oe: "utf-8"
             }
           }
         });
         
-        message.success(t("Java 環境已更新！"));
+        message.success(t("Java 版本已切換，重啟實例後生效"));
         await submit(true);
       } catch (err: any) {
         return reportErrorMsg(err.message);
@@ -77,7 +74,7 @@ defineExpose({ openDialog: async () => await open() });
 <template>
   <a-modal v-model:open="isVisible" centered :title="t('Java 版本切換')" :footer="null" width="400px">
     <div class="java-selector">
-      <div class="desc">{{ t('透過安全通道更新啟動指令：') }}</div>
+      <div class="desc">{{ t('選擇欲切換的執行環境：') }}</div>
       <a-select v-model:value="selectedJavaVersion" style="width: 100%; margin: 15px 0;">
         <a-select-option v-for="opt in javaVersions" :key="opt.value" :value="opt.value">
           {{ opt.label }} ({{ opt.shell }})
@@ -85,7 +82,7 @@ defineExpose({ openDialog: async () => await open() });
       </a-select>
       <div class="btns">
         <a-button @click="cancel">{{ t('取消') }}</a-button>
-        <a-button type="primary" @click="handleConfirm">{{ t('立即應用') }}</a-button>
+        <a-button type="primary" @click="handleConfirm">{{ t('執行切換') }}</a-button>
       </div>
     </div>
   </a-modal>
@@ -93,7 +90,7 @@ defineExpose({ openDialog: async () => await open() });
 
 <style scoped>
 .java-selector { padding: 10px; }
-.desc { color: #888; font-size: 12px; }
+.desc { color: #888; font-size: 13px; }
 .btns { margin-top: 20px; text-align: right; }
 .btns button { margin-left: 8px; }
 </style>
