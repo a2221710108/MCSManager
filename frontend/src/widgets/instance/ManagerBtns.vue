@@ -144,7 +144,11 @@ const btns = computed(() => {
       click: () => {
         javaDialog.value?.openDialog();
       },
-      condition: () => isAdmin.value && instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA)
+      // 修正點：確保返回值絕對是 boolean (使用 !! 強制轉換)
+      condition: (): boolean => {
+        return !!(isAdmin.value && 
+               instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA));
+      }
     },
     {
       title: t("TXT_CODE_656a85d8"),
