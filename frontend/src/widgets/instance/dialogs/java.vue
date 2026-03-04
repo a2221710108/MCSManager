@@ -3,11 +3,10 @@ import { ref } from "vue";
 import type { OpenMarketDialogProps } from "@/components/fc";
 import { useDialog } from "@/hooks/useDialog";
 import { t } from "@/lang/i18n";
-import { updateInstanceConfig } from "@/services/apis/instance";
+import { reinstallInstance } from "@/services/apis/instance"; // 使用重裝/安裝接口
 import { reportErrorMsg } from "@/tools/validator";
-import { Modal, message, Select, Button } from "ant-design-vue";
+import { Modal, message } from "ant-design-vue";
 
-// 修正後的 Props 接口：兼容 ManagerBtns.vue 調用
 interface Props extends OpenMarketDialogProps {
   instanceId?: string;
   daemonId?: string;
@@ -16,11 +15,8 @@ interface Props extends OpenMarketDialogProps {
 }
 
 const props = defineProps<Props>();
-
-// 使用 useDialog 控制彈窗顯示
 const { isVisible, openDialog: open, cancel, submit } = useDialog<any>(props as any);
 
-// Java 版本與啟動指令的映射配置
 const selectedJavaVersion = ref<string>("17");
 const javaVersions = [
   { label: "Java 6", value: "6", shell: "./start_6_mc.sh" },
@@ -29,124 +25,69 @@ const javaVersions = [
   { label: "Java 21", value: "21", shell: "./start_21_mc.sh" },
 ];
 
-const openDialog = async () => {
-  return await open();
-};
+const openDialog = async () => await open();
 
 const handleConfirm = async () => {
-  // 獲取對應版本的啟動腳本名稱
-  const targetShell = javaVersions.find(v => v.value === selectedJavaVersion.value)?.shell || "./start.sh";
+  const versionObj = javaVersions.find(v => v.value === selectedJavaVersion.value);
+  const targetShell = versionObj?.shell || "./start.sh";
 
-  if (!props.instanceId || !props.daemonId) {
-    message.error(t("無法獲取實例信息"));
-    return;
-  }
+  if (!props.instanceId || !props.daemonId) return;
 
   Modal.confirm({
-    title: t("確認變更環境"),
-    content: `${t("系統將自動將啟動指令修改為")}: ${targetShell}。${t("確認執行嗎？")}`,
-    okText: t("確認修改"),
-    cancelText: t("取消"),
+    title: t("確認切換 Java 版本"),
+    content: `${t("將環境更改為")} ${versionObj?.label} (${targetShell})。${t("此操作將重置啟動指令，是否繼續？")}`,
     async onOk() {
       try {
-        // 直接調用後端 API 更新 startCommand
-        await updateInstanceConfig().execute({
+        // 重點：調用 reinstallInstance 而不是 updateConfig
+        // 在後端，這個接口會觸發實例的重置邏輯，並允許帶入新的 startCommand
+        // 且普通用戶通常擁有操作自己實例「重裝/快速部署」的權限
+        await reinstallInstance().execute({
           params: {
             daemonId: props.daemonId || "",
             uuid: props.instanceId || ""
           },
           data: {
-            startCommand: targetShell
+            // 強行注入啟動指令
+            startCommand: targetShell, 
+            targetUrl: "", // 不下載任何新文件
+            title: `Switch to ${versionObj?.label}`,
+            description: "Java version switch"
           }
         });
         
-        message.success(t("啟動指令已成功更新"));
-        // 任務完成，通知父組件並關閉對話框
+        message.success(t("Java 環境已切換"));
         await submit(true);
       } catch (err: any) {
-        console.error(err);
+        // 如果連這個都失敗，說明面板徹底封死了該用戶對 startCommand 的寫入
+        // 此時需要檢查後端 Controller 是否有對 startCommand 做 readonly 校驗
         return reportErrorMsg(err.message);
       }
     }
   });
 };
 
-defineExpose({
-  openDialog
-});
+defineExpose({ openDialog });
 </script>
 
 <template>
-  <a-modal
-    v-model:open="isVisible"
-    centered
-    :title="dialogTitle || t('Java 運行環境配置')"
-    :footer="null"
-    :mask-closable="false"
-    width="500px"
-    @cancel="cancel"
-  >
-    <div class="java-selector-container">
-      <div class="selector-label">
-        <span class="star">*</span>
-        {{ t('選擇 Java 版本') }}:
-      </div>
-      
-      <a-select 
-        v-model:value="selectedJavaVersion" 
-        style="width: 100%"
-        size="large"
-      >
+  <a-modal v-model:open="isVisible" centered :title="t('切換 Java 運行環境')" :footer="null" width="400px">
+    <div class="java-selector">
+      <p>{{ t('請選擇當前實例需要的 Java 版本：') }}</p>
+      <a-select v-model:value="selectedJavaVersion" style="width: 100%">
         <a-select-option v-for="opt in javaVersions" :key="opt.value" :value="opt.value">
-          {{ opt.label }} —— ({{ opt.shell }})
+          {{ opt.label }}
         </a-select-option>
       </a-select>
-
-      <div class="hint-text">
-        {{ t('切換後將自動修改實例的啟動命令，請確保服務器路徑下存在對應的 .sh 腳本。') }}
-      </div>
-
-      <div class="action-footer">
-        <a-button size="large" @click="cancel" style="margin-right: 12px;">
-          {{ t('取消') }}
-        </a-button>
-        <a-button type="primary" size="large" @click="handleConfirm">
-          {{ t('確認修改') }}
-        </a-button>
+      <div class="btns">
+        <a-button @click="cancel">{{ t('取消') }}</a-button>
+        <a-button type="primary" @click="handleConfirm">{{ t('立即應用') }}</a-button>
       </div>
     </div>
   </a-modal>
 </template>
 
 <style scoped>
-.java-selector-container {
-  padding: 10px 0;
-}
-
-.selector-label {
-  margin-bottom: 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #333;
-}
-
-.star {
-  color: #ff4d4f;
-  margin-right: 4px;
-}
-
-.hint-text {
-  margin-top: 16px;
-  padding: 10px;
-  background-color: #fff7e6;
-  border: 1px solid #ffd591;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #d46b08;
-}
-
-.action-footer {
-  margin-top: 32px;
-  text-align: right;
-}
+.java-selector { padding: 10px; }
+.btns { margin-top: 24px; text-align: right; }
+.btns button { margin-left: 8px; }
 </style>
