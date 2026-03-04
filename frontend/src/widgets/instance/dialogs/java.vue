@@ -22,11 +22,12 @@ const emit = defineEmits(["update"]);
  * jarFile: 提示用戶需要準備的啟動檔案名稱
  */
 const JAVA_VERSIONS = [
-  { label: "Java 6", value: "6", script: "./start_6_mc.sh", jarFile: "server_j6.jar" },
-  { label: "Java 8", value: "8", script: "./start_8_mc.sh", jarFile: "run.sh / server.jar" },
-  { label: "Java 17", value: "17", script: "./start_17_mc.sh", jarFile: "startmc.jar" },
-  { label: "Java 21", value: "21", script: "./start_21_mc.sh", jarFile: "startmc.jar" },
-  { label: "Java 25", value: "25", script: "./start_25_mc.sh", jarFile: "startmc.jar" }
+  { label: "Java 6", value: "6", script: "/home/steam/start_6_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 8", value: "8", script: "/home/steam/newstart_8_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 17", value: "17", script: "/home/steam/newstart_17_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 21", value: "21", script: "/home/steam/newstart_21_mc.sh", jarFile: "startmc.jar" },
+  { label: "Forge/NeoForge", value: "21F", script: "/home/steam/newstart_21_newforge.sh", jarFile: "run.sh" },
+  { label: "Java 25", value: "25", script: "/home/steam/start_25_mc.sh", jarFile: "startmc.jar" }
 ];
 
 const open = ref(false);
@@ -47,7 +48,7 @@ const initSelection = () => {
 const openDialog = () => {
   // 檢查伺服器狀態：假設 status 為 0 代表已停止
   if (props.instanceInfo && props.instanceInfo.status !== 0) {
-    return message.error(t("必須先關閉伺服器才能修改 Java 版本！"));
+    return message.error(t("必須先關閉伺服器才能切換 Java 版本！"));
   }
   initSelection();
   open.value = true;
@@ -73,7 +74,7 @@ const submit = async () => {
     emit("update");
     open.value = false;
   } catch (error: any) {
-    return reportErrorMsg(error.message || t("修改失敗"));
+    return reportErrorMsg(error.message || t("切換失敗"));
   }
 };
 
@@ -84,13 +85,13 @@ defineExpose({ openDialog });
   <a-modal
     v-model:open="open"
     centered
-    :title="t('切換 Java 執行版本')"
+    :title="t('切換 Java 版本')"
     :confirm-loading="isLoading"
     @ok="submit"
   >
     <div class="java-config-body">
       <a-typography-paragraph type="secondary">
-        {{ t("請選擇合適的 Java 版本，系統將自動切換啟動指令。") }}
+        {{ t("請選擇合適的 Java 版本。") }}
       </a-typography-paragraph>
 
       <a-radio-group v-model:value="selectedJava" button-style="solid" class="version-grid">
@@ -114,10 +115,7 @@ defineExpose({ openDialog });
             <file-text-outlined /> {{ currentSelection.jarFile }}
           </span>
         </div>
-        <div class="info-item">
-          <span class="info-label">{{ t("執行啟動指令：") }}</span>
-          <code class="info-value code">{{ currentSelection.script }}</code>
-        </div>
+
         
         <a-divider style="margin: 12px 0" />
         
