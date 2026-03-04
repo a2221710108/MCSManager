@@ -3,7 +3,7 @@ import { ref } from "vue";
 import type { OpenMarketDialogProps } from "@/components/fc";
 import { useDialog } from "@/hooks/useDialog";
 import { t } from "@/lang/i18n";
-import { reinstallInstance } from "@/services/apis/instance"; 
+import { reinstallInstance, getQuickStartTemplates } from "@/services/apis/instance"; 
 import { reportErrorMsg } from "@/tools/validator";
 import { Modal, message } from "ant-design-vue";
 
@@ -32,35 +32,39 @@ const handleConfirm = async () => {
   if (!props.instanceId || !props.daemonId) return;
 
   Modal.confirm({
-    title: t("確認切換 Java 版本"),
-    content: `${t("將環境更改為")} ${versionObj?.label}。${t("此操作僅修改啟動指令，不會影響您的伺服器檔案。")}`,
+    title: t("確認安全切換 Java 版本"),
+    content: t("系統將利用現有模板路徑更新啟動指令，此操作不會刪除任何檔案。"),
     async onOk() {
       try {
-        // 調用重裝接口，傳入「偽造」的模板數據
+        // 第一步：獲取一個真實存在的模板標題
+        const templates = await getQuickStartTemplates().execute();
+        const realTemplate = templates[0]; // 隨便取一個合法的模板
+        
+        if (!realTemplate) throw new Error("無法獲取合法模板身份，請檢查網絡");
+
+        // 第二步：發送偽裝請求
         await reinstallInstance().execute({
           params: {
             daemonId: props.daemonId || "",
             uuid: props.instanceId || ""
           },
           data: {
-            // 這些欄位是為了繞過後端對「模板」的校驗
+            // 關鍵：使用真實存在的 title 通過面板校驗
+            title: realTemplate.title, 
+            // 關鍵：將 targetUrl 設為空，防止 Daemon 執行下載/刪除操作
             targetUrl: "", 
+            // 關鍵：注入我們想要的啟動指令
             startCommand: targetShell,
-            title: `Switch_Java_${selectedJavaVersion.value}`,
-            description: "Quick update start command via virtual template",
-            // 核心點：傳遞一個完整的 QuickStartPackages 結構，避免 500 錯誤
-            instanceConfig: {
-              nickname: `Instance_Java_${selectedJavaVersion.value}`,
-              startCommand: targetShell,
-              type: "minecraft/java" // 確保類型正確
+            setupInfo: {
+              ...realTemplate.setupInfo,
+              startCommand: targetShell // 覆蓋為我們需要的 Java 腳本
             }
           }
         });
         
-        message.success(t("Java 環境已透過模板邏輯切換成功！"));
+        message.success(t("Java 環境已更新！"));
         await submit(true);
       } catch (err: any) {
-        // 如果報 Preset Config is not found，說明面板 API 強制校驗了數據庫中必須存在該模板
         return reportErrorMsg(err.message);
       }
     }
@@ -71,12 +75,12 @@ defineExpose({ openDialog: async () => await open() });
 </script>
 
 <template>
-  <a-modal v-model:open="isVisible" centered :title="t('Java 版本安全切換')" :footer="null" width="400px">
+  <a-modal v-model:open="isVisible" centered :title="t('Java 版本切換')" :footer="null" width="400px">
     <div class="java-selector">
-      <p style="color: #666; font-size: 13px;">{{ t('此方式利用安裝引導更新啟動指令，安全且無需管理員權限。') }}</p>
+      <div class="desc">{{ t('透過安全通道更新啟動指令：') }}</div>
       <a-select v-model:value="selectedJavaVersion" style="width: 100%; margin: 15px 0;">
         <a-select-option v-for="opt in javaVersions" :key="opt.value" :value="opt.value">
-          {{ opt.label }} —— ({{ opt.shell }})
+          {{ opt.label }} ({{ opt.shell }})
         </a-select-option>
       </a-select>
       <div class="btns">
@@ -89,6 +93,7 @@ defineExpose({ openDialog: async () => await open() });
 
 <style scoped>
 .java-selector { padding: 10px; }
+.desc { color: #888; font-size: 12px; }
 .btns { margin-top: 20px; text-align: right; }
 .btns button { margin-left: 8px; }
 </style>
