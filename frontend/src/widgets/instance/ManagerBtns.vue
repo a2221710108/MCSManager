@@ -144,10 +144,7 @@ const btns = computed(() => {
       click: () => {
         javaDialog.value?.openDialog();
       },
-      // 權限控制：通常管理員，且實例類型必須是 Minecraft Java 版才顯示
-      condition: () => 
-        isAdmin.value && 
-        (instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false)
+      condition: () => isAdmin.value && instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA)
     },
     {
       title: t("TXT_CODE_656a85d8"),
@@ -308,18 +305,10 @@ watch(instanceInfo, (cfg, oldCfg) => {
 
   <java
     ref="javaDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
-  />
-
-  <java
-    ref="javaDialog"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    :btn-text="t('確認切換')" 
-    :dialog-title="t('環境配置與版本切換')"
+    :instance-id="instanceId || ''"
+    :daemon-id="daemonId || ''"
+    :btn-text="t('確認')"
+    :dialog-title="t('Java 版本與模板選擇')"
     @update="refreshInstanceInfo"
   />
   
