@@ -140,14 +140,12 @@ const btns = computed(() => {
     },
     {
       title: t("切換 Java 版本"),
-      icon: CoffeeOutlined,
+      icon: BuildOutlined, // 或者選一個你喜歡的圖示
       click: () => {
-        javaDialog.value?.openDialog();
+        javaVersionConfigDialog.value?.openDialog();
       },
-      // 修正點：確保返回值絕對是 boolean (使用 !! 強制轉換)
-      condition: (): boolean => {
-        return !!(instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA));
-      }
+      // 條件：必須是 Minecraft Java 版實例才顯示
+      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
     },
     {
       title: t("TXT_CODE_656a85d8"),
@@ -306,12 +304,11 @@ watch(instanceInfo, (cfg, oldCfg) => {
     @save="refreshInstanceInfo"
   />
 
-  <java
-    ref="javaDialog"
-    :instance-id="instanceId || ''"
-    :daemon-id="daemonId || ''"
-    :btn-text="t('確認')"
-    :dialog-title="t('Java 版本與模板選擇')"
+  <JavaVersionConfig
+    ref="javaVersionConfigDialog"
+    :instance-info="instanceInfo"
+    :instance-id="instanceId"
+    :daemon-id="daemonId"
     @update="refreshInstanceInfo"
   />
   
