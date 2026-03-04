@@ -146,8 +146,7 @@ const btns = computed(() => {
       },
       // 修正點：確保返回值絕對是 boolean (使用 !! 強制轉換)
       condition: (): boolean => {
-        return !!(isAdmin.value && 
-               instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA));
+        return !!(instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA));
       }
     },
     {
