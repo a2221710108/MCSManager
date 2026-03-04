@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { useAppRouters } from "@/hooks/useAppRouters";
-import { useScreen } from "@/hooks/useScreen";
 import { t } from "@/lang/i18n";
 import { updateAnyInstanceConfig } from "@/services/apis/instance";
 import { reportErrorMsg } from "@/tools/validator";
 import type { InstanceDetail } from "@/types";
+import { CheckOutlined, FileTextOutlined } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
-import { computed, ref } from "vue";
+import _ from "lodash";
+import { ref, computed } from "vue";
 
 const props = defineProps<{
   instanceInfo?: InstanceDetail;
@@ -16,67 +16,64 @@ const props = defineProps<{
 
 const emit = defineEmits(["update"]);
 
+/**
+ * 定義 Java 配置映射
+ * script: 最終寫入數據庫的啟動指令
+ * jarFile: 提示用戶需要準備的啟動檔案名稱
+ */
+const JAVA_VERSIONS = [
+  { label: "Java 6", value: "6", script: "./start_6_mc.sh", jarFile: "server_j6.jar" },
+  { label: "Java 8", value: "8", script: "./start_8_mc.sh", jarFile: "run.sh / server.jar" },
+  { label: "Java 17", value: "17", script: "./start_17_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 21", value: "21", script: "./start_21_mc.sh", jarFile: "startmc.jar" },
+  { label: "Java 25", value: "25", script: "./start_25_mc.sh", jarFile: "startmc.jar" }
+];
+
 const open = ref(false);
-const selectedJavaVersion = ref<string>();
-const screen = useScreen();
-const isPhone = computed(() => screen.isPhone.value);
+const selectedJava = ref<string>("17");
 const { execute, isLoading } = updateAnyInstanceConfig();
 
-// Java 版本與啟動指令的映射表
-const JAVA_COMMAND_MAP: Record<string, string> = {
-  "6": "./start_6_mc.sh",
-  "8": "./start_8_mc.sh",
-  "17": "./start_17_mc.sh",
-  "21": "./start_21_mc.sh",
-  "25": "./start_25_mc.sh"
+// 計算目前選中的版本完整信息
+const currentSelection = computed(() => {
+  return JAVA_VERSIONS.find((v) => v.value === selectedJava.value);
+});
+
+const initSelection = () => {
+  const currentCmd = props.instanceInfo?.config?.startCommand || "";
+  const found = JAVA_VERSIONS.find((v) => currentCmd.includes(v.script));
+  selectedJava.value = found ? found.value : "17";
 };
 
 const openDialog = () => {
-  if (!props.instanceInfo) return;
+  // 檢查伺服器狀態：假設 status 為 0 代表已停止
+  if (props.instanceInfo && props.instanceInfo.status !== 0) {
+    return message.error(t("必須先關閉伺服器才能修改 Java 版本！"));
+  }
+  initSelection();
   open.value = true;
-  
-  // 根據目前的啟動指令反推選中的 Java 版本（初始化）
-  const currentCmd = props.instanceInfo.config.startCommand;
-  const version = Object.keys(JAVA_COMMAND_MAP).find(
-    (key) => JAVA_COMMAND_MAP[key] === currentCmd
-  );
-  selectedJavaVersion.value = version;
 };
 
 const submit = async () => {
   try {
-    if (!props.instanceInfo) return;
+    if (!currentSelection.value || !props.instanceInfo?.config) return;
 
-    // 1. 核心安全檢查：伺服器必須是關閉狀態 (假設 0 為已停止)
-    // 注意：具體狀態碼需根據您的後端定義調整，通常 MCSM 0 為停止
-    if (props.instanceInfo.status !== 0) {
-      return message.error("伺服器運行中，請先關閉伺服器後再切換 Java 版本！");
-    }
+    // 克隆完整配置並修改 startCommand
+    const postData = _.cloneDeep(props.instanceInfo.config);
+    postData.startCommand = currentSelection.value.script;
 
-    if (!selectedJavaVersion.value) {
-      return message.warning("請選擇一個 Java 版本");
-    }
-
-    const newCommand = JAVA_COMMAND_MAP[selectedJavaVersion.value];
-
-    // 2. 構建提交數據：只修改啟動指令
     await execute({
       params: {
         uuid: props.instanceId ?? "",
         daemonId: props.daemonId ?? ""
       },
-      data: {
-        ...props.instanceInfo.config,
-        startCommand: newCommand
-      }
+      data: postData
     });
 
-    message.success(`成功切換至 Java ${selectedJavaVersion.value}`);
+    message.success(`${t("已切換至")} ${currentSelection.value.label}`);
     emit("update");
     open.value = false;
   } catch (error: any) {
-    console.error(error);
-    return reportErrorMsg(error.message || "修改失敗");
+    return reportErrorMsg(error.message || t("修改失敗"));
   }
 };
 
@@ -87,56 +84,111 @@ defineExpose({ openDialog });
   <a-modal
     v-model:open="open"
     centered
-    :mask-closable="false"
-    :width="isPhone ? '95%' : '500px'"
-    title="快速切換 Java 版本"
+    :title="t('切換 Java 執行版本')"
     :confirm-loading="isLoading"
     @ok="submit"
   >
-    <div class="py-4">
-      <a-alert
-        v-if="instanceInfo?.status !== 0"
-        message="警告"
-        description="偵測到實例正在運行，請停機後操作。"
-        type="error"
-        show-icon
-        class="mb-4"
-      />
-      
-      <a-typography-paragraph>
-        <a-typography-text type="secondary">
-          選擇 Java 版本後，系統將自動將啟動指令更換為對應的腳本（如 ./start_x_mc.sh）。
-        </a-typography-text>
+    <div class="java-config-body">
+      <a-typography-paragraph type="secondary">
+        {{ t("請選擇合適的 Java 版本，系統將自動切換啟動指令。") }}
       </a-typography-paragraph>
 
-      <a-form layout="vertical">
-        <a-form-item label="選擇 Java 版本" required>
-          <a-select
-            v-model:value="selectedJavaVersion"
-            placeholder="請選擇版本"
-            size="large"
-            :disabled="instanceInfo?.status !== 0"
-          >
-            <a-select-option v-for="v in ['6', '8', '17', '21', '25']" :key="v" :value="v">
-              Java {{ v }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        
-        <div v-if="selectedJavaVersion" class="mt-2">
-          <a-typography-text type="secondary">
-            預計修改為指令：
-            <code class="bg-gray-100 px-2 py-1 rounded">{{ JAVA_COMMAND_MAP[selectedJavaVersion] }}</code>
-          </a-typography-text>
+      <a-radio-group v-model:value="selectedJava" button-style="solid" class="version-grid">
+        <a-radio-button 
+          v-for="item in JAVA_VERSIONS" 
+          :key="item.value" 
+          :value="item.value"
+          class="version-card"
+        >
+          <div class="btn-content">
+            <check-outlined v-if="selectedJava === item.value" />
+            {{ item.label }}
+          </div>
+        </a-radio-button>
+      </a-radio-group>
+
+      <div v-if="currentSelection" class="info-card">
+        <div class="info-item">
+          <span class="info-label">{{ t("依賴啟動檔案：") }}</span>
+          <span class="info-value highlight">
+            <file-text-outlined /> {{ currentSelection.jarFile }}
+          </span>
         </div>
-      </a-form>
+        <div class="info-item">
+          <span class="info-label">{{ t("執行啟動指令：") }}</span>
+          <code class="info-value code">{{ currentSelection.script }}</code>
+        </div>
+        
+        <a-divider style="margin: 12px 0" />
+        
+        <div class="notice">
+          <small>⚠️ {{ t("提示：切換後請確保伺服器根目錄下已放置上述啟動檔案。") }}</small>
+        </div>
+      </div>
     </div>
   </a-modal>
 </template>
 
 <style scoped>
-.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
-.mb-4 { margin-bottom: 1rem; }
-.mt-2 { margin-top: 0.5rem; }
-.bg-gray-100 { background-color: #f3f4f6; }
+.version-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.version-card {
+  height: 40px;
+  line-height: 38px;
+  text-align: center;
+  border-radius: 4px !important;
+  border-left: 1px solid #d9d9d9 !important;
+}
+
+.btn-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.info-card {
+  background: #f8f9fb;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e1e4e8;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.info-label {
+  color: #666;
+  font-size: 13px;
+}
+
+.info-value {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.info-value.highlight {
+  color: #1890ff;
+}
+
+.info-value.code {
+  background: #eee;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.notice {
+  color: #faad14;
+}
 </style>
