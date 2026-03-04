@@ -142,7 +142,7 @@ const btns = computed(() => {
       title: t("切換 Java 版本"),
       icon: BuildOutlined, // 或者選一個你喜歡的圖示
       click: () => {
-        javaVersionConfigDialog.value?.openDialog();
+        javaDialog.value?.openDialog();
       },
       // 條件：必須是 Minecraft Java 版實例才顯示
       condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
@@ -305,7 +305,7 @@ watch(instanceInfo, (cfg, oldCfg) => {
   />
 
   <JavaVersionConfig
-    ref="javaVersionConfigDialog"
+    ref="javaDialog"
     :instance-info="instanceInfo"
     :instance-id="instanceId"
     :daemon-id="daemonId"
