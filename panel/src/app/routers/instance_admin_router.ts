@@ -118,34 +118,71 @@ router.post(
 
 // [Top-level Permission]
 // Update instance information (manage users)
+// [Updated Permission]
+// Update instance information (Allow Users with restrictions)
 router.put(
   "/",
-  permission({ level: ROLE.ADMIN }),
+  permission({ level: ROLE.USER }), // 1. 降低准入門檻為普通用戶
   validator({ query: { daemonId: String, uuid: String } }),
   async (ctx) => {
     try {
       const daemonId = String(ctx.query.daemonId);
       const instanceUuid = String(ctx.query.uuid);
-      const config = ctx.request.body;
+      const userUuid = getUserUuid(ctx);
+      const user = userSystem.getInstance(userUuid); // 獲取當前用戶對象
+
+      // 2. 核心檢查：確保該用戶真的擁有或有權管理這個實例
+      if (!isHaveInstanceByUuid(userUuid, daemonId, instanceUuid)) {
+        throw new Error($t("TXT_CODE_permission.forbidden"));
+      }
+
+      let config = ctx.request.body;
+
+      // 3. 安全過濾：如果不是管理員，強制限制修改範圍
+      if (user && user.permission < ROLE.ADMIN) {
+        // 定義允許普通用戶修改的「白名單」
+        const allowedKeys = ["startCommand"]; 
+        const filteredConfig: any = {};
+        
+        // 只保留白名單內的欄位，其餘全部丟棄
+        allowedKeys.forEach(key => {
+          if (config[key] !== undefined) {
+            filteredConfig[key] = config[key];
+          }
+        });
+        
+        // 如果過濾後沒有任何有效欄位，直接報錯或返回
+        if (Object.keys(filteredConfig).length === 0) {
+          throw new Error($t("只有管理員可以修改實例高級配置"));
+        }
+        
+        config = filteredConfig;
+      }
+
+      // 4. 轉發請求給 Daemon
       const remoteService = RemoteServiceSubsystem.getInstance(daemonId);
       const result = await new RemoteRequest(remoteService).request("instance/update", {
         instanceUuid,
         config
       });
+
+      // 5. 記錄日誌
       operationLogger.log("instance_config_change", {
         daemon_id: daemonId,
         instance_id: instanceUuid,
         operator_ip: ctx.ip,
         operator_name: ctx.session?.["userName"],
-        instance_name: config.nickname
+        instance_name: config.nickname || "Instance"
       });
+
       ctx.body = result;
-    } catch (err) {
-      ctx.body = err;
+    } catch (err: any) {
+      // 統一錯誤處理
+      ctx.status = 500;
+      ctx.body = err instanceof Error ? err.message : err;
     }
   }
 );
-
 // [Top-level Permission]
 // delete instance
 router.delete(
