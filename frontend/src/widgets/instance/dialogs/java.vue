@@ -23,7 +23,7 @@ const openDialog = async () => {
 };
 
 const appPackages = ref<InstanceType<typeof AppPackages>>();
-const selectedJavaVersion = ref<string>(''); // 新增Java版本选择状态
+const selectedJavaVersion = ref<string>('');
 
 const handleSelectTemplate = async (item: QuickStartPackages | null) => {
   if (!item) {
@@ -34,6 +34,7 @@ const handleSelectTemplate = async (item: QuickStartPackages | null) => {
   const startCommand = `./start_${selectedJavaVersion.value}_mc.sh`;
 
   if (!props.autoInstall || !props.instanceId || !props.daemonId) {
+    // 使用扩展后的接口传递 startCommand
     await submit({ ...item, startCommand });
     return;
   } else {
@@ -49,10 +50,8 @@ const handleSelectTemplate = async (item: QuickStartPackages | null) => {
               uuid: props.instanceId || ""
             },
             data: {
-              targetUrl: item.targetLink,
-              title: item.title,
-              description: item.description,
-              startCommand // 传递启动命令
+              ...item,
+              startCommand // 直接传递 startCommand
             }
           });
           await submit({ ...item, startCommand });
