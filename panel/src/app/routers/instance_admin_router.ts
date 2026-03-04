@@ -118,20 +118,33 @@ router.post(
 
 // [Top-level Permission]
 // Update instance information (manage users)
+// [Low-level Permission] 
+// 修改為 USER 級別，但在內部檢查是否擁有該實例
 router.put(
   "/",
-  permission({ level: ROLE.ADMIN }),
+  permission({ level: ROLE.USER }), 
   validator({ query: { daemonId: String, uuid: String } }),
   async (ctx) => {
     try {
       const daemonId = String(ctx.query.daemonId);
       const instanceUuid = String(ctx.query.uuid);
+      const userUuid = getUserUuid(ctx);
+
+      // 核心安全性檢查：檢查該用戶是否有權操作此實例
+      // 如果不是管理員，且不擁有該實例，則拒絕
+      if (!isHaveInstanceByUuid(userUuid, daemonId, instanceUuid)) {
+         throw new Error($t("TXT_CODE_permission.forbidden"));
+      }
+
       const config = ctx.request.body;
       const remoteService = RemoteServiceSubsystem.getInstance(daemonId);
+      
+      // 執行更新
       const result = await new RemoteRequest(remoteService).request("instance/update", {
         instanceUuid,
         config
       });
+
       operationLogger.log("instance_config_change", {
         daemon_id: daemonId,
         instance_id: instanceUuid,
