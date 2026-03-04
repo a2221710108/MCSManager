@@ -28,14 +28,14 @@ const JAVA_VERSION_SCRIPTS: Record<string, string> = {
   "Java 11": "./start_11_mc.sh",
   "Java 17": "./start_17_mc.sh",
   "Java 21": "./start_21_mc.sh",
-  "Custom": "" // 用於手動輸入
+  "Custom": ""
 };
 
 interface FormDetail extends InstanceDetail {
   dayjsEndTime?: Dayjs;
   networkAliasesText: string;
   imageSelectMethod: "SELECT" | "EDIT";
-  selectedJavaVersion?: string;
+  selectedJavaVersion?: any; // 修正類型以兼容 SelectValue
 }
 
 const props = defineProps<{
@@ -72,7 +72,6 @@ const IMAGE_DEFINE = { NEW: "__MCSM_NEW_IMAGE__", EDIT: "__MCSM_EDIT_IMAGE__" };
 const initFormDetail = () => {
   if (props.instanceInfo) {
     const currentCmd = props.instanceInfo.config.startCommand;
-    // 反向尋找當前指令對應的 Java 版本
     const matchedVersion = Object.keys(JAVA_VERSION_SCRIPTS).find(
       (key) => JAVA_VERSION_SCRIPTS[key] === currentCmd
     );
@@ -87,10 +86,13 @@ const initFormDetail = () => {
   }
 };
 
-// 處理 Java 版本切換
-const handleJavaVersionChange = (version: string) => {
-  if (options.value && version !== "Custom") {
-    options.value.config.startCommand = JAVA_VERSION_SCRIPTS[version];
+// 修正：處理 Java 版本切換，增加類型保護
+const handleJavaVersionChange = (version: any) => {
+  if (typeof version === "string" && options.value && version !== "Custom") {
+    const script = JAVA_VERSION_SCRIPTS[version];
+    if (script) {
+      options.value.config.startCommand = script;
+    }
   }
 };
 
@@ -213,8 +215,11 @@ defineExpose({ openDialog });
           </a-col>
 
           <a-col :xs="24" :lg="12">
-            <a-form-item :label="t('Java 快速切換')">
-              <a-select v-model:value="options.selectedJavaVersion" @change="handleJavaVersionChange">
+            <a-form-item :label="t('Java 版本預設')">
+              <a-select 
+                v-model:value="options.selectedJavaVersion" 
+                @change="(val: any) => handleJavaVersionChange(val)"
+              >
                 <a-select-option v-for="(script, version) in JAVA_VERSION_SCRIPTS" :key="version" :value="version">
                   <thunderbolt-outlined /> {{ version }} {{ script ? `(${script})` : '' }}
                 </a-select-option>
@@ -230,7 +235,7 @@ defineExpose({ openDialog });
                 placeholder="./start_x_mc.sh"
               />
               <a-typography-text type="secondary">
-                提示：切換上方 Java 版本會自動更新此處腳本路徑。
+                注意：切換上方 Java 版本會自動修改此指令，您也可以手動微調。
               </a-typography-text>
             </a-form-item>
           </a-col>
@@ -266,6 +271,19 @@ defineExpose({ openDialog });
               </a-space>
             </a-col>
           </template>
+        </a-row>
+
+        <a-row v-if="activeKey === TabSettings.ResLimit" :gutter="20">
+            <a-col :xs="24" :lg="12">
+                <a-form-item :label="t('記憶體限制 (MB)')">
+                    <a-input v-model:value="options.config.docker.memory" placeholder="例如: 1024" />
+                </a-form-item>
+            </a-col>
+            <a-col :xs="24" :lg="12">
+                <a-form-item :label="t('CPU 使用權重')">
+                    <a-input v-model:value="options.config.docker.cpuUsage" placeholder="10 - 100" />
+                </a-form-item>
+            </a-col>
         </a-row>
       </a-form>
     </div>
