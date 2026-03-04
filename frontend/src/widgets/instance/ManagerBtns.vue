@@ -139,14 +139,14 @@ const btns = computed(() => {
       condition: () => state.settings.canFileManager || isAdmin.value
     },
     {
-      title: t("切換 Java 版本"),
-      icon: BuildOutlined, // 或者選一個你喜歡的圖示
-      click: () => {
-        javaDialog.value?.openDialog();
-      },
-      // 條件：必須是 Minecraft Java 版實例才顯示
-      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
-    },
+  title: t("切換 Java"),
+  icon: CoffeeOutlined,
+  click: () => {
+    javaDialog.value?.openDialog();
+  },
+  // 僅限 Minecraft Java 版顯示
+  condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+},
     {
       title: t("TXT_CODE_656a85d8"),
       icon: BuildOutlined,
@@ -304,7 +304,7 @@ watch(instanceInfo, (cfg, oldCfg) => {
     @save="refreshInstanceInfo"
   />
 
-  <JavaVersionConfig
+  <java
     ref="javaDialog"
     :instance-info="instanceInfo"
     :instance-id="instanceId"
