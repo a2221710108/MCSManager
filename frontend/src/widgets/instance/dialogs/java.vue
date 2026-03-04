@@ -26,7 +26,7 @@ const JAVA_VERSIONS = [
   { label: "Java 8", value: "8", script: "/home/steam/newstart_8_mc.sh", jarFile: "startmc.jar" },
   { label: "Java 17", value: "17", script: "/home/steam/newstart_17_mc.sh", jarFile: "startmc.jar" },
   { label: "Java 21", value: "21", script: "/home/steam/newstart_21_mc.sh", jarFile: "startmc.jar" },
-  { label: "Forge/NeoForge", value: "21F", script: "/home/steam/newstart_21_newforge.sh", jarFile: "run.sh" },
+  { label: "Forge/NeoForge", value: "21F", script: "/home/steam/start_21_newforge.sh", jarFile: "run.sh" },
   { label: "Java 25", value: "25", script: "/home/steam/start_25_mc.sh", jarFile: "startmc.jar" }
 ];
 
