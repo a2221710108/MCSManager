@@ -87,11 +87,12 @@ defineExpose({ openDialog });
     centered
     :title="t('切換 Java 版本')"
     :confirm-loading="isLoading"
+    :width="520" 
     @ok="submit"
   >
-    <div class="java-config-body">
-      <a-typography-paragraph type="secondary">
-        {{ t("請選擇合適的 Java 版本。") }}
+    <div class="java-config-container">
+      <a-typography-paragraph type="secondary" class="desc-text">
+        {{ t("請選擇合適的 Java 版本，系統將根據選擇調整啟動參數。") }}
       </a-typography-paragraph>
 
       <a-radio-group v-model:value="selectedJava" button-style="solid" class="version-grid">
@@ -99,94 +100,164 @@ defineExpose({ openDialog });
           v-for="item in JAVA_VERSIONS" 
           :key="item.value" 
           :value="item.value"
-          class="version-card"
+          class="version-card-item"
         >
           <div class="btn-content">
-            <check-outlined v-if="selectedJava === item.value" />
-            {{ item.label }}
+            <check-outlined v-if="selectedJava === item.value" class="check-icon" />
+            <span class="label-text">{{ item.label }}</span>
           </div>
         </a-radio-button>
       </a-radio-group>
 
-      <div v-if="currentSelection" class="info-card">
-        <div class="info-item">
-          <span class="info-label">{{ t("依賴啟動檔案：") }}</span>
-          <span class="info-value highlight">
-            <file-text-outlined /> {{ currentSelection.jarFile }}
-          </span>
+      <transition name="fade">
+        <div v-if="currentSelection" class="info-card">
+          <div class="info-row">
+            <span class="info-label">{{ t("依賴啟動檔案") }}</span>
+            <span class="info-value highlight">
+              <file-text-outlined />
+              <span class="file-name">{{ currentSelection.jarFile }}</span>
+            </span>
+          </div>
+          
+          <a-divider class="card-divider" />
+          
+          <div class="notice-box">
+            <exclamation-circle-outlined />
+            <span>{{ t("提示：切換後請確保伺服器根目錄下已放置上述檔案。") }}</span>
+          </div>
         </div>
-
-        
-        <a-divider style="margin: 12px 0" />
-        
-        <div class="notice">
-          <small>⚠️ {{ t("提示：切換後請確保伺服器根目錄下已放置上述啟動檔案。") }}</small>
-        </div>
-      </div>
+      </transition>
     </div>
   </a-modal>
 </template>
 
 <style scoped>
-.version-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  width: 100%;
-  margin-bottom: 20px;
+/* 容器內邊距微調 */
+.java-config-container {
+  padding: 8px 4px;
 }
 
-.version-card {
-  height: 40px;
-  line-height: 38px;
+.desc-text {
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+/* 核心 Grid 佈局優化 */
+.version-grid {
+  display: grid;
+  /* 默認電腦端 3 列 */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+/* Ant Design Radio Button 樣式重置，防止邊框重疊或缺失 */
+.version-card-item {
+  height: auto !important;
+  padding: 0 8px !important;
+  line-height: 40px !important;
   text-align: center;
-  border-radius: 4px !important;
-  border-left: 1px solid #d9d9d9 !important;
+  border-radius: 6px !important;
+  border-left: 1px solid #d9d9d9 !important; /* 強制顯示左邊框 */
+  transition: all 0.3s;
+}
+
+.version-card-item:before {
+  display: none !important; /* 隱藏 AntD 默認的分割線 */
 }
 
 .btn-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
+  width: 100%;
 }
 
+.label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 信息卡片優化 */
 .info-card {
-  background: #f8f9fb;
-  border-radius: 8px;
+  background: #f0f7ff; /* 稍微帶點品牌色調 */
+  border-radius: 10px;
   padding: 16px;
-  border: 1px solid #e1e4e8;
+  border: 1px solid #bae7ff;
 }
 
-.info-item {
+.info-row {
   display: flex;
+  flex-wrap: wrap; /* 內容過長時自動換行 */
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 8px;
 }
 
 .info-label {
-  color: #666;
+  color: #595959;
   font-size: 13px;
 }
 
 .info-value {
   font-weight: 600;
-  color: #2c3e50;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
 }
 
-.info-value.highlight {
-  color: #1890ff;
+.file-name {
+  word-break: break-all; /* 防止長檔名撐破佈局 */
 }
 
-.info-value.code {
-  background: #eee;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: monospace;
+.highlight {
+  color: #1677ff;
 }
 
-.notice {
-  color: #faad14;
+.card-divider {
+  margin: 12px 0;
+  border-color: #d6e4ff;
+}
+
+.notice-box {
+  display: flex;
+  gap: 8px;
+  color: #ed6c02;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* --- 移動端適配 --- */
+
+/* 針對平板或較小螢幕（< 576px） */
+@media (max-width: 576px) {
+  .version-grid {
+    grid-template-columns: repeat(2, 1fr); /* 切換為 2 列 */
+    gap: 10px;
+  }
+}
+
+/* 針對極小螢幕手機（< 380px） */
+@media (max-width: 380px) {
+  .version-grid {
+    grid-template-columns: 1fr; /* 切換為單列 */
+  }
+  
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* 動畫效果 */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
 }
 </style>
