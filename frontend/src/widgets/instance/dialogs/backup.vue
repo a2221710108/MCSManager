@@ -188,27 +188,24 @@ defineExpose({ openDialog });
     :title="t('LazyCloud 備份管理')"
     centered
     :footer="null" 
-    :width="isPhone ? '95%' : '800px'"
-    :body-style="{ padding: isPhone ? '12px' : '24px' }"
+    :width="isPhone ? '100%' : '800px'"
+    :body-style="isPhone ? { padding: '12px' } : {}"
   >
     <div class="backup-container">
       <div class="info-banner">
-        <a-typography-paragraph class="info-text">
-          <div class="info-item">
-            <info-circle-outlined class="info-icon" />
-            <span>{{ t("此處僅展示伺服器內的本地備份。") }}</span>
-          </div>
-          <div class="info-item secondary">
-            <cloud-server-outlined class="info-icon" />
-            <span>{{ t("備份（上限 2 個）已同步至新加坡 LazyCloud 節點。") }}</span>
-          </div>
-        </a-typography-paragraph>
+        <info-circle-outlined class="info-icon" />
+        <div class="info-content">
+          <p class="main-tip">{{ t("此處僅展示伺服器內的本地備份。") }}</p>
+          <p class="sub-tip">
+            {{ t("您的備份（上限 2 個）均已同步至新加坡檔案伺服器。") }}
+          </p>
+        </div>
       </div>
 
-      <div class="toolbar">
-        <a-button :loading="isLoading" type="primary" ghost @click="fetchBackupList" :block="isPhone">
+      <div class="action-bar">
+        <a-button :loading="isLoading" type="primary" ghost @click="fetchBackupList">
           <template #icon><ReloadOutlined /></template>
-          {{ t('重新整理列表') }}
+          {{ t('重新整理') }}
         </a-button>
       </div>
 
@@ -220,35 +217,34 @@ defineExpose({ openDialog });
         item-layout="horizontal"
       >
         <template #renderItem="{ item }">
-          <a-list-item class="responsive-list-item">
+          <a-list-item class="custom-list-item">
             <a-list-item-meta>
               <template #title>
-                <span class="file-name">{{ item.name }}</span>
+                <span class="file-name" :title="item.name">{{ item.name }}</span>
               </template>
               <template #description>
-                <div class="file-meta">
-                  <span class="meta-tag">{{ (item.size / 1024 / 1024).toFixed(2) }} MB</span>
-                  <a-divider type="vertical" />
-                  <span class="meta-time">{{ item.time }}</span>
-                </div>
+                <span class="file-meta">
+                  {{ (item.size / 1024 / 1024).toFixed(2) }} MB 
+                  <a-divider type="vertical" /> 
+                  {{ item.time }}
+                </span>
               </template>
               <template #avatar>
-                <a-avatar class="file-icon" :size="isPhone ? 'default' : 'large'">
+                <a-avatar class="file-icon-bg">
                   <template #icon><FileZipOutlined /></template>
                 </a-avatar>
               </template>
             </a-list-item-meta>
-
+            
             <template #actions>
-              <div class="action-buttons">
-                <a-button class="action-btn" size="middle" @click="handleDownload(item)">
+              <div class="item-actions">
+                <a-button size="small" class="action-btn" @click="handleDownload(item)">
                   <template #icon><DownloadOutlined /></template>
-                  <span v-if="!isPhone">{{ t('下載') }}</span>
+                  {{ t('下載') }}
                 </a-button>
-                <a-button class="action-btn" size="middle" danger @click="handleRestore(item)">
+                <a-button size="small" danger class="action-btn" @click="handleRestore(item)">
                   <template #icon><HistoryOutlined /></template>
-                  <span v-if="!isPhone">{{ t('還原') }}</span>
-                  <span v-else>{{ t('還原') }}</span> 
+                  {{ t('還原') }}
                 </a-button>
               </div>
             </template>
@@ -260,108 +256,98 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-.backup-container {
-  display: flex;
-  flex-direction: column;
-}
-
-/* 頂部橫幅優化 */
+/* 頂部提示橫幅 */
 .info-banner {
-  background: #f0f5ff;
-  border-left: 4px solid #1890ff;
+  background-color: #f0f7ff;
+  border-radius: 8px;
   padding: 12px 16px;
-  border-radius: 4px;
-  margin-bottom: 20px;
-}
-
-.info-text {
-  margin-bottom: 0 !important;
-}
-
-.info-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #262626;
-  font-size: 14px;
+  gap: 12px;
+  margin-bottom: 20px;
+  border: 1px solid #bae7ff;
 }
+.info-icon { color: #1890ff; margin-top: 4px; }
+.info-content p { margin: 0; line-height: 1.5; }
+.main-tip { font-weight: 500; color: #262626; }
+.sub-tip { font-size: 12px; color: #8c8c8c; }
 
-.info-item.secondary {
-  margin-top: 4px;
-  color: #8c8c8c;
-  font-size: 12px;
-}
-
-.info-icon {
-  color: #1890ff;
-}
-
-.toolbar {
+/* 操作欄 */
+.action-bar {
   margin-bottom: 16px;
   display: flex;
   justify-content: flex-end;
 }
 
-/* 列表區域 */
+/* 列表優化 */
 .backup-list {
-  max-height: 55vh; /* 使用螢幕高度百分比，避免手機上溢出 */
+  max-height: 500px;
   overflow-y: auto;
-  border-radius: 8px;
+  background: #fff;
 }
 
-.file-name {
-  word-break: break-all; /* 防止長檔名撐開 */
-  font-weight: 600;
-  color: #262626;
-}
-
-.file-meta {
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.file-icon {
-  background-color: #e6f7ff;
-  color: #1890ff;
-}
-
-/* 響應式佈局核心 */
-.responsive-list-item {
+.custom-list-item {
   transition: background 0.3s;
   padding: 12px 16px !important;
 }
 
-.action-buttons {
+.custom-list-item:hover {
+  background: #fafafa;
+}
+
+/* 檔名溢出處理 */
+.file-name {
+  display: block;
+  font-weight: 600;
+  color: #262626;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 350px; /* 電腦端限制 */
+}
+
+.file-meta {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.file-icon-bg {
+  background-color: #e6f7ff;
+  color: #1890ff;
+}
+
+/* 按鈕組佈局 */
+.item-actions {
   display: flex;
   gap: 8px;
 }
 
-/* 當寬度小於 576px (手機) 時的樣式調整 */
+/* --- 移動端適配 --- */
 @media (max-width: 576px) {
-  .responsive-list-item {
-    flex-direction: column; /* 讓 actions 換行 */
+  .info-banner { padding: 10px; }
+  
+  .custom-list-item {
+    flex-direction: column; /* 讓內容與按鈕上下排列 */
     align-items: flex-start !important;
   }
-
-  :deep(.ant-list-item-action) {
-    margin-inline-start: 0 !important;
-    margin-top: 12px;
-    width: 100%;
+  
+  .file-name {
+    max-width: 220px; /* 手機端更窄 */
   }
 
-  .action-buttons {
+  .ant-list-item-meta {
     width: 100%;
-    justify-content: flex-start;
+    margin-bottom: 12px;
   }
 
-  .action-btn {
-    flex: 1; /* 手機上按鈕平分寬度，更好點擊 */
-    justify-content: center;
+  .item-actions {
+    width: 100%;
+    justify-content: flex-end; /* 按鈕靠右 */
+    border-top: 1px solid #f0f0f0;
+    padding-top: 12px;
   }
   
-  .toolbar {
+  .action-btn {
+    flex: 1; /* 手機端按鈕平分寬度，更好點擊 */
     justify-content: center;
   }
 }
