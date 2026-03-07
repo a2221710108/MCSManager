@@ -145,26 +145,28 @@ defineExpose({ openDialog });
 /* 核心 Grid 佈局優化 */
 .version-grid {
   display: grid;
-  /* 默認電腦端 3 列 */
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   width: 100%;
   margin-bottom: 24px;
 }
 
-/* Ant Design Radio Button 樣式重置，防止邊框重疊或缺失 */
+/* Ant Design Radio Button 適配與重置 */
 .version-card-item {
   height: auto !important;
   padding: 0 8px !important;
   line-height: 40px !important;
   text-align: center;
   border-radius: 6px !important;
-  border-left: 1px solid #d9d9d9 !important; /* 強制顯示左邊框 */
+  /* 使用 AntD 的標準邊框色變數 */
+  border-inline-start: 1px solid var(--ant-color-border) !important; 
   transition: all 0.3s;
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
 }
 
 .version-card-item:before {
-  display: none !important; /* 隱藏 AntD 默認的分割線 */
+  display: none !important; 
 }
 
 .btn-content {
@@ -181,24 +183,26 @@ defineExpose({ openDialog });
   white-space: nowrap;
 }
 
-/* 信息卡片優化 */
+/* 信息卡片深色模式適配 */
 .info-card {
-  background: #f0f7ff; /* 稍微帶點品牌色調 */
+  /* 使用透明度背景，在深色/淺色模式下都能有良好的疊加效果 */
+  background: var(--ant-color-primary-bg); 
   border-radius: 10px;
   padding: 16px;
-  border: 1px solid #bae7ff;
+  border: 1px solid var(--ant-color-primary-border);
+  transition: background 0.3s, border 0.3s;
 }
 
 .info-row {
   display: flex;
-  flex-wrap: wrap; /* 內容過長時自動換行 */
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
 }
 
 .info-label {
-  color: #595959;
+  color: var(--ant-color-text-description);
   font-size: 13px;
 }
 
@@ -211,40 +215,39 @@ defineExpose({ openDialog });
 }
 
 .file-name {
-  word-break: break-all; /* 防止長檔名撐破佈局 */
+  word-break: break-all;
 }
 
 .highlight {
-  color: #1677ff;
+  color: var(--ant-color-primary);
 }
 
 .card-divider {
   margin: 12px 0;
-  border-color: #d6e4ff;
+  /* 使用 AntD 分割線變數 */
+  border-color: var(--ant-color-split);
 }
 
 .notice-box {
   display: flex;
   gap: 8px;
-  color: #ed6c02;
+  /* 使用警告色變數 */
+  color: var(--ant-color-warning-text);
   font-size: 12px;
   line-height: 1.5;
 }
 
 /* --- 移動端適配 --- */
-
-/* 針對平板或較小螢幕（< 576px） */
 @media (max-width: 576px) {
   .version-grid {
-    grid-template-columns: repeat(2, 1fr); /* 切換為 2 列 */
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
 }
 
-/* 針對極小螢幕手機（< 380px） */
 @media (max-width: 380px) {
   .version-grid {
-    grid-template-columns: 1fr; /* 切換為單列 */
+    grid-template-columns: 1fr;
   }
   
   .info-row {
