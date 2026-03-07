@@ -195,12 +195,12 @@ defineExpose({ openDialog });
       <a-alert type="info" show-icon class="info-banner">
         <template #message>
           <a-typography-text strong>
-            {{ t("此處僅展示伺服器內的本地備份。請關閉伺服器後進行備份，") }}
+            {{ t("請關閉伺服器後進行備份。") }}
           </a-typography-text>
         </template>
         <template #description>
           <a-typography-text type="secondary" size="small">
-            {{ t("您的備份（上限 2 個）均已同步至新加坡檔案伺服器。") }}
+            {{ t("此處僅展示伺服器內的本地備份，您的備份（上限 2 個）均已同步至位於新加坡的檔案伺服器。") }}
           </a-typography-text>
         </template>
       </a-alert>
