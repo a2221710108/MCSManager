@@ -195,7 +195,7 @@ defineExpose({ openDialog });
       <a-alert type="info" show-icon class="info-banner">
         <template #message>
           <a-typography-text strong>
-            {{ t("請關閉伺服器後進行備份。") }}
+            {{ t("請關閉伺服器後進行備份") }}
           </a-typography-text>
         </template>
         <template #description>
