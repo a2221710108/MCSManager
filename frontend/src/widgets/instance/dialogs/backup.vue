@@ -29,7 +29,7 @@ import { fileList as getFileListApi, touchFile as touchFileApi } from "@/service
 // 組件
 import BetweenMenus from "@/components/BetweenMenus.vue";
 import CardPanel from "@/components/CardPanel.vue";
-import FileEditor from "./dialogs/FileEditor.vue";
+import FileEditor from "@/widgets/instance/FileEditor.vue";
 
 const props = defineProps<{
   card: LayoutCard;
