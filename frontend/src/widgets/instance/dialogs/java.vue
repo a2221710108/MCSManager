@@ -141,7 +141,7 @@ defineExpose({ openDialog });
   font-size: 14px;
 }
 
-/* 核心 Grid 佈局優化 */
+/* 核心 Grid 佈局 */
 .version-grid {
   display: grid !important;
   grid-template-columns: repeat(3, 1fr);
@@ -150,7 +150,7 @@ defineExpose({ openDialog });
   margin-bottom: 24px;
 }
 
-/* --- 核心修復：按鈕基礎樣式 --- */
+/* --- 核心修復：按鈕基礎與選中設計 --- */
 .version-card-item {
   height: auto !important;
   padding: 0 8px !important;
@@ -158,37 +158,39 @@ defineExpose({ openDialog });
   text-align: center;
   border-radius: 6px !important;
   
-  /* 基礎邊框與過渡動畫 */
+  /* 基礎狀態：白色背景，灰色邊框 */
   border: 1px solid var(--ant-color-border) !important;
   margin-inline-start: 0 !important;
   background: var(--ant-color-bg-container);
   color: var(--ant-color-text);
   
-  /* 確保動畫啟動：針對邊框、背景、縮放進行過渡 */
-  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1) !important;
-  
+  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
 
-/* 移除 AntD 預設的按鈕間分割線 */
+/* 移除按鈕間的預設分割線 */
 .version-card-item:before {
   display: none !important; 
 }
 
-/* --- 重點：選中後的動畫與樣式 --- */
+/* --- 💡 重要：選中後的藍色背景設計 (參考 AntD 標準) --- */
 .version-card-item.ant-radio-button-wrapper-checked {
-  border-color: var(--ant-color-primary) !important;
+  /* 背景變為淺藍色 (Primary Background) */
   background: var(--ant-color-primary-bg) !important;
+  /* 邊框變為品牌藍 (Primary) */
+  border-color: var(--ant-color-primary) !important;
+  /* 文字變為品牌藍 */
   color: var(--ant-color-primary) !important;
-  /* 加上輕微的彈跳縮放效果，增強選中感 */
-  transform: scale(1.02);
-  box-shadow: 0 2px 8px var(--ant-color-primary-outline);
+  
+  /* 稍微加深陰影，增加立體感 */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  z-index: 2;
 }
 
-/* 滑鼠懸停效果 */
+/* 懸停狀態：邊框變色但保持背景 */
 .version-card-item:hover:not(.ant-radio-button-wrapper-checked) {
   border-color: var(--ant-color-primary-hover) !important;
   color: var(--ant-color-primary-hover) !important;
@@ -202,18 +204,14 @@ defineExpose({ openDialog });
   width: 100%;
 }
 
-.check-icon {
-  font-size: 12px;
-  /* 勾選圖標出現的動畫 */
-  animation: check-zoom 0.2s ease-out;
+.label-text {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@keyframes check-zoom {
-  from { transform: scale(0); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
-/* 信息卡片與其他部分保持不變... */
+/* --- 藍色信息卡片樣式 --- */
 .info-card {
   background: var(--ant-color-primary-bg); 
   border-radius: 10px;
@@ -225,13 +223,30 @@ defineExpose({ openDialog });
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
 }
 
+.info-label {
+  color: var(--ant-color-text-description);
+  font-size: 13px;
+}
+
+.highlight {
+  color: var(--ant-color-primary);
+  font-weight: 600;
+}
+
+/* --- 📱 移動端適配 (響應式) --- */
 @media (max-width: 576px) {
-  .version-grid { grid-template-columns: repeat(2, 1fr); }
+  .version-grid {
+    grid-template-columns: repeat(2, 1fr); /* 手機版 2 欄 */
+    gap: 10px;
+  }
 }
 
 @media (max-width: 380px) {
-  .version-grid { grid-template-columns: 1fr; }
+  .version-grid {
+    grid-template-columns: 1fr; /* 極窄手機 1 欄 */
+  }
 }
 </style>
