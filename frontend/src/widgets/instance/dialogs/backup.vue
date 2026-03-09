@@ -20,9 +20,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const open = ref(false);
 const backupFiles = ref<any[]>([]);
-
-// --- 修改處：更新為新的掛載路徑 ---
-const backupDir = "/backup/LazyCloud_backup"; 
+const backupDir = "LazyCloud_backup"; 
 
 const { isPhone } = useScreen();
 const { state: files, execute: fetchFiles, isLoading } = getFileListApi();
@@ -47,7 +45,7 @@ const fetchBackupList = async () => {
       params: {
         daemonId: props.daemonId,
         uuid: props.instanceId,
-        target: backupDir + "/", // 使用新的絕對路徑
+        target: backupDir + "/",
         page: 0,
         page_size: 100,
         file_name: ""
@@ -119,9 +117,8 @@ const handleRestore = (file: any) => {
           }
         });
 
-        // --- 修改處：排除 "/backup" 這個掛載點，避免刪除備份源檔案 ---
         const targetsToDelete = rootRes.value?.items
-          ?.filter((item: any) => item.name !== "backup") 
+          ?.filter((item: any) => item.name !== backupDir)
           .map((item: any) => "/" + item.name) || [];
 
         if (targetsToDelete.length > 0) {
@@ -138,7 +135,7 @@ const handleRestore = (file: any) => {
           data: {
             type: 2,
             code: "utf-8",
-            source: backupDir + "/" + file.name, // 已包含 /backup
+            source: "/" + backupDir + "/" + file.name,
             targets: "/" 
           }
         });
@@ -147,7 +144,7 @@ const handleRestore = (file: any) => {
         const tarFileName = file.name.replace(/\.gz$/i, "");
         if (tarFileName.endsWith(".tar")) {
           message.loading({ content: t("請稍等..."), key: msgKey });
-          await sleep(3500); 
+          await sleep(3500); // 等待 3.5 秒，確保繞過 2 秒的限制
 
           message.loading({ content: t("正在執行第二階段拆包..."), key: msgKey });
           try {
@@ -161,6 +158,7 @@ const handleRestore = (file: any) => {
               }
             });
 
+            // 再次等待 1 秒後刪除臨時檔，防止刪除操作也被冷卻攔截
             await sleep(1000); 
             await executeDelete({
               params: { daemonId: props.daemonId, uuid: props.instanceId },
