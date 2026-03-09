@@ -133,7 +133,7 @@ defineExpose({ openDialog });
 
 <style scoped>
 .java-config-container {
-  padding: 8px; /* 增加容器內邊距，防止邊緣切到 */
+  padding: 8px;
 }
 
 .desc-text {
@@ -143,14 +143,14 @@ defineExpose({ openDialog });
 
 /* 核心 Grid 佈局優化 */
 .version-grid {
-  display: grid !important; /* 強制覆蓋 Radio Group 的 inline 屬性 */
+  display: grid !important;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   width: 100%;
   margin-bottom: 24px;
 }
 
-/* --- 核心修復：重置 Ant Design Radio Button 樣式 --- */
+/* --- 核心修復：按鈕基礎樣式 --- */
 .version-card-item {
   height: auto !important;
   padding: 0 8px !important;
@@ -158,28 +158,40 @@ defineExpose({ openDialog });
   text-align: center;
   border-radius: 6px !important;
   
-  /* 徹底重置 AntD 預設的邊框合併行為 */
-  border: 1px solid var(--ant-color-border) !important; 
-  border-inline-start: 1px solid var(--ant-color-border) !important; 
-  margin-inline-start: 0 !important; /* 防止 AntD 向左位移 1px 的邏輯 */
-  
-  transition: all 0.3s;
+  /* 基礎邊框與過渡動畫 */
+  border: 1px solid var(--ant-color-border) !important;
+  margin-inline-start: 0 !important;
   background: var(--ant-color-bg-container);
   color: var(--ant-color-text);
+  
+  /* 確保動畫啟動：針對邊框、背景、縮放進行過渡 */
+  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1) !important;
+  
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
 }
 
-/* 隱藏 AntD 按鈕之間的分割線 */
+/* 移除 AntD 預設的按鈕間分割線 */
 .version-card-item:before {
   display: none !important; 
 }
 
-/* 選中狀態的邊框修正 */
+/* --- 重點：選中後的動畫與樣式 --- */
 .version-card-item.ant-radio-button-wrapper-checked {
   border-color: var(--ant-color-primary) !important;
   background: var(--ant-color-primary-bg) !important;
+  color: var(--ant-color-primary) !important;
+  /* 加上輕微的彈跳縮放效果，增強選中感 */
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px var(--ant-color-primary-outline);
+}
+
+/* 滑鼠懸停效果 */
+.version-card-item:hover:not(.ant-radio-button-wrapper-checked) {
+  border-color: var(--ant-color-primary-hover) !important;
+  color: var(--ant-color-primary-hover) !important;
 }
 
 .btn-content {
@@ -190,7 +202,18 @@ defineExpose({ openDialog });
   width: 100%;
 }
 
-/* 信息卡片適配 */
+.check-icon {
+  font-size: 12px;
+  /* 勾選圖標出現的動畫 */
+  animation: check-zoom 0.2s ease-out;
+}
+
+@keyframes check-zoom {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 信息卡片與其他部分保持不變... */
 .info-card {
   background: var(--ant-color-primary-bg); 
   border-radius: 10px;
@@ -200,23 +223,15 @@ defineExpose({ openDialog });
 
 .info-row {
   display: flex;
-  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
 }
 
-/* --- 移動端適配 --- */
 @media (max-width: 576px) {
-  .version-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
+  .version-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 380px) {
-  .version-grid {
-    grid-template-columns: 1fr;
-  }
+  .version-grid { grid-template-columns: 1fr; }
 }
 </style>
