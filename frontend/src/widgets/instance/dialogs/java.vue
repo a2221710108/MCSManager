@@ -132,9 +132,8 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 容器內邊距微調 */
 .java-config-container {
-  padding: 8px 4px;
+  padding: 8px; /* 增加容器內邊距，防止邊緣切到 */
 }
 
 .desc-text {
@@ -144,29 +143,43 @@ defineExpose({ openDialog });
 
 /* 核心 Grid 佈局優化 */
 .version-grid {
-  display: grid;
+  display: grid !important; /* 強制覆蓋 Radio Group 的 inline 屬性 */
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   width: 100%;
   margin-bottom: 24px;
 }
 
-/* Ant Design Radio Button 適配與重置 */
+/* --- 核心修復：重置 Ant Design Radio Button 樣式 --- */
 .version-card-item {
   height: auto !important;
   padding: 0 8px !important;
   line-height: 40px !important;
   text-align: center;
   border-radius: 6px !important;
-  /* 使用 AntD 的標準邊框色變數 */
+  
+  /* 徹底重置 AntD 預設的邊框合併行為 */
+  border: 1px solid var(--ant-color-border) !important; 
   border-inline-start: 1px solid var(--ant-color-border) !important; 
+  margin-inline-start: 0 !important; /* 防止 AntD 向左位移 1px 的邏輯 */
+  
   transition: all 0.3s;
   background: var(--ant-color-bg-container);
   color: var(--ant-color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+/* 隱藏 AntD 按鈕之間的分割線 */
 .version-card-item:before {
   display: none !important; 
+}
+
+/* 選中狀態的邊框修正 */
+.version-card-item.ant-radio-button-wrapper-checked {
+  border-color: var(--ant-color-primary) !important;
+  background: var(--ant-color-primary-bg) !important;
 }
 
 .btn-content {
@@ -177,20 +190,12 @@ defineExpose({ openDialog });
   width: 100%;
 }
 
-.label-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 信息卡片深色模式適配 */
+/* 信息卡片適配 */
 .info-card {
-  /* 使用透明度背景，在深色/淺色模式下都能有良好的疊加效果 */
   background: var(--ant-color-primary-bg); 
   border-radius: 10px;
   padding: 16px;
   border: 1px solid var(--ant-color-primary-border);
-  transition: background 0.3s, border 0.3s;
 }
 
 .info-row {
@@ -199,42 +204,6 @@ defineExpose({ openDialog });
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-}
-
-.info-label {
-  color: var(--ant-color-text-description);
-  font-size: 13px;
-}
-
-.info-value {
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-}
-
-.file-name {
-  word-break: break-all;
-}
-
-.highlight {
-  color: var(--ant-color-primary);
-}
-
-.card-divider {
-  margin: 12px 0;
-  /* 使用 AntD 分割線變數 */
-  border-color: var(--ant-color-split);
-}
-
-.notice-box {
-  display: flex;
-  gap: 8px;
-  /* 使用警告色變數 */
-  color: var(--ant-color-warning-text);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 /* --- 移動端適配 --- */
@@ -249,18 +218,5 @@ defineExpose({ openDialog });
   .version-grid {
     grid-template-columns: 1fr;
   }
-  
-  .info-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
-/* 動畫效果 */
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
 }
 </style>
