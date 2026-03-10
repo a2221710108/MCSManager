@@ -132,7 +132,7 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 容器內邊距微調 */
+/* --- 基礎容器與描述 --- */
 .java-config-container {
   padding: 8px 4px;
 }
@@ -140,10 +140,11 @@ defineExpose({ openDialog });
 .desc-text {
   margin-bottom: 20px;
   font-size: 14px;
-  opacity: 0.8;
+  /* 使用自適應文字顏色，透明度 0.65 */
+  color: var(--ant-text-color-secondary, rgba(0, 0, 0, 0.45)); 
 }
 
-/* 核心 Grid 佈局 */
+/* --- 網格佈局 (Grid) --- */
 .version-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -152,27 +153,47 @@ defineExpose({ openDialog });
   margin-bottom: 24px;
 }
 
-/* 按鈕樣式優化：適配深色模式 */
+/* --- 單個按鈕卡片樣式 --- */
 .version-card-item {
   height: auto !important;
-  padding: 4px 8px !important;
-  line-height: 32px !important;
+  padding: 10px 8px !important;
+  line-height: 1.5 !important;
   text-align: center;
   border-radius: 8px !important;
-  /* 使用透明邊框，避免在深色模式下顯得突兀 */
+  /* 邊框使用半透明，適配所有背景 */
   border: 1px solid rgba(140, 140, 140, 0.2) !important;
   transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
   background: transparent !important;
+  /* 確保初始文字顏色正確 */
+  color: inherit !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* 選中狀態的亮點 */
+/* 移除 AntD 默認的左側分隔線 */
+.version-card-item:before {
+  display: none !important;
+}
+
+/* --- 選中狀態 (核心修復) --- */
 .version-card-item.ant-radio-button-wrapper-checked {
   border-color: #1677ff !important;
+  /* 強制文字為品牌藍，避免變白看不清 */
+  color: #1677ff !important;
+  background: rgba(22, 119, 255, 0.1) !important;
   box-shadow: 0 2px 8px rgba(22, 119, 255, 0.15);
 }
 
-.version-card-item:before {
-  display: none !important;
+.version-card-item.ant-radio-button-wrapper-checked .label-text {
+  font-weight: 600; /* 選中時文字加粗 */
+}
+
+/* 懸停效果 */
+.version-card-item:hover {
+  border-color: #4096ff !important;
+  color: #4096ff !important;
+  background: rgba(22, 119, 255, 0.05) !important;
 }
 
 .btn-content {
@@ -187,15 +208,20 @@ defineExpose({ openDialog });
   font-size: 12px;
 }
 
-/* --- 信息卡片優化 (核心適配) --- */
+.label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- 依賴檔案信息卡片 (深色模式適配) --- */
 .info-card {
-  /* 使用 rgba 背景，確保在深色模式下依然和諧 */
+  /* 背景使用 6% 的品牌藍，深色模式下會呈現深邃感 */
   background: rgba(22, 119, 255, 0.06); 
   border-radius: 12px;
   padding: 16px;
-  /* 邊框同樣使用透明度 */
   border: 1px solid rgba(22, 119, 255, 0.15);
-  backdrop-filter: blur(4px); /* 增加一點質感 */
+  backdrop-filter: blur(8px); /* 增加磨砂質感 */
 }
 
 .info-row {
@@ -206,7 +232,7 @@ defineExpose({ openDialog });
 }
 
 .info-label {
-  color: var(--ant-text-color-secondary, #8c8c8c);
+  color: var(--ant-text-color-secondary, rgba(140, 140, 140, 0.8));
   font-size: 13px;
 }
 
@@ -216,35 +242,29 @@ defineExpose({ openDialog });
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background: rgba(255, 255, 255, 0.4); /* 淺色模式下的微白 */
+  /* 檔案名稱背景框，深淺模式通用 */
+  background: rgba(140, 140, 140, 0.1); 
   border-radius: 6px;
-}
-
-/* 深色模式下的微調 (如果你的系統有 .dark 類名，或者 AntD 自動處理) */
-:deep(.ant-input-dark) .info-value {
-  background: rgba(0, 0, 0, 0.2);
+  color: #1677ff; /* 檔案名稱高亮色 */
 }
 
 .file-name {
   word-break: break-all;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 13px;
-}
-
-.highlight {
-  color: #1677ff;
 }
 
 .card-divider {
   margin: 12px 0;
-  border-color: rgba(22, 119, 255, 0.1);
+  /* 分割線透明度化 */
+  border-color: rgba(22, 119, 255, 0.1) !important;
 }
 
 .notice-box {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  color: #fa8c16; /* 使用 AntD 標準橘色 */
+  color: #fa8c16; /* 警告色 */
   font-size: 12px;
   line-height: 1.6;
 }
@@ -257,6 +277,7 @@ defineExpose({ openDialog });
 @media (max-width: 576px) {
   .version-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
 }
 
@@ -270,9 +291,9 @@ defineExpose({ openDialog });
   }
 }
 
-/* 動畫 */
+/* --- 動畫效果 --- */
 .fade-enter-active, .fade-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
