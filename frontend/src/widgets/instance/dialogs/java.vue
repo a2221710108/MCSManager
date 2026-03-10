@@ -140,8 +140,10 @@ defineExpose({ openDialog });
 .desc-text {
   margin-bottom: 20px;
   font-size: 14px;
-  /* 使用自適應文字顏色，透明度 0.65 */
-  color: var(--ant-text-color-secondary, rgba(0, 0, 0, 0.45)); 
+  /* 使用 currentColor 或不指定顏色，僅通過 opacity 實現灰度感 */
+  /* 這樣在深色模式下，它會是半透明的白色；淺色下是半透明的黑色 */
+  color: inherit !important;
+  opacity: 0.65; 
 }
 
 /* --- 網格佈局 (Grid) --- */
