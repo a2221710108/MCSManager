@@ -132,8 +132,9 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
+/* 容器內邊距 */
 .java-config-container {
-  padding: 8px;
+  padding: 8px 4px;
 }
 
 .desc-text {
@@ -143,57 +144,49 @@ defineExpose({ openDialog });
 
 /* 核心 Grid 佈局 */
 .version-grid {
-  display: grid !important;
+  display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   width: 100%;
   margin-bottom: 24px;
 }
 
-/* --- 核心修復：按鈕基礎與選中設計 --- */
+/* --- 關鍵修正：重置 AntD Radio Button 邊框機制 --- */
 .version-card-item {
-  height: auto !important;
+  height: 44px !important;
   padding: 0 8px !important;
-  line-height: 40px !important;
+  line-height: 42px !important; /* 扣除上下邊框 1px * 2 */
   text-align: center;
-  border-radius: 6px !important;
-  
-  /* 基礎狀態：白色背景，灰色邊框 */
-  border: 1px solid var(--ant-color-border) !important;
-  margin-inline-start: 0 !important;
+  border-radius: 8px !important;
   background: var(--ant-color-bg-container);
   color: var(--ant-color-text);
+  transition: all 0.2s ease;
   
-  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+  /* 強制恢復被 AntD 隱藏的左邊框 */
+  border-inline-start: 1px solid var(--ant-color-border) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  margin-inline-start: 0 !important; 
+  position: relative;
 }
 
-/* 移除按鈕間的預設分割線 */
-.version-card-item:before {
+/* 移除 AntD 用於處理緊貼按鈕的分割線偽元素 */
+.version-card-item::before {
   display: none !important; 
 }
 
-/* --- 💡 重要：選中後的藍色背景設計 (參考 AntD 標準) --- */
-.version-card-item.ant-radio-button-wrapper-checked {
-  /* 背景變為淺藍色 (Primary Background) */
+/* 選中狀態樣式優化 */
+.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
   background: var(--ant-color-primary-bg) !important;
-  /* 邊框變為品牌藍 (Primary) */
   border-color: var(--ant-color-primary) !important;
-  /* 文字變為品牌藍 */
   color: var(--ant-color-primary) !important;
-  
-  /* 稍微加深陰影，增加立體感 */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   z-index: 2;
 }
 
-/* 懸停狀態：邊框變色但保持背景 */
-.version-card-item:hover:not(.ant-radio-button-wrapper-checked) {
-  border-color: var(--ant-color-primary-hover) !important;
-  color: var(--ant-color-primary-hover) !important;
+/* 懸停狀態 */
+.version-card-item:hover {
+  border-color: var(--ant-color-primary) !important;
+  color: var(--ant-color-primary);
+  z-index: 1;
 }
 
 .btn-content {
@@ -202,16 +195,21 @@ defineExpose({ openDialog });
   justify-content: center;
   gap: 6px;
   width: 100%;
+  height: 100%;
+}
+
+.check-icon {
+  font-size: 12px;
 }
 
 .label-text {
-  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
 
-/* --- 藍色信息卡片樣式 --- */
+/* 信息卡片 */
 .info-card {
   background: var(--ant-color-primary-bg); 
   border-radius: 10px;
@@ -229,24 +227,64 @@ defineExpose({ openDialog });
 .info-label {
   color: var(--ant-color-text-description);
   font-size: 13px;
+  flex-shrink: 0;
+}
+
+.info-value {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0; /* 允許內層省略 */
+}
+
+.file-name {
+  word-break: break-all;
+  font-family: monospace;
 }
 
 .highlight {
   color: var(--ant-color-primary);
-  font-weight: 600;
 }
 
-/* --- 📱 移動端適配 (響應式) --- */
+.card-divider {
+  margin: 12px 0;
+  border-color: var(--ant-color-split);
+}
+
+.notice-box {
+  display: flex;
+  gap: 8px;
+  color: var(--ant-color-warning-text);
+  font-size: 12px;
+  line-height: 1.5;
+  align-items: flex-start;
+}
+
+/* --- 移動端適配 --- */
 @media (max-width: 576px) {
   .version-grid {
-    grid-template-columns: repeat(2, 1fr); /* 手機版 2 欄 */
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 380px) {
   .version-grid {
-    grid-template-columns: 1fr; /* 極窄手機 1 欄 */
+    grid-template-columns: 1fr;
   }
+  
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* 動畫效果 */
+.fade-enter-active, .fade-leave-active {
+  transition: all 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 </style>
