@@ -134,36 +134,6 @@ defineExpose({ openDialog });
   </a-modal>
 </template>
 
-<script setup>
-import { computed } from 'vue';
-import { 
-  CheckOutlined, 
-  FileTextOutlined, 
-  ExclamationCircleOutlined 
-} from '@ant-design/icons-vue';
-
-// 假設的 Props 與數據，請根據實際情況調整
-const props = defineProps(['open', 'isLoading']);
-const emit = defineEmits(['update:open', 'submit']);
-
-// 模擬數據
-const JAVA_VERSIONS = [
-  { label: 'Java 8', value: 'java8', jarFile: 'server-j8.jar' },
-  { label: 'Java 11', value: 'java11', jarFile: 'server-j11.jar' },
-  { label: 'Java 17', value: 'java17', jarFile: 'server-j17.jar' },
-  { label: 'Java 21', value: 'java21', jarFile: 'server-j21.jar' },
-];
-
-const selectedJava = defineModel('value', { default: 'java17' });
-
-const currentSelection = computed(() => 
-  JAVA_VERSIONS.find(v => v.value === selectedJava.value)
-);
-
-const submit = () => emit('submit', selectedJava.value);
-const t = (key) => key; // 翻譯函數佔位
-</script>
-
 <style scoped>
 .java-config-container {
   padding: 8px 4px;
