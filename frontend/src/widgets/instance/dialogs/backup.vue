@@ -200,7 +200,7 @@ defineExpose({ openDialog });
         </template>
         <template #description>
           <a-typography-text type="secondary" size="small">
-            {{ t("此處僅展示伺服器內的本地備份，您的備份（上限 2 個）均已同步至位於新加坡的檔案伺服器。") }}
+            {{ t("此處僅展示伺服器內的本地備份，您的備份（上限 2 個）均已同步至位於新加坡的檔案伺服器，每個備份保存期限為 35 天。您可以前往 LazyCloud_backup 資料夾進行進一步管理，如您不慎刪除本地備份可聯絡管理員獲取遠端備份檔案。") }}
           </a-typography-text>
         </template>
       </a-alert>
