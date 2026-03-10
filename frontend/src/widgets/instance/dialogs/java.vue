@@ -132,7 +132,6 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 容器內邊距微調 */
 .java-config-container {
   padding: 8px 4px;
 }
@@ -142,29 +141,49 @@ defineExpose({ openDialog });
   font-size: 14px;
 }
 
-/* 核心 Grid 佈局優化 */
+/* --- 核心 Grid 佈局 --- */
 .version-grid {
   display: grid;
-  /* 默認電腦端 3 列 */
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   width: 100%;
   margin-bottom: 24px;
 }
 
-/* Ant Design Radio Button 樣式重置，防止邊框重疊或缺失 */
-.version-card-item {
+/* 參考你提供的設計：移除寫死的高度，改用 padding 並強化過渡 */
+:deep(.ant-radio-button-wrapper) {
   height: auto !important;
-  padding: 0 8px !important;
-  line-height: 40px !important;
+  padding: 10px 8px !important;
   text-align: center;
-  border-radius: 6px !important;
-  border-left: 1px solid #d9d9d9 !important; /* 強制顯示左邊框 */
-  transition: all 0.3s;
+  border: 1px solid var(--ant-color-border-secondary) !important;
+  border-radius: 8px !important;
+  background: var(--ant-color-bg-container);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.version-card-item:before {
-  display: none !important; /* 隱藏 AntD 默認的分割線 */
+/* 移除 AntD 原生的按鈕間左側線條 */
+:deep(.ant-radio-button-wrapper::before) {
+  display: none !important;
+}
+
+/* --- 選中狀態：兼容深色模式的核心修改 --- */
+:deep(.ant-radio-button-wrapper-checked) {
+  /* 使用透明藍背景，這樣在深色模式下會透出底部的黑色，看起來是深藍 */
+  background: rgba(var(--ant-color-primary-rgb), 0.15) !important;
+  color: var(--ant-color-primary) !important;
+  border-color: var(--ant-color-primary) !important;
+  /* 使用動態陰影變量 */
+  box-shadow: 0 2px 8px var(--ant-color-primary-outline) !important;
+}
+
+/* 懸停效果：參考備份管理員的 hover 邏輯 */
+:deep(.ant-radio-button-wrapper:hover:not(.ant-radio-button-wrapper-checked)) {
+  background: var(--ant-color-fill-alter);
+  border-color: var(--ant-color-primary-hover) !important;
+  color: var(--ant-color-primary-hover);
 }
 
 .btn-content {
@@ -175,30 +194,37 @@ defineExpose({ openDialog });
   width: 100%;
 }
 
+.check-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+  /* 勾選圖標顏色跟隨主題 */
+  color: var(--ant-color-primary);
+}
+
 .label-text {
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* 信息卡片優化 */
+/* --- 信息卡片：增強對比度 --- */
 .info-card {
-  background: #f0f7ff; /* 稍微帶點品牌色調 */
-  border-radius: 10px;
+  /* 使用更具層次感的背景變量 */
+  background: var(--ant-color-fill-quaternary);
+  border-radius: 12px;
   padding: 16px;
-  border: 1px solid #bae7ff;
+  border: 1px solid var(--ant-color-border-secondary);
 }
 
 .info-row {
   display: flex;
-  flex-wrap: wrap; /* 內容過長時自動換行 */
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
 }
 
 .info-label {
-  color: #595959;
+  color: var(--ant-color-text-description);
   font-size: 13px;
 }
 
@@ -206,58 +232,55 @@ defineExpose({ openDialog });
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 4px;
-  max-width: 100%;
+  gap: 6px;
 }
 
-.file-name {
-  word-break: break-all; /* 防止長檔名撐破佈局 */
-}
-
+/* 亮藍色文字在深色模式下會自動調整亮度（若使用 link 變量） */
 .highlight {
-  color: #1677ff;
+  color: var(--ant-color-link);
 }
 
 .card-divider {
   margin: 12px 0;
-  border-color: #d6e4ff;
+  border-block-start: 1px solid var(--ant-color-border-subtle);
 }
 
 .notice-box {
   display: flex;
   gap: 8px;
-  color: #ed6c02;
+  color: var(--ant-color-warning-text);
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
+  /* 參考 a-alert 的底色邏輯 */
+  background: var(--ant-color-warning-bg);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ant-color-warning-border);
 }
 
-/* --- 移動端適配 --- */
+.warning-icon {
+  margin-top: 2px;
+}
 
-/* 針對平板或較小螢幕（< 576px） */
+/* --- 響應式佈局 --- */
 @media (max-width: 576px) {
   .version-grid {
-    grid-template-columns: repeat(2, 1fr); /* 切換為 2 列 */
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-/* 針對極小螢幕手機（< 380px） */
 @media (max-width: 380px) {
   .version-grid {
-    grid-template-columns: 1fr; /* 切換為單列 */
-  }
-  
-  .info-row {
-    flex-direction: column;
-    align-items: flex-start;
+    grid-template-columns: 1fr;
   }
 }
 
-/* 動畫效果 */
+/* 動畫效果保持不變 */
 .fade-enter-active, .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+  transform: translateY(6px);
 }
 </style>
