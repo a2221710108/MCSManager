@@ -82,194 +82,185 @@ defineExpose({ openDialog });
 </script>
 
 <template>
-  <a-modal
-    v-model:open="open"
-    centered
-    :title="t('切換 Java 版本')"
-    :confirm-loading="isLoading"
-    :width="520"
-    @ok="submit"
-  >
-    <div class="java-config-container">
-      <a-typography-paragraph type="secondary" class="desc-text">
-        {{ t("請選擇合適的 Java 版本，系統將根據選擇調整啟動參數。") }}
-      </a-typography-paragraph>
+  <a-modal
+    v-model:open="open"
+    centered
+    :title="t('切換 Java 版本')"
+    :confirm-loading="isLoading"
+    :width="520" 
+    @ok="submit"
+  >
+    <div class="java-config-container">
+      <a-typography-paragraph type="secondary" class="desc-text">
+        {{ t("請選擇合適的 Java 版本，系統將根據選擇調整啟動參數。") }}
+      </a-typography-paragraph>
 
-      <a-radio-group v-model:value="selectedJava" class="version-grid">
-        <a-radio-button
-          v-for="item in JAVA_VERSIONS"
-          :key="item.value"
-          :value="item.value"
-          class="version-card-item"
-        >
-          <div class="btn-content">
-            <check-outlined 
-              class="check-icon" 
-              :style="{ visibility: selectedJava === item.value ? 'visible' : 'hidden' }" 
-            />
-            <span class="label-text">{{ item.label }}</span>
-          </div>
-        </a-radio-button>
-      </a-radio-group>
+      <a-radio-group v-model:value="selectedJava" button-style="solid" class="version-grid">
+        <a-radio-button 
+          v-for="item in JAVA_VERSIONS" 
+          :key="item.value" 
+          :value="item.value"
+          class="version-card-item"
+        >
+          <div class="btn-content">
+            <check-outlined v-if="selectedJava === item.value" class="check-icon" />
+            <span class="label-text">{{ item.label }}</span>
+          </div>
+        </a-radio-button>
+      </a-radio-group>
 
-      <transition name="fade" mode="out-in">
-        <div v-if="currentSelection" :key="selectedJava" class="info-card">
-          <div class="info-row">
-            <span class="info-label">{{ t("依賴啟動檔案") }}</span>
-            <span class="info-value highlight">
-              <file-text-outlined />
-              <span class="file-name">{{ currentSelection.jarFile }}</span>
-            </span>
-          </div>
-          
-          <a-divider class="card-divider" />
-          
-          <div class="notice-box">
-            <exclamation-circle-outlined class="warning-icon" />
-            <span>{{ t("提示：切換後請確保伺服器根目錄下已放置上述檔案。") }}</span>
-          </div>
-        </div>
-      </transition>
-    </div>
-  </a-modal>
+      <transition name="fade">
+        <div v-if="currentSelection" class="info-card">
+          <div class="info-row">
+            <span class="info-label">{{ t("依賴啟動檔案") }}</span>
+            <span class="info-value highlight">
+              <file-text-outlined />
+              <span class="file-name">{{ currentSelection.jarFile }}</span>
+            </span>
+          </div>
+          
+          <a-divider class="card-divider" />
+          
+          <div class="notice-box">
+            <exclamation-circle-outlined />
+            <span>{{ t("提示：切換後請確保伺服器根目錄下已放置上述檔案。") }}</span>
+          </div>
+        </div>
+      </transition>
+    </div>
+  </a-modal>
 </template>
 
 <style scoped>
+/* 容器內邊距微調 */
 .java-config-container {
-  padding: 8px 4px;
+  padding: 8px 4px;
 }
 
 .desc-text {
-  margin-bottom: 20px;
-  font-size: 14px;
+  margin-bottom: 20px;
+  font-size: 14px;
 }
 
-/* --- 核心 Grid 佈局 --- */
+/* 核心 Grid 佈局優化 */
 .version-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  width: 100%;
-  margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 24px;
 }
 
-/* 強制覆蓋 Ant Design Radio Button 預設樣式 */
-:deep(.ant-radio-button-wrapper) {
-  height: 44px !important;
-  line-height: 42px !important;
-  padding: 0 8px !important;
-  text-align: center;
-  border: 1px solid var(--ant-color-border) !important;
-  border-radius: 8px !important;
-  background: var(--ant-color-bg-container);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Ant Design Radio Button 適配與重置 */
+.version-card-item {
+  height: auto !important;
+  padding: 0 8px !important;
+  line-height: 40px !important;
+  text-align: center;
+  border-radius: 6px !important;
+  /* 使用 AntD 的標準邊框色變數 */
+  border-inline-start: 1px solid var(--ant-color-border) !important; 
+  transition: all 0.3s;
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
 }
 
-/* 移除 AntD 原生的按鈕間左側線條 */
-:deep(.ant-radio-button-wrapper::before) {
-  display: none !important;
-}
-
-/* 選中狀態樣式 */
-:deep(.ant-radio-button-wrapper-checked) {
-  color: var(--ant-color-primary) !important;
-  background: var(--ant-color-primary-bg) !important;
-  border-color: var(--ant-color-primary) !important;
-  box-shadow: 0 2px 6px rgba(var(--ant-color-primary-rgb), 0.15);
+.version-card-item:before {
+  display: none !important; 
 }
 
 .btn-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 100%;
-}
-
-.check-icon {
-  font-size: 12px;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
 }
 
 .label-text {
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* --- 信息卡片 --- */
+/* 信息卡片深色模式適配 */
 .info-card {
-  background: var(--ant-color-fill-alter);
-  border-radius: 12px;
-  padding: 16px;
-  border: 1px solid var(--ant-color-border-secondary);
+  /* 使用透明度背景，在深色/淺色模式下都能有良好的疊加效果 */
+  background: var(--ant-color-primary-bg); 
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid var(--ant-color-primary-border);
+  transition: background 0.3s, border 0.3s;
 }
 
 .info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
 .info-label {
-  color: var(--ant-color-text-description);
-  font-size: 13px;
+  color: var(--ant-color-text-description);
+  font-size: 13px;
 }
 
 .info-value {
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.file-name {
+  word-break: break-all;
 }
 
 .highlight {
-  color: var(--ant-color-primary);
+  color: var(--ant-color-primary);
 }
 
 .card-divider {
-  margin: 12px 0;
+  margin: 12px 0;
+  /* 使用 AntD 分割線變數 */
+  border-color: var(--ant-color-split);
 }
 
 .notice-box {
-  display: flex;
-  gap: 8px;
-  color: var(--ant-color-warning-text);
-  font-size: 12px;
-  line-height: 1.6;
-  background: var(--ant-color-warning-bg);
-  padding: 8px 12px;
-  border-radius: 6px;
+  display: flex;
+  gap: 8px;
+  /* 使用警告色變數 */
+  color: var(--ant-color-warning-text);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
-.warning-icon {
-  margin-top: 2px;
-}
-
-/* --- 響應式佈局 --- */
+/* --- 移動端適配 --- */
 @media (max-width: 576px) {
-  .version-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .version-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
 }
 
 @media (max-width: 380px) {
-  .version-grid {
-    grid-template-columns: 1fr;
-  }
+  .version-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 /* 動畫效果 */
 .fade-enter-active, .fade-leave-active {
-  transition: all 0.2s ease;
+  transition: opacity 0.3s ease;
 }
 .fade-enter-from, .fade-leave-to {
-  opacity: 0;
-  transform: translateY(4px);
+  opacity: 0;
 }
-</style>
-
+</style>幫我優化一下 java選擇按鈕
