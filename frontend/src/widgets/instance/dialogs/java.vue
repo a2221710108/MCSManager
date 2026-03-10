@@ -140,31 +140,39 @@ defineExpose({ openDialog });
 .desc-text {
   margin-bottom: 20px;
   font-size: 14px;
+  opacity: 0.8;
 }
 
-/* 核心 Grid 佈局優化 */
+/* 核心 Grid 佈局 */
 .version-grid {
   display: grid;
-  /* 默認電腦端 3 列 */
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   width: 100%;
   margin-bottom: 24px;
 }
 
-/* Ant Design Radio Button 樣式重置，防止邊框重疊或缺失 */
+/* 按鈕樣式優化：適配深色模式 */
 .version-card-item {
   height: auto !important;
-  padding: 0 8px !important;
-  line-height: 40px !important;
+  padding: 4px 8px !important;
+  line-height: 32px !important;
   text-align: center;
-  border-radius: 6px !important;
-  border-left: 1px solid #d9d9d9 !important; /* 強制顯示左邊框 */
-  transition: all 0.3s;
+  border-radius: 8px !important;
+  /* 使用透明邊框，避免在深色模式下顯得突兀 */
+  border: 1px solid rgba(140, 140, 140, 0.2) !important;
+  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
+  background: transparent !important;
+}
+
+/* 選中狀態的亮點 */
+.version-card-item.ant-radio-button-wrapper-checked {
+  border-color: #1677ff !important;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.15);
 }
 
 .version-card-item:before {
-  display: none !important; /* 隱藏 AntD 默認的分割線 */
+  display: none !important;
 }
 
 .btn-content {
@@ -175,30 +183,30 @@ defineExpose({ openDialog });
   width: 100%;
 }
 
-.label-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.check-icon {
+  font-size: 12px;
 }
 
-/* 信息卡片優化 */
+/* --- 信息卡片優化 (核心適配) --- */
 .info-card {
-  background: #f0f7ff; /* 稍微帶點品牌色調 */
-  border-radius: 10px;
+  /* 使用 rgba 背景，確保在深色模式下依然和諧 */
+  background: rgba(22, 119, 255, 0.06); 
+  border-radius: 12px;
   padding: 16px;
-  border: 1px solid #bae7ff;
+  /* 邊框同樣使用透明度 */
+  border: 1px solid rgba(22, 119, 255, 0.15);
+  backdrop-filter: blur(4px); /* 增加一點質感 */
 }
 
 .info-row {
   display: flex;
-  flex-wrap: wrap; /* 內容過長時自動換行 */
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .info-label {
-  color: #595959;
+  color: var(--ant-text-color-secondary, #8c8c8c);
   font-size: 13px;
 }
 
@@ -206,12 +214,21 @@ defineExpose({ openDialog });
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 4px;
-  max-width: 100%;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.4); /* 淺色模式下的微白 */
+  border-radius: 6px;
+}
+
+/* 深色模式下的微調 (如果你的系統有 .dark 類名，或者 AntD 自動處理) */
+:deep(.ant-input-dark) .info-value {
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .file-name {
-  word-break: break-all; /* 防止長檔名撐破佈局 */
+  word-break: break-all;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
 }
 
 .highlight {
@@ -220,44 +237,45 @@ defineExpose({ openDialog });
 
 .card-divider {
   margin: 12px 0;
-  border-color: #d6e4ff;
+  border-color: rgba(22, 119, 255, 0.1);
 }
 
 .notice-box {
   display: flex;
+  align-items: flex-start;
   gap: 8px;
-  color: #ed6c02;
+  color: #fa8c16; /* 使用 AntD 標準橘色 */
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
-/* --- 移動端適配 --- */
+.notice-box :deep(.anticon) {
+  margin-top: 3px;
+}
 
-/* 針對平板或較小螢幕（< 576px） */
+/* --- 響應式適配 --- */
 @media (max-width: 576px) {
   .version-grid {
-    grid-template-columns: repeat(2, 1fr); /* 切換為 2 列 */
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-/* 針對極小螢幕手機（< 380px） */
 @media (max-width: 380px) {
   .version-grid {
-    grid-template-columns: 1fr; /* 切換為單列 */
+    grid-template-columns: 1fr;
   }
-  
   .info-row {
     flex-direction: column;
     align-items: flex-start;
   }
 }
 
-/* 動畫效果 */
+/* 動畫 */
 .fade-enter-active, .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: all 0.3s ease;
 }
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+  transform: translateY(10px);
 }
 </style>
