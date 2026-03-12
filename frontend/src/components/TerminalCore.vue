@@ -117,6 +117,16 @@ onMounted(async () => {
       });
     }
     term = await initTerminal();
+
+    // --- 新增：從前端攔截亂碼關鍵指令 ---
+    if (term) {
+      // 攔截 OSC 11 (背景顏色查詢)，直接回傳 true 代表已處理，但不做任何回應
+      term.parser.registerOscHandler(11, () => true);
+      // 攔截 OSC 10 (前景顏色查詢)
+      term.parser.registerOscHandler(10, () => true);
+    }
+    // ----------------------------------
+
   } catch (error: any) {
     console.error(error);
     throw error;
