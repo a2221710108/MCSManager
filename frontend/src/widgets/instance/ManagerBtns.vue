@@ -22,7 +22,8 @@ import {
   FolderOpenOutlined,
   UsergroupDeleteOutlined,
   CoffeeOutlined,
-  HistoryOutlined
+  HistoryOutlined,
+  GlobalOutlined
 } from "@ant-design/icons-vue";
 
 import { computed, ref, watch } from "vue";
@@ -39,7 +40,7 @@ import RconSettings from "./dialogs/RconSettings.vue";
 import TermConfig from "./dialogs/TermConfig.vue";
 import backup from "./dialogs/backup.vue";
 import java from "./dialogs/java.vue";
-import java from "./dialogs/srv.vue";
+import srv from "./dialogs/srv.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -150,7 +151,7 @@ const btns = computed(() => {
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
 },
     title: t("自定義域名"),
-  icon: CoffeeOutlined,
+  icon: GlobalOutlined,
   click: () => {
     srvDialog.value?.openDialog();
   },
