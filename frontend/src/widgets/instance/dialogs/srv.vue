@@ -229,7 +229,11 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-.srv-manager-wrapper { padding: 4px; color: var(--text-color); }
+/* 全局間距與基礎顏色 */
+.srv-manager-wrapper { 
+  padding: 4px; 
+  color: var(--text-color); 
+}
 
 .desc-text {
   margin-bottom: 20px;
@@ -238,6 +242,7 @@ defineExpose({ openDialog });
   opacity: 0.65; 
 }
 
+/* --- 輸入區域卡片 --- */
 .config-card {
   background: rgba(128, 128, 128, 0.08);
   padding: 16px;
@@ -257,26 +262,31 @@ defineExpose({ openDialog });
   gap: 8px;
   align-items: stretch;
 }
+
 .input-subdomain { flex: 3; }
+
 .input-port { 
   flex: 1.5; 
   display: flex;
   align-items: center;
 }
+
 :deep(.ant-input-number-input) {
   height: 32px;
 }
 
-/* 列表容器：解決邊框顯示不全並增加高度擴展 */
+/* --- 列表區域與滾動優化 --- */
 .list-container {
-  max-height: 420px; /* 增加一點高度 */
+  max-height: 450px; /* 擴展列表高度 */
   overflow-y: auto;
-  padding: 2px 2px 24px 2px; /* 底部 padding 確保最後一個 Item 陰影和邊框完整 */
+  /* 關鍵修正：增加 padding 確保最後一個項目的邊框和陰影不被裁剪 */
+  padding: 4px 8px 30px 8px; 
+  margin-top: 8px;
 }
 
-/* 自定義滾動條樣式 */
+/* 自定義滾動條樣式，使其更輕量 */
 .list-container::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 .list-container::-webkit-scrollbar-thumb {
   background: rgba(128, 128, 128, 0.2);
@@ -290,28 +300,45 @@ defineExpose({ openDialog });
   margin-bottom: 12px;
   padding: 0 4px;
 }
+
 .list-title { font-weight: 600; font-size: 14px; }
 
+/* --- 單個項目樣式 (修正邊框問題) --- */
 .srv-item {
   background: rgba(128, 128, 128, 0.05);
-  margin-bottom: 12px; /* 增加間距 */
-  border: 1px solid rgba(128, 128, 128, 0.1);
+  margin-bottom: 12px;
+  /* 使用全邊框 */
+  border: 1px solid rgba(128, 128, 128, 0.1) !important;
   border-radius: 10px;
-  padding: 12px !important;
-  transition: all 0.3s;
-}
-.srv-item:hover {
-  border-color: #1890ff;
-  background: rgba(24, 144, 255, 0.05);
+  padding: 12px 16px !important;
+  transition: all 0.3s ease;
+  overflow: visible !important; /* 確保邊框不會被截斷 */
 }
 
+/* 核心修正：移除 Ant Design 默認的底部邊框，避免與我們的自定義邊框重疊導致顯示異常 */
+:deep(.ant-list-item) {
+  border-block-end: none !important;
+  border-bottom: none !important;
+}
+
+.srv-item:hover {
+  border-color: #1890ff !important;
+  background: rgba(24, 144, 255, 0.05);
+  transform: translateY(-1px); /* 輕微浮動感 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* --- 域名與複製按鈕佈局 --- */
 .domain-title-wrapper {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.domain-text { font-weight: bold; color: var(--text-color); }
+.domain-text { 
+  font-weight: bold; 
+  color: var(--text-color); 
+}
 
 .copy-btn {
   padding: 0;
@@ -320,10 +347,12 @@ defineExpose({ openDialog });
   font-size: 14px;
   color: #1890ff;
   opacity: 0.6;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
 }
+
 .copy-btn:hover {
   opacity: 1;
+  transform: scale(1.1);
 }
 
 .domain-icon {
@@ -338,11 +367,22 @@ defineExpose({ openDialog });
   font-size: 16px;
 }
 
-.target-text { font-size: 12px; opacity: 0.6; color: var(--text-color); }
+.target-text { 
+  font-size: 12px; 
+  opacity: 0.6; 
+  color: var(--text-color); 
+}
 
+/* --- 移動端適配 --- */
 @media (max-width: 576px) {
-  .input-row { flex-direction: column; }
+  .input-row { 
+    flex-direction: column; 
+    gap: 12px;
+  }
   .btn-add { width: 100%; }
-  .list-container { max-height: 350px; }
+  .list-container { 
+    max-height: 380px; 
+    padding-bottom: 50px; /* 移動端留白更多一些 */
+  }
 }
 </style>
