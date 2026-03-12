@@ -229,20 +229,20 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 全局間距與基礎顏色 */
+/* 基礎佈局 */
 .srv-manager-wrapper { 
   padding: 4px; 
   color: var(--text-color); 
 }
 
-.desc-text {
-  margin-bottom: 20px;
-  font-size: 14px;
-  color: inherit !important;
+.desc-text { 
+  margin-bottom: 20px; 
+  font-size: 14px; 
   opacity: 0.65; 
+  color: inherit !important;
 }
 
-/* --- 輸入區域卡片 --- */
+/* --- 配置卡片 --- */
 .config-card {
   background: rgba(128, 128, 128, 0.08);
   padding: 16px;
@@ -250,21 +250,20 @@ defineExpose({ openDialog });
   margin-bottom: 24px;
 }
 
-.section-title {
-  font-size: 12px;
-  font-weight: bold;
-  margin-bottom: 12px;
-  opacity: 0.6;
+.section-title { 
+  font-size: 12px; 
+  font-weight: bold; 
+  margin-bottom: 12px; 
+  opacity: 0.6; 
 }
 
-.input-row {
-  display: flex;
-  gap: 8px;
+.input-row { 
+  display: flex; 
+  gap: 8px; 
   align-items: stretch;
 }
 
 .input-subdomain { flex: 3; }
-
 .input-port { 
   flex: 1.5; 
   display: flex;
@@ -275,64 +274,53 @@ defineExpose({ openDialog });
   height: 32px;
 }
 
-/* --- 列表區域與滾動優化 --- */
+/* --- 列表容器 (關鍵修正) --- */
 .list-container {
-  max-height: 450px; /* 擴展列表高度 */
+  max-height: 480px; /* 增加列表可視高度 */
   overflow-y: auto;
-  /* 關鍵修正：增加 padding 確保最後一個項目的邊框和陰影不被裁剪 */
-  padding: 4px 8px 30px 8px; 
+  /* padding-bottom 是確保最後一項邊框不被截斷的關鍵 */
+  padding: 4px 8px 32px 8px; 
   margin-top: 8px;
 }
 
-/* 自定義滾動條樣式，使其更輕量 */
-.list-container::-webkit-scrollbar {
-  width: 4px;
-}
-.list-container::-webkit-scrollbar-thumb {
-  background: rgba(128, 128, 128, 0.2);
-  border-radius: 10px;
+/* 移除 Ant Design 預設的列表邊框干擾 */
+:deep(.ant-list-items) {
+  overflow: visible !important;
 }
 
-.list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+:deep(.ant-list-item) {
+  border: none !important;
+  border-bottom: none !important;
+  padding: 0 !important; /* 讓自定義的 srv-item 控制間距 */
   margin-bottom: 12px;
-  padding: 0 4px;
 }
 
-.list-title { font-weight: 600; font-size: 14px; }
-
-/* --- 單個項目樣式 (修正邊框問題) --- */
+/* --- 單個項目樣式 (srv-item) --- */
 .srv-item {
   background: rgba(128, 128, 128, 0.05);
-  margin-bottom: 12px;
-  /* 使用全邊框 */
-  border: 1px solid rgba(128, 128, 128, 0.1) !important;
+  /* 使用全邊框，!important 確保優先級 */
+  border: 1px solid rgba(128, 128, 128, 0.15) !important;
   border-radius: 10px;
   padding: 12px 16px !important;
   transition: all 0.3s ease;
-  overflow: visible !important; /* 確保邊框不會被截斷 */
-}
-
-/* 核心修正：移除 Ant Design 默認的底部邊框，避免與我們的自定義邊框重疊導致顯示異常 */
-:deep(.ant-list-item) {
-  border-block-end: none !important;
-  border-bottom: none !important;
+  display: flex !important;
+  align-items: center;
+  box-sizing: border-box !important;
+  /* 確保陰影和邊框渲染不被截斷 */
+  overflow: visible !important;
 }
 
 .srv-item:hover {
   border-color: #1890ff !important;
   background: rgba(24, 144, 255, 0.05);
-  transform: translateY(-1px); /* 輕微浮動感 */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* --- 域名與複製按鈕佈局 --- */
-.domain-title-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.domain-title-wrapper { 
+  display: flex; 
+  align-items: center; 
+  gap: 6px; 
 }
 
 .domain-text { 
@@ -347,12 +335,10 @@ defineExpose({ openDialog });
   font-size: 14px;
   color: #1890ff;
   opacity: 0.6;
-  transition: all 0.2s;
 }
 
 .copy-btn:hover {
   opacity: 1;
-  transform: scale(1.1);
 }
 
 .domain-icon {
@@ -364,7 +350,6 @@ defineExpose({ openDialog });
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
 }
 
 .target-text { 
@@ -379,10 +364,30 @@ defineExpose({ openDialog });
     flex-direction: column; 
     gap: 12px;
   }
+  
   .btn-add { width: 100%; }
-  .list-container { 
-    max-height: 380px; 
-    padding-bottom: 50px; /* 移動端留白更多一些 */
+
+  /* 需求：在移動端移除複製按鈕 */
+  .copy-btn {
+    display: none !important;
   }
+
+  .list-container { 
+    max-height: 380px;
+    padding-bottom: 40px; 
+  }
+  
+  .srv-item {
+    margin-bottom: 16px;
+  }
+}
+
+/* 自定義滾動條 */
+.list-container::-webkit-scrollbar {
+  width: 4px;
+}
+.list-container::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: 10px;
 }
 </style>
