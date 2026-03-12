@@ -9,7 +9,8 @@ import {
   DeleteOutlined, 
   ReloadOutlined, 
   ExclamationCircleOutlined,
-  InfoCircleOutlined 
+  InfoCircleOutlined,
+  CopyOutlined
 } from "@ant-design/icons-vue";
 import { createVNode } from "vue";
 
@@ -57,6 +58,14 @@ const apiRequest = async (method: string, body?: any) => {
     throw new Error(errorText || "請求失敗");
   }
   return res;
+};
+
+const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text).then(() => {
+    message.success(t("已複製到剪貼簿"));
+  }).catch(() => {
+    message.error(t("複製失敗"));
+  });
 };
 
 // 獲取 SRV 列表
@@ -189,7 +198,17 @@ defineExpose({ openDialog });
                   </div>
                 </template>
                 <template #title>
-                  <span class="domain-text">{{ item.subdomain }}.{{ DOMAIN_SUFFIX }}</span>
+                  <div class="domain-title-wrapper">
+                    <span class="domain-text">{{ item.subdomain }}.{{ DOMAIN_SUFFIX }}</span>
+                    <a-button 
+                      type="link" 
+                      size="small" 
+                      class="copy-btn" 
+                      @click="copyToClipboard(`${item.subdomain}.${DOMAIN_SUFFIX}`)"
+                    >
+                      <template #icon><CopyOutlined /></template>
+                    </a-button>
+                  </div>
                 </template>
                 <template #description>
                   <span class="target-text">{{ t('指向端口:') }} {{ item.port }}</span>
@@ -210,38 +229,22 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 全局間距 */
 .srv-manager-wrapper { padding: 4px; color: var(--text-color); }
-.mb-4 { margin-bottom: 16px; }
-
-/* 藍色 Alert 深度適配 */
-:deep(.custom-alert) {
-  border-radius: 8px;
-  background-color: rgba(24, 144, 255, 0.1) !important;
-  border: 1px solid rgba(24, 144, 255, 0.2) !important;
-}
-:deep(.custom-alert .ant-alert-message), 
-:deep(.custom-alert .ant-alert-description) {
-  color: var(--text-color) !important;
-  opacity: 0.9;
-}
 
 .desc-text {
   margin-bottom: 20px;
   font-size: 14px;
-  /* 使用 currentColor 或不指定顏色，僅通過 opacity 實現灰度感 */
-  /* 這樣在深色模式下，它會是半透明的白色；淺色下是半透明的黑色 */
   color: inherit !important;
   opacity: 0.65; 
 }
 
-/* 輸入區域卡片 */
 .config-card {
   background: rgba(128, 128, 128, 0.08);
   padding: 16px;
   border-radius: 12px;
   margin-bottom: 24px;
 }
+
 .section-title {
   font-size: 12px;
   font-weight: bold;
@@ -249,36 +252,49 @@ defineExpose({ openDialog });
   opacity: 0.6;
 }
 
-/* Flex 佈局解決對齊問題 */
 .input-row {
   display: flex;
   gap: 8px;
   align-items: stretch;
 }
 .input-subdomain { flex: 3; }
-
-/* 修正 InputNumber 的文字垂直居中 */
 .input-port { 
   flex: 1.5; 
   display: flex;
   align-items: center;
 }
 :deep(.ant-input-number-input) {
-  height: 32px; /* 與普通 input 保持一致 */
+  height: 32px;
 }
 
-/* 列表樣式 */
+/* 列表容器：解決邊框顯示不全並增加高度擴展 */
+.list-container {
+  max-height: 420px; /* 增加一點高度 */
+  overflow-y: auto;
+  padding: 2px 2px 24px 2px; /* 底部 padding 確保最後一個 Item 陰影和邊框完整 */
+}
+
+/* 自定義滾動條樣式 */
+.list-container::-webkit-scrollbar {
+  width: 5px;
+}
+.list-container::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: 10px;
+}
+
 .list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  padding: 0 4px;
 }
 .list-title { font-weight: 600; font-size: 14px; }
 
 .srv-item {
-  background: rgba(128, 128, 128, 0.05); /* 使用透明度而非純色 */
-  margin-bottom: 10px;
+  background: rgba(128, 128, 128, 0.05);
+  margin-bottom: 12px; /* 增加間距 */
   border: 1px solid rgba(128, 128, 128, 0.1);
   border-radius: 10px;
   padding: 12px !important;
@@ -287,6 +303,27 @@ defineExpose({ openDialog });
 .srv-item:hover {
   border-color: #1890ff;
   background: rgba(24, 144, 255, 0.05);
+}
+
+.domain-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.domain-text { font-weight: bold; color: var(--text-color); }
+
+.copy-btn {
+  padding: 0;
+  height: auto;
+  line-height: 1;
+  font-size: 14px;
+  color: #1890ff;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.copy-btn:hover {
+  opacity: 1;
 }
 
 .domain-icon {
@@ -301,12 +338,11 @@ defineExpose({ openDialog });
   font-size: 16px;
 }
 
-.domain-text { font-weight: bold; color: var(--text-color); }
 .target-text { font-size: 12px; opacity: 0.6; color: var(--text-color); }
 
-/* 移動端適配 */
 @media (max-width: 576px) {
   .input-row { flex-direction: column; }
   .btn-add { width: 100%; }
+  .list-container { max-height: 350px; }
 }
 </style>
