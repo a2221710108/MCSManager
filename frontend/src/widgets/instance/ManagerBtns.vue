@@ -325,12 +325,12 @@ watch(instanceInfo, (cfg, oldCfg) => {
   />
 
   <srv
-    ref="srvDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
-  />
+  ref="srvDialog"
+  :instance-info="instanceInfo"
+  :instance-id="instanceId ?? ''"
+  :daemon-id="daemonId ?? ''"
+  @update="refreshInstanceInfo"
+/>
   
 </template>
 
