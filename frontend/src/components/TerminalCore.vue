@@ -116,25 +116,23 @@ onMounted(async () => {
     term = await initTerminal();
 
     if (term) {
-      // 1. 攔截背景/前景顏色查詢 (解決 rgb:1e1e 亂碼)
-      // 這是標準 API，不會報錯
+      // 1. 攔截背景色查詢 (OSC 11) - 解決 rgb:1e1e...
       term.parser.registerOscHandler(11, () => true);
       term.parser.registerOscHandler(10, () => true);
 
-      // 2. 攔截 DSR 游標位置回報 (解決 [37;1R 亂碼)
-      // 改用寫入攔截器，這是處理 TypeScript 報錯最乾淨的方法
-      const originalWrite = term.write.bind(term);
-      
-      // 這裡我們攔截的是前端顯示過程，但更有效的是攔截數據傳輸
-      // 由於你的 sendCommand 是在 useTerminalHook 裡定義的
-      // 我們直接針對終端機的回傳動作進行「沉默處理」
-      
-      term.onData((data) => {
-        // 如果偵測到數據是回報序列（ESC[...R），我們就不做任何動作
-        if (data.startsWith('\x1b[') && data.endsWith('R')) {
-          return;
-        }
-      });
+      // 2. 深度攔截游標回報 (DSR) - 解決 [37;1R
+      // 使用 (term as any) 避開 TS 類型檢查，直接修改底層 core
+      const core = (term as any)._core;
+      if (core && core.coreService) {
+        const originalTriggerData = core.coreService.triggerDataEvent.bind(core.coreService);
+        core.coreService.triggerDataEvent = (data: string) => {
+          // 只要數據包含 [行;列R 這種游標回報格式，就攔截它
+          if (data.includes('\x1b[') && data.endsWith('R')) {
+            return; 
+          }
+          originalTriggerData(data);
+        };
+      }
     }
 
   } catch (error: any) {
