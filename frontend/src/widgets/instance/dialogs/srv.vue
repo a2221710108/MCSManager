@@ -132,11 +132,11 @@ defineExpose({ openDialog });
     :title="t('自定義連線域名')"
     centered
     :footer="null"
-    :width="isPhone ? '95%' : '650px'"
+    :width="isPhone ? '100%' : '650px'"
     class="srv-modal"
   >
     <div class="srv-manager-wrapper">
-      <a-typography-paragraph class="desc-text">
+      <a-typography-paragraph type="secondary" class="desc-text">
         {{ t("您可以自定義一個子域名，讓玩家無需輸入端口即可加入伺服器。") }}
       </a-typography-paragraph>
 
@@ -181,7 +181,7 @@ defineExpose({ openDialog });
           :locale="{ emptyText: t('目前尚未建立任何域名') }"
         >
           <template #renderItem="{ item }">
-            <a-list-item :key="item.id" class="srv-item">
+            <a-list-item class="srv-item">
               <a-list-item-meta>
                 <template #avatar>
                   <div class="domain-icon">
@@ -189,7 +189,7 @@ defineExpose({ openDialog });
                   </div>
                 </template>
                 <template #title>
-                  <div class="domain-text">{{ item.subdomain }}.{{ DOMAIN_SUFFIX }}</div>
+                  <span class="domain-text">{{ item.subdomain }}.{{ DOMAIN_SUFFIX }}</span>
                 </template>
                 <template #description>
                   <span class="target-text">{{ t('指向端口:') }} {{ item.port }}</span>
@@ -210,16 +210,32 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-.srv-manager-wrapper { padding: 4px; }
+/* 全局間距 */
+.srv-manager-wrapper { padding: 4px; color: var(--text-color); }
+.mb-4 { margin-bottom: 16px; }
+
+/* 藍色 Alert 深度適配 */
+:deep(.custom-alert) {
+  border-radius: 8px;
+  background-color: rgba(24, 144, 255, 0.1) !important;
+  border: 1px solid rgba(24, 144, 255, 0.2) !important;
+}
+:deep(.custom-alert .ant-alert-message), 
+:deep(.custom-alert .ant-alert-description) {
+  color: var(--text-color) !important;
+  opacity: 0.9;
+}
 
 .desc-text {
   margin-bottom: 20px;
   font-size: 14px;
+  /* 使用 currentColor 或不指定顏色，僅通過 opacity 實現灰度感 */
+  /* 這樣在深色模式下，它會是半透明的白色；淺色下是半透明的黑色 */
+  color: inherit !important;
   opacity: 0.65; 
-  color: var(--text-color, inherit);
 }
 
-/* 新增區域卡片 */
+/* 輸入區域卡片 */
 .config-card {
   background: rgba(128, 128, 128, 0.08);
   padding: 16px;
@@ -231,19 +247,27 @@ defineExpose({ openDialog });
   font-weight: bold;
   margin-bottom: 12px;
   opacity: 0.6;
-  text-transform: uppercase;
 }
 
-/* 輸入框佈局修正 */
+/* Flex 佈局解決對齊問題 */
 .input-row {
   display: flex;
   gap: 8px;
-  align-items: flex-start; /* 防止子組件高度被強制拉伸不一致 */
+  align-items: stretch;
 }
 .input-subdomain { flex: 3; }
-.input-port { flex: 1.5; width: 100%; }
 
-/* 列表樣式修正 */
+/* 修正 InputNumber 的文字垂直居中 */
+.input-port { 
+  flex: 1.5; 
+  display: flex;
+  align-items: center;
+}
+:deep(.ant-input-number-input) {
+  height: 32px; /* 與普通 input 保持一致 */
+}
+
+/* 列表樣式 */
 .list-header {
   display: flex;
   justify-content: space-between;
@@ -253,53 +277,36 @@ defineExpose({ openDialog });
 .list-title { font-weight: 600; font-size: 14px; }
 
 .srv-item {
-  background: rgba(128, 128, 128, 0.05);
+  background: rgba(128, 128, 128, 0.05); /* 使用透明度而非純色 */
   margin-bottom: 10px;
   border: 1px solid rgba(128, 128, 128, 0.1);
   border-radius: 10px;
-  padding: 12px 16px !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 12px !important;
+  transition: all 0.3s;
 }
 .srv-item:hover {
   border-color: #1890ff;
   background: rgba(24, 144, 255, 0.05);
-  transform: translateY(-1px);
 }
 
 .domain-icon {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   background: rgba(24, 144, 255, 0.15);
   color: #1890ff;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
 }
 
-.domain-text { 
-  font-weight: bold; 
-  color: var(--text-color, #000); 
-  word-break: break-all;
-  line-height: 1.4;
-}
-.target-text { font-size: 12px; opacity: 0.55; color: var(--text-color, #000); }
+.domain-text { font-weight: bold; color: var(--text-color); }
+.target-text { font-size: 12px; opacity: 0.6; color: var(--text-color); }
 
-/* 移動端適配修正 */
+/* 移動端適配 */
 @media (max-width: 576px) {
-  .input-row { flex-direction: column; gap: 12px; }
-  .input-subdomain, .input-port, .btn-add { width: 100% !important; }
-  
-  /* 手機端讓移除按鈕更易點擊 */
-  :deep(.ant-list-item-action) {
-    margin-inline-start: 0;
-  }
-  
-  /* 縮小後綴避免擠壓 */
-  :deep(.ant-input-group-addon) {
-    font-size: 12px;
-    padding: 0 4px;
-  }
+  .input-row { flex-direction: column; }
+  .btn-add { width: 100%; }
 }
 </style>
