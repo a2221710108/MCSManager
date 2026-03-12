@@ -130,7 +130,8 @@ const btns = computed(() => {
       click: () => {
         mcSettingsDialog.value?.openDialog();
       },
-      condition: () => isAdmin.value && instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+      // 修正後的寫法：加上括號
+     condition: () => isAdmin.value && (instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false)
     },
     {
       title: t("備份管理"), // 或者使用對應的 i18n key
