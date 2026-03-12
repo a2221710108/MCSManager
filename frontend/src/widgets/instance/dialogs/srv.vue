@@ -88,7 +88,7 @@ const handleAddSRV = async () => {
       subdomain: newSubdomain.value,
       port: newPort.value
     });
-    message.success(t("添加成功，DNS 解析通常在 1-5 分鐘內生效"));
+    message.success(t("添加成功，通常在 1-5 分鐘內生效"));
     newSubdomain.value = "";
     newPort.value = undefined;
     await fetchSRVList();
@@ -133,12 +133,13 @@ defineExpose({ openDialog });
     centered
     :footer="null"
     :width="isPhone ? '100%' : '650px'"
+    class="srv-modal"
   >
     <div class="srv-manager-wrapper">
-      <a-alert type="success" show-icon class="mb-4">
+      <a-alert type="info" show-icon class="mb-4 custom-alert">
         <template #icon><InfoCircleOutlined /></template>
         <template #description>
-          {{ t("您可以自定義一個子域名，讓玩家無需輸入端口即可加入。系統將自動解析至高速節點。") }}
+          {{ t("您可以自定義一個子域名，讓玩家無需輸入端口即可加入伺服器。") }}
         </template>
       </a-alert>
 
@@ -170,10 +171,9 @@ defineExpose({ openDialog });
 
       <div class="list-container">
         <div class="list-header">
-          <span class="list-title">{{ t("我的域名列表") }}</span>
-          <a-button type="text" size="small" @click="fetchSRVList" :loading="isLoading">
+          <span class="list-title">{{ t("我的綁定列表") }}</span>
+          <a-button type="link" size="small" @click="fetchSRVList" :loading="isLoading">
             <template #icon><ReloadOutlined /></template>
-            {{ t("重新整理") }}
           </a-button>
         </div>
 
@@ -181,9 +181,7 @@ defineExpose({ openDialog });
           :loading="isLoading" 
           :data-source="srvRecords" 
           item-layout="horizontal"
-          bordered
-          class="srv-list"
-          :locale="{ emptyText: t('目前尚未建立任何自定義域名') }"
+          :locale="{ emptyText: t('目前尚未建立任何域名') }"
         >
           <template #renderItem="{ item }">
             <a-list-item class="srv-item">
@@ -197,7 +195,7 @@ defineExpose({ openDialog });
                   <span class="domain-text">{{ item.subdomain }}.{{ DOMAIN_SUFFIX }}</span>
                 </template>
                 <template #description>
-                  <span class="target-text">指向端口: {{ item.port }}</span>
+                  <span class="target-text">{{ t('指向端口:') }} {{ item.port }}</span>
                 </template>
               </a-list-item-meta>
               <template #actions>
@@ -215,81 +213,92 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-.srv-manager-wrapper { padding: 4px; }
+/* 全局間距 */
+.srv-manager-wrapper { padding: 4px; color: var(--text-color); }
 .mb-4 { margin-bottom: 16px; }
 
+/* 藍色 Alert 深度適配 */
+:deep(.custom-alert) {
+  border-radius: 8px;
+  background-color: rgba(24, 144, 255, 0.1) !important;
+  border: 1px solid rgba(24, 144, 255, 0.2) !important;
+}
+:deep(.custom-alert .ant-alert-message), 
+:deep(.custom-alert .ant-alert-description) {
+  color: var(--text-color) !important;
+  opacity: 0.9;
+}
+
+/* 輸入區域卡片 */
 .config-card {
   background: rgba(128, 128, 128, 0.08);
   padding: 16px;
   border-radius: 12px;
   margin-bottom: 24px;
 }
-
 .section-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: bold;
   margin-bottom: 12px;
-  color: #666;
-  text-transform: uppercase;
+  opacity: 0.6;
 }
 
+/* Flex 佈局解決對齊問題 */
 .input-row {
   display: flex;
-  gap: 12px;
+  gap: 8px;
+  align-items: stretch;
+}
+.input-subdomain { flex: 3; }
+
+/* 修正 InputNumber 的文字垂直居中 */
+.input-port { 
+  flex: 1.5; 
+  display: flex;
+  align-items: center;
+}
+:deep(.ant-input-number-input) {
+  height: 32px; /* 與普通 input 保持一致 */
 }
 
-.input-subdomain { flex: 3; }
-.input-port { flex: 2; }
-.btn-add { flex: 1; }
-
+/* 列表樣式 */
 .list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
-  padding: 0 4px;
 }
-
-.list-title {
-  font-weight: 600;
-  font-size: 15px;
-}
-
-.srv-list {
-  background: transparent;
-  border-radius: 8px;
-  overflow: hidden;
-}
+.list-title { font-weight: 600; font-size: 14px; }
 
 .srv-item {
-  background: var(--card-bg, #fff);
-  margin-bottom: 8px;
-  border: 1px solid rgba(128, 128, 128, 0.15);
-  border-radius: 8px;
+  background: rgba(128, 128, 128, 0.05); /* 使用透明度而非純色 */
+  margin-bottom: 10px;
+  border: 1px solid rgba(128, 128, 128, 0.1);
+  border-radius: 10px;
   padding: 12px !important;
   transition: all 0.3s;
 }
-
 .srv-item:hover {
   border-color: #1890ff;
-  background: rgba(24, 144, 255, 0.02);
+  background: rgba(24, 144, 255, 0.05);
 }
 
 .domain-icon {
-  width: 40px;
-  height: 40px;
-  background: rgba(24, 144, 255, 0.1);
+  width: 36px;
+  height: 36px;
+  background: rgba(24, 144, 255, 0.15);
   color: #1890ff;
-  border-radius: 50%;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
 }
 
-.domain-text { font-weight: bold; }
-.target-text { font-size: 12px; opacity: 0.7; }
+.domain-text { font-weight: bold; color: var(--text-color); }
+.target-text { font-size: 12px; opacity: 0.6; color: var(--text-color); }
 
+/* 移動端適配 */
 @media (max-width: 576px) {
   .input-row { flex-direction: column; }
   .btn-add { width: 100%; }
