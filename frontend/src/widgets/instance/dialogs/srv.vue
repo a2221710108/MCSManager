@@ -19,11 +19,10 @@ const props = defineProps<{
 }>();
 
 // --- 配置區 ---
-// 這裡已改為你的自定義域名
-const API_ENDPOINT = "https://srv.lazycloud.one/srv"; 
+const API_ENDPOINT = "https://api.lazycloud.de/srv"; 
 const DOMAIN_SUFFIX = "lazycloud.de";
-// 建議在 Worker 設置此 Key 進行校驗，若無設置可保持空字串
-const AUTH_KEY = ""; 
+// 請確保此 Key 與 Cloudflare Worker 中的 AUTH_KEY 一致
+const AUTH_KEY = "Your_Secret_Access_Key"; 
 
 const open = ref(false);
 const isLoading = ref(false);
@@ -40,7 +39,7 @@ const openDialog = async () => {
   await fetchSRVList();
 };
 
-// 請求封裝（含 Auth Header）
+// 請求封裝
 const apiRequest = async (method: string, body?: any) => {
   const options: RequestInit = {
     method,
@@ -79,7 +78,6 @@ const handleAddSRV = async () => {
     return message.warning(t("請填寫完整的子域名與端口"));
   }
 
-  // 子域名格式檢查
   if (!/^[a-zA-Z0-9-]+$/.test(newSubdomain.value)) {
     return message.error(t("子域名格式不正確（僅限字母數字）"));
   }
@@ -106,7 +104,7 @@ const handleDelete = (record: any) => {
   Modal.confirm({
     title: t("確認移除此域名？"),
     icon: createVNode(ExclamationCircleOutlined),
-    content: t(`即將刪除：${record.subdomain}.${DOMAIN_SUFFIX} (端口 ${record.port})`),
+    content: `${record.subdomain}.${DOMAIN_SUFFIX} (Port: ${record.port})`,
     okText: t("確認刪除"),
     okType: "danger",
     cancelText: t("取消"),
@@ -140,7 +138,7 @@ defineExpose({ openDialog });
       <a-alert type="success" show-icon class="mb-4">
         <template #icon><InfoCircleOutlined /></template>
         <template #description>
-          {{ t("您可以自定義一個子域名，讓玩家無需輸入雜亂的端口即可加入。系統將自動解析至 LazyCloud 高速節點。") }}
+          {{ t("您可以自定義一個子域名，讓玩家無需輸入端口即可加入。系統將自動解析至高速節點。") }}
         </template>
       </a-alert>
 
@@ -157,7 +155,7 @@ defineExpose({ openDialog });
           
           <a-input-number 
             v-model:value="newPort" 
-            :placeholder="t('服務器端口')" 
+            :placeholder="t('端口')" 
             class="input-port"
             :min="1" 
             :max="65535" 
@@ -179,7 +177,14 @@ defineExpose({ openDialog });
           </a-button>
         </div>
 
-        <a-list :loading="isLoading" :data-source="srvRecords" item-layout="horizontal">
+        <a-list 
+          :loading="isLoading" 
+          :data-source="srvRecords" 
+          item-layout="horizontal"
+          bordered
+          class="srv-list"
+          :locale="{ emptyText: t('目前尚未建立任何自定義域名') }"
+        >
           <template #renderItem="{ item }">
             <a-list-item class="srv-item">
               <a-list-item-meta>
@@ -202,11 +207,6 @@ defineExpose({ openDialog });
                 </a-button>
               </template>
             </a-list-item>
-          </template>
-          <template #emptyText>
-            <div class="empty-state">
-              <p>{{ t("目前尚未建立任何自定義域名") }}</p>
-            </div>
           </template>
         </a-list>
       </div>
@@ -255,23 +255,30 @@ defineExpose({ openDialog });
   font-size: 15px;
 }
 
+.srv-list {
+  background: transparent;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 .srv-item {
-  border: 1px solid rgba(128, 128, 128, 0.15);
+  background: var(--card-bg, #fff);
   margin-bottom: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.15);
   border-radius: 8px;
   padding: 12px !important;
   transition: all 0.3s;
 }
 
 .srv-item:hover {
+  border-color: #1890ff;
   background: rgba(24, 144, 255, 0.02);
-  border-color: rgba(24, 144, 255, 0.3);
 }
 
 .domain-icon {
   width: 40px;
   height: 40px;
-  background: #e6f7ff;
+  background: rgba(24, 144, 255, 0.1);
   color: #1890ff;
   border-radius: 50%;
   display: flex;
@@ -280,9 +287,8 @@ defineExpose({ openDialog });
   font-size: 18px;
 }
 
-.domain-text { font-weight: bold; color: #333; }
-.target-text { font-size: 12px; color: #888; }
-.empty-state { padding: 40px 0; text-align: center; color: #aaa; }
+.domain-text { font-weight: bold; }
+.target-text { font-size: 12px; opacity: 0.7; }
 
 @media (max-width: 576px) {
   .input-row { flex-direction: column; }
