@@ -39,6 +39,7 @@ import RconSettings from "./dialogs/RconSettings.vue";
 import TermConfig from "./dialogs/TermConfig.vue";
 import backup from "./dialogs/backup.vue";
 import java from "./dialogs/java.vue";
+import java from "./dialogs/srv.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -49,6 +50,7 @@ const instanceDetailsDialog = ref<InstanceType<typeof InstanceDetail>>();
 const instanceFundamentalDetailDialog = ref<InstanceType<typeof InstanceFundamentalDetail>>();
 const backupDialog = ref<InstanceType<typeof backup>>();
 const javaDialog = ref<InstanceType<typeof java>>();
+const srvDialog = ref<InstanceType<typeof srv>>();
 
 const { toPage: toOtherPager } = useAppRouters();
 
@@ -143,6 +145,14 @@ const btns = computed(() => {
   icon: CoffeeOutlined,
   click: () => {
     javaDialog.value?.openDialog();
+  },
+  // 僅限 Minecraft Java 版顯示
+  condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+},
+    title: t("自定義域名"),
+  icon: CoffeeOutlined,
+  click: () => {
+    srvDialog.value?.openDialog();
   },
   // 僅限 Minecraft Java 版顯示
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
@@ -306,6 +316,14 @@ watch(instanceInfo, (cfg, oldCfg) => {
 
   <java
     ref="javaDialog"
+    :instance-info="instanceInfo"
+    :instance-id="instanceId"
+    :daemon-id="daemonId"
+    @update="refreshInstanceInfo"
+  />
+
+  <srv
+    ref="srvDialog"
     :instance-info="instanceInfo"
     :instance-id="instanceId"
     :daemon-id="daemonId"
