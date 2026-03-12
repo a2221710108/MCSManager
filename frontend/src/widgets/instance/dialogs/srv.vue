@@ -229,7 +229,7 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 基礎佈局 */
+/* 基礎佈局與文字 */
 .srv-manager-wrapper { 
   padding: 4px; 
   color: var(--text-color); 
@@ -274,16 +274,32 @@ defineExpose({ openDialog });
   height: 32px;
 }
 
-/* --- 列表容器 (關鍵修正) --- */
+/* --- 列表區域 --- */
 .list-container {
-  max-height: 480px; /* 增加列表可視高度 */
+  max-height: 480px; 
   overflow-y: auto;
-  /* padding-bottom 是確保最後一項邊框不被截斷的關鍵 */
-  padding: 4px 8px 32px 8px; 
+  padding: 4px 8px 32px 8px; /* 底部緩衝確保邊框完整 */
   margin-top: 8px;
 }
 
-/* 移除 Ant Design 預設的列表邊框干擾 */
+/* 還原列表標題樣式 */
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.list-title { 
+  font-weight: 600; 
+  font-size: 14px; 
+}
+
+/* 隱藏重新整理按鈕，但保留 DOM 結構以維持邏輯調用（或直接在 Template 刪除） */
+.refresh-btn {
+  display: none !important;
+}
+
+/* --- 項目樣式 (srv-item) --- */
 :deep(.ant-list-items) {
   overflow: visible !important;
 }
@@ -291,14 +307,12 @@ defineExpose({ openDialog });
 :deep(.ant-list-item) {
   border: none !important;
   border-bottom: none !important;
-  padding: 0 !important; /* 讓自定義的 srv-item 控制間距 */
+  padding: 0 !important;
   margin-bottom: 12px;
 }
 
-/* --- 單個項目樣式 (srv-item) --- */
 .srv-item {
   background: rgba(128, 128, 128, 0.05);
-  /* 使用全邊框，!important 確保優先級 */
   border: 1px solid rgba(128, 128, 128, 0.15) !important;
   border-radius: 10px;
   padding: 12px 16px !important;
@@ -306,7 +320,6 @@ defineExpose({ openDialog });
   display: flex !important;
   align-items: center;
   box-sizing: border-box !important;
-  /* 確保陰影和邊框渲染不被截斷 */
   overflow: visible !important;
 }
 
@@ -316,7 +329,7 @@ defineExpose({ openDialog });
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* --- 域名與複製按鈕佈局 --- */
+/* --- 內容與複製按鈕 --- */
 .domain-title-wrapper { 
   display: flex; 
   align-items: center; 
@@ -335,10 +348,6 @@ defineExpose({ openDialog });
   font-size: 14px;
   color: #1890ff;
   opacity: 0.6;
-}
-
-.copy-btn:hover {
-  opacity: 1;
 }
 
 .domain-icon {
@@ -364,10 +373,9 @@ defineExpose({ openDialog });
     flex-direction: column; 
     gap: 12px;
   }
-  
   .btn-add { width: 100%; }
 
-  /* 需求：在移動端移除複製按鈕 */
+  /* 移動端隱藏複製按鈕 */
   .copy-btn {
     display: none !important;
   }
@@ -376,13 +384,9 @@ defineExpose({ openDialog });
     max-height: 380px;
     padding-bottom: 40px; 
   }
-  
-  .srv-item {
-    margin-bottom: 16px;
-  }
 }
 
-/* 自定義滾動條 */
+/* 滾動條 */
 .list-container::-webkit-scrollbar {
   width: 4px;
 }
