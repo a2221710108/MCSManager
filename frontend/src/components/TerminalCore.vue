@@ -111,21 +111,26 @@ const refreshPage = () => {
 onMounted(async () => {
   try {
     if (instanceId && daemonId) {
-      await setUpTerminal({
-        instanceId,
-        daemonId
-      });
+      await setUpTerminal({ instanceId, daemonId });
     }
     term = await initTerminal();
 
-    // --- 新增：從前端攔截亂碼關鍵指令 ---
     if (term) {
-      // 攔截 OSC 11 (背景顏色查詢)，直接回傳 true 代表已處理，但不做任何回應
+      // 1. 攔截背景/前景顏色查詢 (解決 rgb:1e1e 亂碼)
       term.parser.registerOscHandler(11, () => true);
-      // 攔截 OSC 10 (前景顏色查詢)
       term.parser.registerOscHandler(10, () => true);
+
+      // 2. 攔截 DSR 游標位置回報 (解決 [37;1R 亂碼)
+      // 我們攔截前端發往後端的數據流，過濾掉回報序列
+      const _write = term._coreHandlerService.triggerDataEvent.bind(term._coreHandlerService);
+      term._coreHandlerService.triggerDataEvent = (data: string) => {
+        if (data.includes('\x1b[') && data.endsWith('R')) {
+          // 如果數據看起來像游標回報 [行;列R，就直接吞掉
+          return;
+        }
+        _write(data);
+      };
     }
-    // ----------------------------------
 
   } catch (error: any) {
     console.error(error);
