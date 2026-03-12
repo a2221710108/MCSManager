@@ -150,6 +150,7 @@ const btns = computed(() => {
   // 僅限 Minecraft Java 版顯示
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
 },
+    {
     title: t("自定義域名"),
   icon: GlobalOutlined,
   click: () => {
