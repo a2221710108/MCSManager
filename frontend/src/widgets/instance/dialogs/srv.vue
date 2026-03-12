@@ -136,12 +136,9 @@ defineExpose({ openDialog });
     class="srv-modal"
   >
     <div class="srv-manager-wrapper">
-      <a-alert type="info" show-icon class="mb-4 custom-alert">
-        <template #icon><InfoCircleOutlined /></template>
-        <template #description>
-          {{ t("您可以自定義一個子域名，讓玩家無需輸入端口即可加入伺服器。") }}
-        </template>
-      </a-alert>
+      <a-typography-paragraph type="secondary" class="desc-text">
+        {{ t("您可以自定義一個子域名，讓玩家無需輸入端口即可加入伺服器。") }}
+      </a-typography-paragraph>
 
       <div class="config-card">
         <div class="section-title">{{ t("新增解析記錄") }}</div>
@@ -227,6 +224,15 @@ defineExpose({ openDialog });
 :deep(.custom-alert .ant-alert-description) {
   color: var(--text-color) !important;
   opacity: 0.9;
+}
+
+.desc-text {
+  margin-bottom: 20px;
+  font-size: 14px;
+  /* 使用 currentColor 或不指定顏色，僅通過 opacity 實現灰度感 */
+  /* 這樣在深色模式下，它會是半透明的白色；淺色下是半透明的黑色 */
+  color: inherit !important;
+  opacity: 0.65; 
 }
 
 /* 輸入區域卡片 */
