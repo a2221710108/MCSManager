@@ -19,10 +19,10 @@ const props = defineProps<{
 }>();
 
 // --- 配置區 ---
-const API_ENDPOINT = "https://api.lazycloud.de/srv"; 
+const API_ENDPOINT = "https://srv.lazycloud.one/srv"; 
 const DOMAIN_SUFFIX = "lazycloud.de";
 // 請確保此 Key 與 Cloudflare Worker 中的 AUTH_KEY 一致
-const AUTH_KEY = "Your_Secret_Access_Key"; 
+const AUTH_KEY = ""; 
 
 const open = ref(false);
 const isLoading = ref(false);
