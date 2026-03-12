@@ -178,9 +178,9 @@ defineExpose({ openDialog });
       <div class="list-container">
         <div class="list-header">
           <span class="list-title">{{ t("我的綁定列表") }}</span>
-          <a-button type="link" size="small" @click="fetchSRVList" :loading="isLoading">
-            <template #icon><ReloadOutlined /></template>
-          </a-button>
+          <a-button class="refresh-btn" type="link" size="small" @click="fetchSRVList" :loading="isLoading">
+    <template #icon><ReloadOutlined /></template>
+  </a-button>
         </div>
 
         <a-list 
