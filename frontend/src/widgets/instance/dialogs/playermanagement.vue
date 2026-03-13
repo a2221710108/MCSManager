@@ -44,22 +44,31 @@ const fetchPlayers = async () => {
   if (!pingConfig.value.ip) return;
   isLoading.value = true;
   try {
+    // 加上 ?t=xxx 避免瀏覽器緩存 API 結果
     const res = await fetch(
-      `https://api.mcstatus.io/v2/status/java/${pingConfig.value.ip}:${pingConfig.value.port}`
+      `https://api.mcstatus.io/v2/status/java/${pingConfig.value.ip}:${pingConfig.value.port}?t=${Date.now()}`
     );
     const data = await res.json();
+    
+    // 清空舊數據再賦值，確保響應式更新
+    onlinePlayers.value = []; 
+    
     if (data.online && data.players && data.players.list) {
       onlinePlayers.value = data.players.list;
     } else {
       onlinePlayers.value = [];
+      // 如果獲取不到列表，可能是伺服器隱藏了玩家名單
+      if (data.online) message.warn(t("伺服器已開啟但未公開玩家名單"));
     }
   } catch (err) {
     console.error("Fetch players error:", err);
+    message.error(t("無法獲取玩家名單"));
   } finally {
     isLoading.value = false;
   }
 };
 
+  
 // 核心修正：增加 async/await 與 try-catch 攔截「實例沒有在運作」錯誤
 const runCommand = async (cmd: string, playerName: string) => {
   const fullCommand = cmd.replace("{player}", playerName);
@@ -138,6 +147,7 @@ defineExpose({
                       <a-button @click="runCommand('op {player}', item.name_raw || item.name)">
                         <template #icon><CrownOutlined /></template>
                       </a-button>
+                    </a-tooltip>
                     <a-tooltip :title="t('撤銷管理員')">
                       <a-button @click="runCommand('deop {player}', item.name_raw || item.name)">
                         <template #icon><CrownFilled /></template>
@@ -166,9 +176,6 @@ defineExpose({
           </template>
         </a-list>
 
-        <div v-if="!isLoading && onlinePlayers.length === 0" class="empty-state">
-          <a-empty :description="t('暫無在線玩家')" />
-        </div>
       </div>
     </div>
   </a-modal>
