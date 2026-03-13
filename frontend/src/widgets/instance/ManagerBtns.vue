@@ -267,7 +267,6 @@ watch(instanceInfo, (cfg, oldCfg) => {
       </ResponsiveLayoutGroup>
     </template>
   </CardPanel>
- </template> 
 
   <TermConfig
     ref="terminalConfigDialog"
@@ -356,6 +355,8 @@ watch(instanceInfo, (cfg, oldCfg) => {
    :use-terminal-hook="terminalHook"
    @update="refreshInstanceInfo"
  /> 
+  
+</template> 
 
 <style lang="scss" scoped>
 .function-btns-container {
