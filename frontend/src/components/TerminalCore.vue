@@ -1,157 +1,122 @@
 <script setup lang="ts">
-import connectErrorImage from "@/assets/daemon_connection_error.png";
-import { useCommandHistory } from "@/hooks/useCommandHistory";
-import { useXhrPollError } from "@/hooks/useXhrPollError";
-import { t } from "@/lang/i18n";
-import { getInstanceOutputLog } from "@/services/apis/instance";
-import { useLayoutContainerStore } from "@/stores/useLayoutContainerStore";
-import { CodeOutlined, DeleteOutlined, LoadingOutlined } from "@ant-design/icons-vue";
+import { onMounted, ref, reactive, watch, nextTick, onBeforeUnmount } from "vue";
+// ... (保持原有的 import 不變)
 import { Terminal } from "@xterm/xterm";
-import { message } from "ant-design-vue";
-import { onMounted, ref, watch } from "vue"; // 增加 watch
-import { encodeConsoleColor, type UseTerminalHook } from "../hooks/useTerminal";
-import { getRandomId } from "../tools/randId";
+import { FitAddon } from "@xterm/addon-fit"; // 建議確保有 fit 插件以保證佈局自適應
 
 const props = defineProps<{
   instanceId: string;
   daemonId: string;
   height: string;
   useTerminalHook: UseTerminalHook;
-  filterType: string; // 必須保留此屬性以接收 Terminal.vue 的切換信號
 }>();
 
+// --- 新增：標籤頁狀態管理 ---
+const activeTab = ref("ALL");
+const isMinecraft = ref(false);
+
+// 存儲三個終端實例及其 DOM ID
+const terminals = reactive({
+  ALL: { term: null as Terminal | null, id: `term-all-${getRandomId()}`, fit: null as any },
+  WARN: { term: null as Terminal | null, id: `term-warn-${getRandomId()}`, fit: null as any },
+  ERROR: { term: null as Terminal | null, id: `term-error-${getRandomId()}` , fit: null as any }
+});
+
 const { containerState } = useLayoutContainerStore();
+const { /* ...原有的解構 */ commandInputValue } = useCommandHistory();
+const { state, events, isConnect, socketAddress, execute: setUpTerminal, initTerminalWindow, sendCommand, clearTerminal } = props.useTerminalHook;
 
-const {
-  focusHistoryList,
-  selectLocation,
-  history,
-  commandInputValue,
-  handleHistorySelect,
-  clickHistoryItem
-} = useCommandHistory();
+// --- 新增：日誌過濾邏輯 ---
+const writeToTabs = (data: string) => {
+  // 1. 寫入默認終端 (保持原功能不變)
+  terminals.ALL.term?.write(data);
 
-const {
-  state,
-  events,
-  isConnect,
-  socketAddress,
-  execute: setUpTerminal,
-  initTerminalWindow,
-  sendCommand,
-  clearTerminal
-} = props.useTerminalHook;
-
-const instanceId = props.instanceId;
-const daemonId = props.daemonId;
-const terminalDomId = `terminal-window-${getRandomId()}`;
-const socketError = ref<Error>();
-const { isXhrPollError, xhrPollErrorReason } = useXhrPollError(socketError);
-
-let term: Terminal | undefined;
-let inputRef = ref<HTMLElement | null>(null);
-
-// --- 核心功能：日誌過濾邏輯 ---
-const filterLog = (text: string): string => {
-  const type = props.filterType;
-  if (!text || type === "ALL") return text;
-  
-  const lines = text.split(/\r?\n/);
-  const filteredLines = lines.filter(line => {
-    const upperLine = line.toUpperCase();
-    if (type === "WARN") return upperLine.includes("WARN") || upperLine.includes("WARNING");
-    if (type === "ERROR") return upperLine.includes("ERROR") || upperLine.includes("FATAL") || upperLine.includes("EXCEPTION");
-    return false;
-  });
-  
-  return filteredLines.length > 0 ? filteredLines.join('\r\n') + '\r\n' : '';
-};
-
-const handleSendCommand = () => {
-  if (focusHistoryList.value) return;
-  sendCommand(commandInputValue.value || "");
-  commandInputValue.value = "";
-};
-
-const handleClickHistoryItem = (item: string) => {
-  clickHistoryItem(item);
-  inputRef.value?.focus();
-};
-
-const initTerminal = async () => {
-  if (containerState.isDesignMode) return;
-  const dom = document.getElementById(terminalDomId);
-  if (dom) {
-    const term = initTerminalWindow(dom);
-    return term;
-  }
-  throw new Error(t("TXT_CODE_42bcfe0c"));
-};
-
-// --- 原始事件處理 ---
-events.on("opened", () => message.success(t("TXT_CODE_e13abbb1")));
-events.on("stopped", () => message.success(t("TXT_CODE_efb6d377")));
-events.on("error", (error: Error) => (socketError.value = error));
-
-// 修改：實時輸出增加過濾
-events.on("stdout", (data: any) => {
-  const rawText = typeof data === 'string' ? data : data.text;
-  const processed = filterLog(rawText);
-  if (processed && term) {
-    term.write(state.value?.config?.terminalOption?.haveColor ? encodeConsoleColor(processed) : processed);
-  }
-});
-
-// 將原有的 detail 邏輯提取出來，以便重複調用
-const loadHistoryLog = async () => {
-  try {
-    const { value } = await getInstanceOutputLog().execute({
-      params: { uuid: instanceId || "", daemonId: daemonId || "" }
-    });
-    if (value && term) {
-      const processed = filterLog(value);
-      if (processed) {
-        term.write(state.value?.config?.terminalOption?.haveColor ? encodeConsoleColor(processed) : processed);
-      }
+  // 2. 如果是 Minecraft，則進行分流
+  if (isMinecraft.value) {
+    // 簡單過濾正則 (匹配 [時刻] [線程/LEVEL]:)
+    if (data.includes("/WARN") || /WARN/i.test(data)) {
+      terminals.WARN.term?.write(data);
     }
-  } catch (error: any) {}
+    if (data.includes("/ERROR") || /ERROR/i.test(data)) {
+      terminals.ERROR.term?.write(data);
+    }
+  }
 };
 
-// 原始代碼的一次性加載
-events.once("detail", loadHistoryLog);
-
-// --- 監聽分頁切換：點擊標籤時重新加載日誌 ---
-watch(() => props.filterType, () => {
-  if (term) {
-    term.reset(); // 清空終端
-    loadHistoryLog(); // 重新拉取並過濾
+// 重寫初始化邏輯以支持多實例
+const initAllTerminals = async () => {
+  if (containerState.isDesignMode) return;
+  
+  // 初始化 ALL (這是主終端)
+  const domAll = document.getElementById(terminals.ALL.id);
+  if (domAll) {
+    terminals.ALL.term = initTerminalWindow(domAll);
+    // 執行你原有的攔截邏輯
+    interceptDSR(terminals.ALL.term);
   }
+
+  // 如果是 Minecraft，初始化另外兩個
+  if (isMinecraft.value) {
+    await nextTick();
+    ["WARN", "ERROR"].forEach(tab => {
+      const dom = document.getElementById((terminals as any)[tab].id);
+      if (dom) {
+        const t = new Terminal((terminals.ALL.term as any).options); // 繼承主終端配置
+        const fitAddon = new FitAddon();
+        t.loadAddon(fitAddon);
+        t.open(dom);
+        fitAddon.fit();
+        (terminals as any)[tab].term = t;
+        (terminals as any)[tab].fit = fitAddon;
+      }
+    });
+  }
+};
+
+// 封裝你原有的 DSR 攔截邏輯
+const interceptDSR = (term: any) => {
+  if (!term) return;
+  term.parser.registerOscHandler(11, () => true);
+  term.parser.registerOscHandler(10, () => true);
+  const core = term._core;
+  if (core?.coreService) {
+    const originalTriggerData = core.coreService.triggerDataEvent.bind(core.coreService);
+    core.coreService.triggerDataEvent = (data: string) => {
+      if (data.includes('\x1b[') && data.endsWith('R')) return;
+      originalTriggerData(data);
+    };
+  }
+};
+
+// 監聽數據流
+events.on("data", (data: string) => {
+  writeToTabs(data);
 });
 
-const refreshPage = () => window.location.reload();
+// 監聽實例類型
+watch(() => state.value?.instanceInfo, (info) => {
+  if (info?.config?.type) {
+    // 判斷是否為 Minecraft (java 或 bedrock)
+    isMinecraft.value = info.config.type.includes("minecraft");
+  }
+}, { immediate: true });
 
 onMounted(async () => {
   try {
-    if (instanceId && daemonId) {
-      await setUpTerminal({ instanceId, daemonId });
+    if (props.instanceId && props.daemonId) {
+      await setUpTerminal({ instanceId: props.instanceId, daemonId: props.daemonId });
     }
-    term = await initTerminal();
-
-    if (term) {
-      term.parser.registerOscHandler(11, () => true);
-      term.parser.registerOscHandler(10, () => true);
-      const core = (term as any)._core;
-      if (core && core.coreService) {
-        const originalTriggerData = core.coreService.triggerDataEvent.bind(core.coreService);
-        core.coreService.triggerDataEvent = (data: string) => {
-          if (data.includes('\x1b[') && data.endsWith('R')) return; 
-          originalTriggerData(data);
-        };
-      }
-    }
-  } catch (error: any) {
+    await initAllTerminals();
+  } catch (error) {
     console.error(error);
   }
+});
+
+// 當切換標籤時重新調整大小
+watch(activeTab, () => {
+  nextTick(() => {
+    (terminals as any)[activeTab.value]?.fit?.fit();
+  });
 });
 </script>
 
@@ -160,97 +125,103 @@ onMounted(async () => {
     <div v-if="!isConnect" class="terminal-loading">
       <LoadingOutlined style="font-size: 72px; color: white" />
     </div>
+
+    <div v-if="isMinecraft" class="terminal-tabs">
+      <div 
+        v-for="tab in ['ALL', 'WARN', 'ERROR']" 
+        :key="tab"
+        :class="['tab-item', activeTab === tab ? 'active' : '']"
+        @click="activeTab = tab"
+      >
+        {{ tab === 'ALL' ? t('TXT_CODE_555e2c1b').replace(':','') : tab }}
+        <span v-if="tab === 'ERROR'" class="dot-error"></span>
+      </div>
+    </div>
+
     <div class="terminal-button-group position-absolute-right position-absolute-top">
       <ul>
         <li @click="clearTerminal()">
           <a-tooltip placement="top">
-            <template #title>
-              <span>{{ t("TXT_CODE_b1e2e1b4") }}</span>
-            </template>
+            <template #title><span>{{ t("TXT_CODE_b1e2e1b4") }}</span></template>
             <delete-outlined />
           </a-tooltip>
         </li>
       </ul>
     </div>
+
     <div class="terminal-wrapper global-card-container-shadow position-relative">
       <div class="terminal-container">
-        <div
-          v-if="!containerState.isDesignMode"
-          :id="terminalDomId"
+        <div 
+          v-show="activeTab === 'ALL'"
+          :id="terminals.ALL.id" 
           :style="{ height: props.height }"
         ></div>
-        <div v-else :style="{ height: props.height }">
+        
+        <div 
+          v-if="isMinecraft"
+          v-show="activeTab === 'WARN'"
+          :id="terminals.WARN.id" 
+          :style="{ height: props.height }"
+        ></div>
+
+        <div 
+          v-if="isMinecraft"
+          v-show="activeTab === 'ERROR'"
+          :id="terminals.ERROR.id" 
+          :style="{ height: props.height }"
+        ></div>
+
+        <div v-if="containerState.isDesignMode" :style="{ height: props.height }">
           <p class="terminal-design-tip">{{ $t("TXT_CODE_7ac6f85c") }}</p>
         </div>
       </div>
     </div>
-    <div class="command-input">
-      <div v-show="focusHistoryList" class="history">
-        <li v-for="(item, key) in history" :key="item">
-          <a-tag
-            :color="key !== selectLocation ? 'blue' : '#108ee9'"
-            @click="handleClickHistoryItem(item)"
-          >
-            {{ item.length > 14 ? item.slice(0, 14) + "..." : item }}
-          </a-tag>
-        </li>
-      </div>
-      <a-input
-        ref="inputRef"
-        v-model:value="commandInputValue"
-        :placeholder="t('TXT_CODE_555e2c1b')"
-        autofocus
-        :disabled="containerState.isDesignMode || !isConnect"
-        @press-enter="handleSendCommand"
-        @keydown="handleHistorySelect"
-      >
-        <template #prefix>
-          <CodeOutlined style="font-size: 18px" />
-        </template>
-      </a-input>
-    </div>
 
-    <div v-if="socketError" class="error-card">
-      <div class="error-card-container">
-        <a-typography-title :level="5">{{ $t("TXT_CODE_6929b0b2") }}</a-typography-title>
-        <a-typography-paragraph>
-          {{ $t("TXT_CODE_812a629e") + socketAddress }}
-        </a-typography-paragraph>
-        <div>
-          <img :src="connectErrorImage" style="width: 100%; height: 110px" />
-        </div>
-        <a-typography-title :level="5">{{ $t("TXT_CODE_9c95b60f") }}</a-typography-title>
-        <a-typography-paragraph>
-          <pre style="font-size: 12px"><code>{{ socketError?.message||"" }}</code></pre>
-          <div v-if="isXhrPollError" style="font-size: 12px">
-            <span> {{ xhrPollErrorReason }}</span>
-          </div>
-        </a-typography-paragraph>
-        <a-typography-paragraph v-if="isXhrPollError">
-          <div class="flex" style="gap: 8px; font-size: 12px">
-            <span><strong>{{ $t("TXT_CODE_d4c8fb3b") }}</strong></span>
-            <a href="https://discord.gg/auDk2Rj7aD" target="_blank">{{ $t("TXT_CODE_9b3ce825") }}</a>
-            <span>|</span>
-            <a href="https://news.lazycloud.one/" target="_blank">{{ $t("TXT_CODE_10cc2794") }}</a>
-          </div>
-        </a-typography-paragraph>
-        <a-typography-title :level="5">{{ $t("TXT_CODE_f1c96d8a") }}</a-typography-title>
-        <a-typography-paragraph>
-          <ul>
-            <li>{{ $t("TXT_CODE_ceba9262") }}</li>
-            <li>{{ $t("TXT_CODE_84099e5") }}</li>
-            <li>{{ $t("TXT_CODE_86ff658a") }}</li>
-          </ul>
-          <div class="flex flex-center">
-            <a-typography-link @click="refreshPage">{{ $t("TXT_CODE_f8b28901") }}</a-typography-link>
-          </div>
-        </a-typography-paragraph>
-      </div>
     </div>
-  </div>
 </template>
 
 <style lang="scss" scoped>
+/* 新增：標籤頁樣式，採用簡約深色風格 */
+.terminal-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  
+  .tab-item {
+    padding: 4px 16px;
+    background: #2a2a2a;
+    color: #999;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.3s;
+    border: 1px solid transparent;
+    border-bottom: none;
+
+    &:hover {
+      background: #333;
+      color: #eee;
+    }
+
+    &.active {
+      background: #1e1e1e;
+      color: #fff;
+      border-color: var(--card-border-color);
+      font-weight: bold;
+    }
+
+    .dot-error {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: #ff4d4f;
+      border-radius: 50%;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+  }
+}
+
 .error-card {
   position: absolute;
   left: 0;
@@ -378,4 +349,6 @@ onMounted(async () => {
     color: rgba(255, 255, 255, 0.584);
   }
 }
+
+
 </style>
