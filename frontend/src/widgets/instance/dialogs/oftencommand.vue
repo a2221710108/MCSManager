@@ -50,7 +50,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("天氣切換"), cmd: "weather {val}", options: ["clear", "rain", "thunder"] },
       { label: t("時間設置"), cmd: "time set {val}", options: ["day", "night", "noon", "midnight"] },
       { label: t("發送全服信息"), cmd: "say {text}", placeholder: t("輸入信息...") },
-      { label: t("發送標題文字"), cmd: "title {text}", placeholder: t("標題內容") },
+      { label: t("發送標題文字"), cmd: "title {player} title {text}", placeholder: t("標題內容") },
       { label: t("傳送玩家"), cmd: "tp {player} {player}" }, 
     ]
   },
@@ -194,119 +194,253 @@ defineExpose({ openDialog });
     v-model:open="open"
     :title="t('快捷指令')"
     :footer="null"
-    :width="750"
+    :width="800"
     centered
+    class="quick-cmd-modal"
   >
     <div v-if="COMMAND_GROUPS.length > 0" class="quick-cmd-container">
-      
       <div class="header-toolbar">
-        <span class="desc-text">{{ t("點擊執行快捷指令，數據刷新可能有 1-5 分鐘延遲") }}</span>
+        <span class="desc-text">{{ t("數據刷新可能有 1-5 分鐘延遲") }}</span>
         <a-button class="refresh-btn" size="small" @click="fetchPlayers" :loading="isFetchingPlayers">
           <template #icon><ReloadOutlined /></template>
         </a-button>
       </div>
 
-      <div v-for="group in COMMAND_GROUPS" :key="group.group" class="group-section">
-        <div class="group-header">
-          <component :is="group.icon" class="group-icon" />
-          <span>{{ group.group }}</span>
-        </div>
-
-        <div class="cmd-grid">
-          <div v-for="item in group.commands" :key="item.label" class="cmd-card">
-            <div class="cmd-top">
-              <span class="cmd-label">{{ item.label }}</span>
+      <a-collapse v-model:activeKey="activeKeys" ghost expand-icon-position="right" class="custom-collapse">
+        <a-collapse-panel v-for="group in COMMAND_GROUPS" :key="group.group">
+          <template #header>
+            <div class="group-header">
+              <component :is="group.icon" class="group-icon" />
+              <span>{{ group.group }}</span>
+              <span class="cmd-count">{{ group.commands.length }}</span>
             </div>
-            
-            <div class="cmd-body">
-              <div class="inputs-group">
-                <template v-for="(type, index) in getParams(item.cmd)" :key="index">
-                  <a-select
-                    v-if="type === 'player'"
-                    v-model:value="formState[`${item.label}_${index}`]"
-                    :placeholder="t('玩家')"
-                    size="small"
-                    show-search
-                    class="param-input player-select"
-                  >
-                    <a-select-option v-for="n in onlinePlayers" :key="n" :value="n">
-                      <div class="player-option">
-                        <img :src="getAvatar(n)" class="mini-avatar" />
-                        <span>{{ n }}</span>
-                      </div>
-                    </a-select-option>
-                  </a-select>
+          </template>
 
-                  <a-select
-                    v-else-if="type === 'val'"
-                    v-model:value="formState[`${item.label}_${index}`]"
-                    size="small"
-                    class="param-input val-select"
-                  >
-                    <a-select-option v-for="opt in (item.options || [])" :key="opt" :value="opt">{{ opt }}</a-select-option>
-                  </a-select>
+          <div class="cmd-list">
+            <div v-for="item in group.commands" :key="item.label" class="cmd-row">
+              <div class="cmd-label-section">
+                <span class="cmd-label">{{ item.label }}</span>
+              </div>
+              
+              <div class="cmd-controls-section">
+                <div class="inputs-group">
+                  <template v-for="(type, index) in getParams(item.cmd)" :key="index">
+                    <a-select
+                      v-if="type === 'player'"
+                      v-model:value="formState[`${item.label}_${index}`]"
+                      :placeholder="t('玩家')"
+                      size="small"
+                      show-search
+                      class="param-input player-select"
+                    >
+                      <a-select-option v-for="n in onlinePlayers" :key="n" :value="n">
+                        <div class="player-option">
+                          <img :src="getAvatar(n)" class="mini-avatar" />
+                          <span>{{ n }}</span>
+                        </div>
+                      </a-select-option>
+                    </a-select>
 
-                  <a-input
-                    v-else
-                    v-model:value="formState[`${item.label}_${index}`]"
-                    :placeholder="getPlaceholder(item, index)"
-                    size="small"
-                    class="param-input text-input"
-                  />
-                </template>
+                    <a-select
+                      v-else-if="type === 'val'"
+                      v-model:value="formState[`${item.label}_${index}`]"
+                      size="small"
+                      class="param-input val-select"
+                    >
+                      <a-select-option v-for="opt in (item.options || [])" :key="opt" :value="opt">
+                        {{ opt }}
+                      </a-select-option>
+                    </a-select>
+
+                    <a-input
+                      v-else
+                      v-model:value="formState[`${item.label}_${index}`]"
+                      :placeholder="getPlaceholder(item, index)"
+                      size="small"
+                      class="param-input text-input"
+                    />
+                  </template>
+                </div>
               </div>
 
-              <a-button type="primary" size="small" class="exec-btn" @click="runCommand(item)">
-                <SendOutlined />
-              </a-button>
+              <div class="cmd-action-section">
+                <a-button type="primary" size="small" class="exec-btn" @click="runCommand(item)">
+                  <template #icon><SendOutlined /></template>
+                </a-button>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </a-collapse-panel>
+      </a-collapse>
     </div>
   </a-modal>
 </template>
 
+<script setup lang="ts">
+// ... (之前的 script 邏輯保持不變，只需增加一個 activeKeys)
+const activeKeys = ref([COMMAND_GROUPS[0].group]); // 預設展開第一組
+</script>
+
 <style scoped>
-.quick-cmd-container { padding: 4px; }
-.header-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.desc-text { font-size: 13px; opacity: 0.6; }
-.refresh-btn { border-radius: 8px; background: rgba(140, 140, 140, 0.1); border: 1px solid rgba(140, 140, 140, 0.2); transition: all 0.2s; }
-.refresh-btn:hover { background: rgba(22, 119, 255, 0.1); border-color: #1677ff; color: #1677ff; }
-
-/* --- 分組與網格 --- */
-.group-section { margin-bottom: 24px; }
-.group-header { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; margin-bottom: 12px; opacity: 0.85; }
-.group-icon { color: #1677ff; }
-.cmd-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-
-/* --- 卡片設計 --- */
-.cmd-card {
-  background: rgba(22, 119, 255, 0.03);
-  border: 1px solid rgba(140, 140, 140, 0.15);
-  border-radius: 12px;
-  padding: 12px;
-  transition: all 0.2s ease;
+.quick-cmd-container {
+  padding: 0 4px;
+  max-height: 70vh;
+  overflow-y: auto;
 }
-.cmd-card:hover {
-  border-color: #1677ff;
-  background: rgba(22, 119, 255, 0.06);
-  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.08);
+
+.header-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 0 12px;
 }
-.cmd-label { font-size: 13px; font-weight: 600; opacity: 0.9; }
-.cmd-top { margin-bottom: 10px; }
-.cmd-body { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.inputs-group { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
 
-.param-input { background: rgba(140, 140, 140, 0.05) !important; border-radius: 6px !important; }
-.player-select { width: 100px; }
-.val-select { width: 80px; }
-.text-input { width: 90px; }
+.desc-text {
+  font-size: 12px;
+  opacity: 0.5;
+}
 
-.exec-btn { border-radius: 8px; height: 28px; width: 28px; display: flex; align-items: center; justify-content: center; padding: 0; background: #1677ff; }
+.refresh-btn {
+  border-radius: 6px;
+  background: rgba(140, 140, 140, 0.1);
+  border: none;
+}
 
-.player-option { display: flex; align-items: center; gap: 8px; }
-.mini-avatar { width: 18px; height: 18px; border-radius: 4px; }
+/* --- 摺疊面板樣式 --- */
+.custom-collapse :deep(.ant-collapse-item) {
+  border-bottom: 1px solid rgba(140, 140, 140, 0.1) !important;
+  margin-bottom: 4px;
+}
 
-@media (max-width: 650px) { .cmd-grid { grid-template-columns: 1fr; } }
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--ant-primary-color);
+}
+
+.cmd-count {
+  font-size: 11px;
+  background: rgba(22, 119, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: normal;
+}
+
+/* --- 指令列佈局 (核心修改) --- */
+.cmd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.cmd-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(22, 119, 255, 0.02);
+  border: 1px solid rgba(140, 140, 140, 0.08);
+  border-radius: 8px;
+  transition: all 0.2s;
+  gap: 12px;
+}
+
+.cmd-row:hover {
+  background: rgba(22, 119, 255, 0.05);
+  border-color: rgba(22, 119, 255, 0.3);
+}
+
+.cmd-label-section {
+  min-width: 140px;
+  max-width: 140px;
+}
+
+.cmd-label {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.cmd-controls-section {
+  flex: 1;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.inputs-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cmd-action-section {
+  display: flex;
+  align-items: center;
+}
+
+/* --- 輸入組件微調 --- */
+.param-input {
+  background: rgba(140, 140, 140, 0.05) !important;
+  border-radius: 4px !important;
+}
+
+.player-select { width: 110px; }
+.val-select { width: 90px; }
+.text-input { width: 100px; }
+
+.exec-btn {
+  border-radius: 6px;
+  background: #1677ff;
+  border: none;
+  opacity: 0.8;
+}
+
+.exec-btn:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.player-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-avatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+/* --- 響應式：手機端自動換回垂直佈局 --- */
+@media (max-width: 600px) {
+  .cmd-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .cmd-label-section {
+    max-width: 100%;
+  }
+  .cmd-controls-section {
+    width: 100%;
+  }
+  .inputs-group {
+    width: 100%;
+  }
+  .param-input {
+    flex: 1;
+  }
+  .cmd-action-section {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
 </style>
