@@ -51,8 +51,9 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("遊戲難度"), cmd: "difficulty {val}", options: ["peaceful", "easy", "normal", "hard"] },
       { label: t("天氣切換"), cmd: "weather {val}", options: ["clear", "rain", "thunder"] },
       { label: t("時間設置"), cmd: "time set {val}", options: ["day", "night", "noon", "midnight"] },
-      { label: t("發送全服信息"), cmd: "say {text}", placeholder: t("輸入信息...") },
-      { label: t("發送標題文字"), cmd: "title {text}", placeholder: t("標題內容") },
+      { label: t("發送全服信息"), cmd: "say {text}", placeholder: t("輸入信息") },
+      { label: t("發送標題文字"), cmd: "title {player} {text}", placeholder: t("內容") },
+      { label: t("全伺服器標題文字"), cmd: "title @a {text}", placeholder: t("內容") },
       { label: t("傳送玩家"), cmd: "tp {player} {player}" }, 
     ]
   },
@@ -66,7 +67,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("火焰傷害"), cmd: "gamerule fire_damage {val}", options: ["true", "false"] },
       { label: t("冰凍傷害"), cmd: "gamerule freeze_damage {val}", options: ["true", "false"] },
       { label: t("原諒死者"), cmd: "gamerule forgive_dead_players {val}", options: ["true", "false"] },
-      { label: t("誰都不原諒"), cmd: "gamerule universal_anger {val}", options: ["true", "false"] },
+      { label: t("怪物無差別仇恨"), cmd: "gamerule universal_anger {val}", options: ["true", "false"] },
     ]
   },
   {
@@ -81,14 +82,15 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("玩家移動檢測"), cmd: "gamerule player_movement_check {val}", options: ["true", "false"] },
       { label: t("玩家定位條"), cmd: "gamerule locator_bar {val}", options: ["true", "false"] },
       { label: t("積雪厚度"), cmd: "gamerule max_snow_accumulation_height {text}", placeholder: t("1 表示一格") },
-      { label: t("創造模式傳送門等待時間"), cmd: "gamerule players_nether_portal_creative_delay {text}", placeholder: t("20 代表一秒") },
-      { label: t("生存模式傳送門等待時間"), cmd: "gamerule players_nether_portal_default_delay {text}", placeholder: "80" },
-      { label: t("進入地獄"), cmd: "gamerule allow_entering_nether_using_portals {val}", options: ["true", "false"] },
+      { label: t("創造傳送門等待時間"), cmd: "gamerule players_nether_portal_creative_delay {text}", placeholder: t("20 代表一秒") },
+      { label: t("生存傳送門等待時間"), cmd: "gamerule players_nether_portal_default_delay {text}", placeholder: "80" },
+      { label: t("允許進入地獄"), cmd: "gamerule allow_entering_nether_using_portals {val}", options: ["true", "false"] },
       { label: t("跳過夜晚睡眠比例"), cmd: "gamerule players_sleeping_percentage {text}", placeholder: t("大於100將無法跳過") },
       { label: t("PVP"), cmd: "gamerule pvp {val}", options: ["true", "false"] },
       { label: t("藤蔓蔓延"), cmd: "gamerule spread_vines {val}", options: ["true", "false"] },
       { label: t("TNT爆炸"), cmd: "gamerule tnt_explodes {val}", options: ["true", "false"] },
-      { label: t("世界邊界"), cmd: "worldborder {text}", placeholder: "" },
+      { label: t("設定世界中心"), cmd: "worldborder center {text}", placeholder: "x y" },
+      { label: t("設定世界邊界"), cmd: "worldborder add {text}", placeholder: "" },
     ]
   },
   {
