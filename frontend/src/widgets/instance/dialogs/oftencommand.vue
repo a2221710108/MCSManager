@@ -52,8 +52,8 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("天氣切換"), cmd: "weather {val}", options: ["clear", "rain", "thunder"] },
       { label: t("時間設置"), cmd: "time set {val}", options: ["day", "night", "noon", "midnight"] },
       { label: t("發送全服信息"), cmd: "say {text}", placeholder: t("輸入信息") },
-      { label: t("發送標題文字"), cmd: "title {player} {text}", placeholder: t("內容") },
-      { label: t("全伺服器標題文字"), cmd: "title @a {text}", placeholder: t("內容") },
+      { label: t("發送標題文字"), cmd: "title {player} title {text}", placeholder: t("內容") },
+      { label: t("全伺服器標題文字"), cmd: "title @a title {text}", placeholder: t("內容") },
       { label: t("傳送玩家"), cmd: "tp {player} {player}" }, 
     ]
   },
