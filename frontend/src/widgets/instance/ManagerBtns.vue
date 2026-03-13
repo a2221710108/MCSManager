@@ -148,7 +148,7 @@ const btns = computed(() => {
   title: t("玩家管理"),
   icon: UsergroupDeleteOutlined,
   click: () => {
-    playermanamentgeDialog.value?.openDialog();
+    playermanagementDialog.value?.openDialog();
   },
   // 僅限 Minecraft Java 版顯示
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
@@ -349,8 +349,8 @@ watch(instanceInfo, (cfg, oldCfg) => {
   :instance-info="instanceInfo"
   :instance-id="instanceId"
   :daemon-id="daemonId"
+  :use-terminal-hook="useTerminalHook"
   @update="refreshInstanceInfo"
-  :use-terminal-hook="useTerminalHook"  
 />
 
 <style lang="scss" scoped>
