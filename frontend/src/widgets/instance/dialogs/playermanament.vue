@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed } from "vue";
 import { t } from "@/lang/i18n";
 import type { InstanceDetail } from "@/types";
 import { message } from "ant-design-vue";
-// 修正路徑：從 dialogs 目錄退回 hooks 目錄
+// 確保路徑指向你的 useTerminal hook
 import { useTerminal } from "../../../hooks/useTerminal";
 import {
   UserOutlined,
   CrownOutlined,
   StopOutlined,
   LogoutOutlined,
-  CheckOutlined,
-  CloseOutlined
+  ReloadOutlined,
+  ThunderboltOutlined,
+  SmileOutlined
 } from "@ant-design/icons-vue";
 
 const props = defineProps<{
@@ -22,23 +23,28 @@ const props = defineProps<{
 
 const { sendCommand } = useTerminal();
 
+const open = ref(false);
 const onlinePlayers = ref<any[]>([]);
 const isLoading = ref(false);
 
-// 模擬 OP 列表（未來可對接 API）
-const opPlayers = ref<string[]>([]);
+// 模擬 OP 玩家名單（之後可透過讀取 ops.json 的 API 替換）
+const opPlayers = ref<string[]>(["LazyCloud_Admin"]); 
 
+// 獲取 mcping 填寫的配置
 const pingConfig = computed(() => ({
-  ip: props.instanceInfo?.config?.pingConfig.ip || "127.0.0.1",
+  ip: props.instanceInfo?.config?.pingConfig.ip || "",
   port: props.instanceInfo?.config?.pingConfig.port || 25565
 }));
 
+// 獲取玩家列表
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) return;
   isLoading.value = true;
   try {
-    // 使用公共 API 獲取玩家列表
-    const res = await fetch(`https://api.mcstatus.io/v2/status/java/${pingConfig.value.ip}:${pingConfig.value.port}`);
+    // 使用公共 API 獲取 Java 版伺服器在線玩家
+    const res = await fetch(
+      `https://api.mcstatus.io/v2/status/java/${pingConfig.value.ip}:${pingConfig.value.port}`
+    );
     const data = await res.json();
     if (data.online && data.players && data.players.list) {
       onlinePlayers.value = data.players.list;
@@ -47,104 +53,165 @@ const fetchPlayers = async () => {
     }
   } catch (err) {
     console.error("Fetch players error:", err);
+    message.error(t("無法連接到 Ping API"));
   } finally {
     isLoading.value = false;
   }
 };
 
+// 執行指令
 const runCommand = (cmd: string, playerName: string) => {
   const fullCommand = cmd.replace("{player}", playerName);
   sendCommand(fullCommand);
-  message.success(`${t("TXT_CODE_d3de39b4")}: ${fullCommand}`);
+  // 使用你專案中已有的成功提示 i18n key，或直接顯示文字
+  message.success(`${t("指令已發送")}: ${fullCommand}`);
 };
 
+// 判斷是否為 OP
 const isOp = (name: string) => opPlayers.value.includes(name);
+
+// 獲取頭像
 const getAvatar = (name: string) => `https://minotar.net/avatar/${name}/32`;
 
-onMounted(() => {
+// 打開對話框的方法
+const openDialog = () => {
+  open.value = true;
   fetchPlayers();
+};
+
+// 暴露給父組件 ManagerBtns.vue 呼叫
+defineExpose({
+  openDialog
 });
 </script>
 
 <template>
-  <div class="player-management">
-    <div class="flex-between mb-16" style="display: flex; justify-content: space-between; align-items: center;">
-      <a-typography-title :level="5" class="ma-0">
-        <UserOutlined /> {{ t("在線玩家") }} ({{ onlinePlayers.length }})
-      </a-typography-title>
-      <a-button type="primary" size="small" :loading="isLoading" @click="fetchPlayers">
-        {{ t("刷新") }}
-      </a-button>
+  <a-modal
+    v-model:open="open"
+    :title="t('玩家管理')"
+    :footer="null"
+    :width="650"
+    centered
+    destroy-on-close
+  >
+    <div class="player-management-container">
+      <div class="header-actions">
+        <a-typography-text type="secondary">
+          <SmileOutlined /> {{ t("當前在線") }}: {{ onlinePlayers.length }}
+        </a-typography-text>
+        <a-button type="link" size="small" :loading="isLoading" @click="fetchPlayers">
+          <template #icon><ReloadOutlined /></template>
+          {{ t("刷新") }}
+        </a-button>
+      </div>
+
+      <a-divider style="margin: 12px 0" />
+
+      <div class="player-list-wrapper">
+        <a-list :data-source="onlinePlayers" :loading="isLoading">
+          <template #renderItem="{ item }">
+            <a-list-item>
+              <div class="player-card">
+                <div class="player-identity">
+                  <a-avatar :src="getAvatar(item.name_raw || item.name)" />
+                  <div class="player-name-group">
+                    <span :class="{ 'is-op': isOp(item.name_raw || item.name) }">
+                      {{ item.name_raw || item.name }}
+                    </span>
+                    <a-tag v-if="isOp(item.name_raw || item.name)" color="red" size="small">OP</a-tag>
+                  </div>
+                </div>
+
+                <div class="player-ops">
+                  <a-button-group>
+                    <a-tooltip :title="t('設為管理員')">
+                      <a-button @click="runCommand('op {player}', item.name_raw || item.name)">
+                        <template #icon><CrownOutlined /></template>
+                      </a-button>
+                    </a-tooltip>
+
+                    <a-tooltip :title="t('生存模式')">
+                      <a-button @click="runCommand('gamemode survival {player}', item.name_raw || item.name)">S</a-button>
+                    </a-tooltip>
+                    <a-tooltip :title="t('創造模式')">
+                      <a-button @click="runCommand('gamemode creative {player}', item.name_raw || item.name)">C</a-button>
+                    </a-tooltip>
+
+                    <a-popconfirm :title="t('確定踢出玩家？')" @confirm="runCommand('kick {player}', item.name_raw || item.name)">
+                      <a-button danger><LogoutOutlined /></a-button>
+                    </a-popconfirm>
+                    <a-popconfirm :title="t('確定封禁玩家？')" @confirm="runCommand('ban {player}', item.name_raw || item.name)">
+                      <a-button danger type="primary"><StopOutlined /></a-button>
+                    </a-popconfirm>
+                  </a-button-group>
+                </div>
+              </div>
+            </a-list-item>
+          </template>
+        </a-list>
+
+        <div v-if="!isLoading && onlinePlayers.length === 0" class="empty-state">
+          <a-empty :description="t('暫無在線玩家')" />
+        </div>
+      </div>
     </div>
-
-    <a-divider style="margin: 12px 0" />
-
-    <a-list :data-source="onlinePlayers" :loading="isLoading">
-      <template #renderItem="{ item }">
-        <a-list-item>
-          <div class="player-item-wrapper">
-            <div class="player-info">
-              <a-avatar :src="getAvatar(item.name_raw || item.name)" />
-              <span class="ml-12" :class="{ 'op-text': isOp(item.name_raw || item.name) }">
-                {{ item.name_raw || item.name }}
-                <a-tag v-if="isOp(item.name_raw || item.name)" color="red" size="small" class="ml-4">OP</a-tag>
-              </span>
-            </div>
-
-            <div class="player-actions">
-              <a-button-group size="small">
-                <a-tooltip :title="t('設為 OP')">
-                  <a-button @click="runCommand('op {player}', item.name_raw || item.name)">
-                    <template #icon><CrownOutlined /></template>
-                  </a-button>
-                </a-tooltip>
-                <a-tooltip :title="t('生存模式')">
-                  <a-button @click="runCommand('gamemode survival {player}', item.name_raw || item.name)">S</a-button>
-                </a-tooltip>
-                <a-tooltip :title="t('創造模式')">
-                  <a-button @click="runCommand('gamemode creative {player}', item.name_raw || item.name)">C</a-button>
-                </a-tooltip>
-                <a-popconfirm :title="t('確定踢出？')" @confirm="runCommand('kick {player}', item.name_raw || item.name)">
-                  <a-button danger><LogoutOutlined /></a-button>
-                </a-popconfirm>
-                <a-popconfirm :title="t('確定封禁？')" @confirm="runCommand('ban {player}', item.name_raw || item.name)">
-                  <a-button danger type="primary"><StopOutlined /></a-button>
-                </a-popconfirm>
-              </a-button-group>
-            </div>
-          </div>
-        </a-list-item>
-      </template>
-    </a-list>
-    
-    <div v-if="!isLoading && onlinePlayers.length === 0" class="mt-20 text-center">
-      <a-empty :description="t('當前無玩家在線')" />
-    </div>
-  </div>
+  </a-modal>
 </template>
 
 <style lang="scss" scoped>
-.player-item-wrapper {
+.player-management-container {
+  min-height: 300px;
+}
+
+.header-actions {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
+}
+
+.player-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   width: 100%;
 }
 
-.player-info {
+.player-identity {
   display: flex;
   align-items: center;
+  gap: 12px;
+
+  .player-name-group {
+    display: flex;
+    flex-direction: column;
+    
+    span {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .is-op {
+      color: #ff4d4f; /* OP 玩家名字變紅 */
+      font-weight: bold;
+    }
+  }
 }
 
-.op-text {
-  color: #ff4d4f;
-  font-weight: bold;
+.player-list-wrapper {
+  max-height: 450px;
+  overflow-y: auto;
 }
 
-.ml-12 { margin-left: 12px; }
-.ml-4 { margin-left: 4px; }
-.mb-16 { margin-bottom: 16px; }
-.mt-20 { margin-top: 20px; }
-.text-center { text-align: center; }
-.ma-0 { margin: 0; }
+.empty-state {
+  padding: 40px 0;
+  text-align: center;
+}
+
+// 讓按鈕組在移動端也整齊
+.player-ops {
+  .ant-btn-group {
+    display: flex;
+    align-items: center;
+  }
+}
 </style>
