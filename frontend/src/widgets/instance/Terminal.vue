@@ -308,7 +308,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 </script>
 
 <template>
-  <!-- Terminal Page View -->
   <div v-if="innerTerminalType">
     <div class="mb-24">
       <BetweenMenus>
@@ -337,19 +336,19 @@ const terminalTopTags = computed<TagInfo[]>(() => {
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
 
               <span
-  v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 0"
-  class="ml-16"
->
-  <a-tooltip>
-    <template #title>
-      {{ t("TXT_CODE_4a37ec9c") }}
-    </template>
-    <LaptopOutlined />
-  </a-tooltip>
-  <span class="ml-6" style="opacity: 0.8">
-    {{ instanceInfo?.watcher }}
-  </span>
-</span>
+                v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 0"
+                class="ml-16"
+              >
+                <a-tooltip>
+                  <template #title>
+                    {{ t("TXT_CODE_4a37ec9c") }}
+                  </template>
+                  <LaptopOutlined />
+                </a-tooltip>
+                <span class="ml-6" style="opacity: 0.8">
+                  {{ instanceInfo?.watcher }}
+                </span>
+              </span>
             </a-typography-paragraph>
           </div>
         </template>
@@ -406,31 +405,29 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         </template>
       </BetweenMenus>
     </div>
+
     <div class="mb-10 justify-end">
       <TerminalTags :tags="terminalTopTags" />
     </div>
-    
-    // 注意：下面的div是我自己家的
-    <div v-if="instanceInfo?.config?.type?.startsWith('minecraft')" class="mb-10">
-  <a-tabs v-model:activeKey="activeTab" type="card" size="small">
-    <a-tab-pane key="ALL" tab="全部" />
-    <a-tab-pane key="WARN" tab="警告" />
-    <a-tab-pane key="ERROR" tab="錯誤" />
-    <a-tab-pane key="CHAT" tab="聊天" />
-  </a-tabs>
-</div>
-    
-    <TerminalCore
-  v-if="instanceId && daemonId"
-  :instance-id="instanceId"
-  :daemon-id="daemonId"
-  :use-terminal-hook="terminalHook"
-  :height="card.height"
-  :filter-type="activeTab" 
-/>
 
-  <!-- Other Page View -->
-  <CardPanel v-else class="containerWrapper" style="height: 100%">
+    <div v-if="instanceInfo?.config?.type?.startsWith('minecraft')" class="mb-10">
+      <a-tabs v-model:activeKey="activeTab" type="card" size="small">
+        <a-tab-pane key="ALL" tab="全部" />
+        <a-tab-pane key="WARN" tab="警告" />
+        <a-tab-pane key="ERROR" tab="錯誤" />
+        <a-tab-pane key="CHAT" tab="聊天" />
+      </a-tabs>
+    </div>
+
+    <TerminalCore
+      v-if="instanceId && daemonId"
+      :instance-id="instanceId"
+      :daemon-id="daemonId"
+      :use-terminal-hook="terminalHook"
+      :height="card.height"
+      :filter-type="activeTab"
+    />
+  </div> <CardPanel v-else class="containerWrapper" style="height: 100%">
     <template #title>
       <CloudServerOutlined />
       <span class="ml-8"> {{ getInstanceName }} </span>
@@ -484,6 +481,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         :instance-id="instanceId"
         :daemon-id="daemonId"
         :height="card.height"
+        :filter-type="activeTab"
       />
     </template>
   </CardPanel>
