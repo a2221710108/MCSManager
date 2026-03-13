@@ -42,6 +42,7 @@ import backup from "./dialogs/backup.vue";
 import java from "./dialogs/java.vue";
 import srv from "./dialogs/srv.vue";
 import playermanagement from "./dialogs/playermanagement.vue";
+import { useTerminal } from "@/hooks/useTerminal";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -54,6 +55,8 @@ const backupDialog = ref<InstanceType<typeof backup>>();
 const javaDialog = ref<InstanceType<typeof java>>();
 const srvDialog = ref<InstanceType<typeof srv>>();
 const playermanagementDialog = ref<InstanceType<typeof playermanagement>>();
+
+const terminalHook = useTerminal();
   
 const { toPage: toOtherPager } = useAppRouters();
 
