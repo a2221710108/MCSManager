@@ -39,8 +39,10 @@ const {
   clearTerminal
 } = props.useTerminalHook;
 
+// --- 狀態管理 ---
 const activeTab = ref("ALL");
 const isMinecraft = ref(false);
+const inputRef = ref<HTMLElement | null>(null);
 
 const terminals = reactive({
   ALL: { term: null as Terminal | null, id: `term-all-${getRandomId()}`, fit: null as FitAddon | null },
@@ -48,53 +50,50 @@ const terminals = reactive({
   ERROR: { term: null as Terminal | null, id: `term-error-${getRandomId()}`, fit: null as FitAddon | null }
 });
 
-const inputRef = ref<HTMLElement | null>(null);
-
-// 移除顏色代碼以便過濾
+// --- 工具：清洗 ANSI 顏色並進行過濾匹配 ---
 const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[a-zA-Z\d\n\r]*(?:;[a-zA-Z\d\n\r]*)*)?/g, "");
 
-// --- 核心分流寫入邏輯 (優化匹配規則) ---
 const writeToTabs = (data: string) => {
   if (!data) return;
+  
+  // 1. ALL 終端永遠寫入原始數據
   terminals.ALL.term?.write(data);
 
+  // 2. 針對 Minecraft 進行行過濾
   if (isMinecraft.value) {
-    const cleanData = stripAnsi(data);
+    const cleanData = stripAnsi(data).toUpperCase();
     
-    // 改用更寬鬆的正則，匹配包含 WARN 或 ERROR 的日誌行
-    // 例如 [02:15:43 WARN]: 
-    if (/WARN/i.test(cleanData)) {
+    // 匹配 WARN
+    if (cleanData.includes("WARN") || cleanData.includes("WARNING")) {
       terminals.WARN.term?.write(data);
     }
-    if (/ERROR/i.test(cleanData)) {
+    // 匹配 ERROR / FATAL / EXCEPTION
+    if (cleanData.includes("ERROR") || cleanData.includes("FATAL") || cleanData.includes("EXCEPTION")) {
       terminals.ERROR.term?.write(data);
     }
   }
 };
 
-const interceptDSR = (term: any) => {
-  if (!term) return;
-  term.parser.registerOscHandler(11, () => true);
-  term.parser.registerOscHandler(10, () => true);
-};
-
+// --- 初始化終端實例 ---
 const initAllTerminals = async () => {
   if (containerState.isDesignMode) return;
   
+  // 初始化主終端
   const domAll = document.getElementById(terminals.ALL.id);
   if (domAll) {
     terminals.ALL.term = initTerminalWindow(domAll);
-    interceptDSR(terminals.ALL.term);
     const fit = new FitAddon();
     terminals.ALL.term.loadAddon(fit);
     terminals.ALL.fit = fit;
   }
 
+  // 初始化副終端 (WARN/ERROR)
   if (isMinecraft.value) {
     await nextTick();
     (["WARN", "ERROR"] as const).forEach(tab => {
       const dom = document.getElementById(terminals[tab].id);
       if (dom) {
+        // 使用與主終端相同的配置
         const tObj = new Terminal((terminals.ALL.term as any).options);
         const fit = new FitAddon();
         tObj.loadAddon(fit);
@@ -107,8 +106,15 @@ const initAllTerminals = async () => {
   }
 };
 
-events.on("data", (data: string) => writeToTabs(data));
+// --- 事件處理 ---
 
+// 即時數據流
+events.on("stdout", (data: any) => {
+  const rawText = typeof data === 'string' ? data : data.text;
+  writeToTabs(rawText);
+});
+
+// 歷史日誌加載 (修復刷新後空白的核心)
 events.once("detail", async () => {
   try {
     const { value } = await getInstanceOutputLog().execute({
@@ -116,31 +122,33 @@ events.once("detail", async () => {
     });
 
     if (value) {
-      const finalLog = state.value?.config?.terminalOption?.haveColor 
-        ? encodeConsoleColor(value) 
-        : value;
+      const haveColor = state.value?.config?.terminalOption?.haveColor;
+      const finalLog = haveColor ? encodeConsoleColor(value) : value;
 
+      // 必須按行拆分，否則整個大日誌塊包含一個 WARN 就會被全塞進 WARN 分頁
       const lines = finalLog.split(/\r?\n/);
       lines.forEach(line => {
-        // 歷史記錄每一行手動補上換行符以便 xterm 渲染
         writeToTabs(line + "\r\n");
       });
     }
   } catch (error: any) {
-    console.error("History Log Error:", error);
+    console.error("Load history error:", error);
   }
 });
 
 events.on("opened", () => message.success(t("TXT_CODE_e13abbb1")));
 events.on("stopped", () => message.success(t("TXT_CODE_efb6d377")));
 
+// 監聽類型
 watch(() => state.value?.config?.type, (type) => {
   isMinecraft.value = !!(type && type.includes("minecraft"));
 }, { immediate: true });
 
+// 切換標籤時重新調整寬度
 watch(activeTab, async () => {
   await nextTick();
-  (terminals as any)[activeTab.value]?.fit?.fit();
+  const current = (terminals as any)[activeTab.value];
+  current?.fit?.fit();
 });
 
 const handleSendCommand = () => {
@@ -180,7 +188,7 @@ onMounted(async () => {
         :class="['tab-item', activeTab === tab ? 'active' : '']"
         @click="activeTab = tab"
       >
-        {{ tab === 'ALL' ? 'ALL' : tab }}
+        {{ tab }}
       </div>
     </div>
 
@@ -202,6 +210,7 @@ onMounted(async () => {
           <div v-show="activeTab === 'WARN'" :id="terminals.WARN.id" :style="{ height: props.height }"></div>
           <div v-show="activeTab === 'ERROR'" :id="terminals.ERROR.id" :style="{ height: props.height }"></div>
         </template>
+
         <div v-if="containerState.isDesignMode" :style="{ height: props.height }">
           <p class="terminal-design-tip">{{ t("TXT_CODE_7ac6f85c") }}</p>
         </div>
@@ -220,6 +229,7 @@ onMounted(async () => {
         ref="inputRef"
         v-model:value="commandInputValue"
         :placeholder="t('TXT_CODE_555e2c1b')"
+        autofocus
         :disabled="containerState.isDesignMode || !isConnect"
         @press-enter="handleSendCommand"
         @keydown="handleHistorySelect"
