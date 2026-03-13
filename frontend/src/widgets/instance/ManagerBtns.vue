@@ -264,6 +264,7 @@ watch(instanceInfo, (cfg, oldCfg) => {
       </ResponsiveLayoutGroup>
     </template>
   </CardPanel>
+ </template> 
 
   <TermConfig
     ref="terminalConfigDialog"
@@ -337,21 +338,21 @@ watch(instanceInfo, (cfg, oldCfg) => {
   />
 
   <srv
-  ref="srvDialog"
-  :instance-info="instanceInfo"
-  :instance-id="instanceId ?? ''"
-  :daemon-id="daemonId ?? ''"
-  @update="refreshInstanceInfo"
-/>
+   ref="srvDialog"
+   :instance-info="instanceInfo"
+   :instance-id="instanceId ?? ''"
+   :daemon-id="daemonId ?? ''"
+   @update="refreshInstanceInfo"
+ /> 
 
   <playermanagement
-  ref="playermanagementDialog"
-  :instance-info="instanceInfo"
-  :instance-id="instanceId"
-  :daemon-id="daemonId"
-  :use-terminal-hook="useTerminalHook"
-  @update="refreshInstanceInfo"
-/>
+   ref="playermanagementDialog"
+   :instance-info="instanceInfo"
+   :instance-id="instanceId"
+   :daemon-id="daemonId"
+   :use-terminal-hook="useTerminalHook"
+   @update="refreshInstanceInfo"
+ /> 
 
 <style lang="scss" scoped>
 .function-btns-container {
