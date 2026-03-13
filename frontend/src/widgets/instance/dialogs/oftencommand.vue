@@ -107,26 +107,29 @@ const COMMAND_GROUPS: CommandGroup[] = [
     group: t("EssentialsX 指令（需安裝對應的 Plugin）"),
     icon: RocketOutlined,
     commands: [
-      { label: t("廣播信息"), cmd: "broadcast {text}", placeholder: t("") },
-      { label: t("點燃"), cmd: "burn {player} "},
-      { label: t("熄滅"), cmd: "ext {player} "},
-      { label: t("補充飢餓"), cmd: "feed {player} "},
+      { label: t("廣播信息"), cmd: "broadcast {text}", placeholder: t("輸入廣播內容") },
+      { label: t("點燃"), cmd: "burn {player}" },
+      { label: t("熄滅"), cmd: "ext {player}" },
+      { label: t("補充飢餓"), cmd: "feed {player}" },
       { label: t("清空物品"), cmd: "clearinventory {player}" },
       { label: t("獲取玩家座標"), cmd: "getpos {player}" },
       { label: t("允許飛行"), cmd: "fly {player}" },
       { label: t("無敵"), cmd: "god {player}" },
-      { label: t("閃電劈人"), cmd: "lightning {player} {text}", placeholder: t("傷害")"  },
+      // 修正：移除了 placeholder 後面多餘的引號
+      { label: t("閃電劈人"), cmd: "lightning {player} {text}", placeholder: [t("玩家"), t("傷害")] },
       { label: t("發射核彈"), cmd: "nuke {player}" },
-      { label: t("綽號"), cmd: "nickname {player} {text}", placeholder: t("") },
+      { label: t("綽號"), cmd: "nickname {player} {text}", placeholder: [t("玩家"), t("新名稱")] },
       { label: t("移除綽號"), cmd: "nick {player} off" },
-      { label: t("PM"), cmd: "msg {player} {text}", placeholder: t("") },
+      { label: t("PM"), cmd: "msg {player} {text}", placeholder: [t("對象"), t("訊息內容")] },
       { label: t("修改指定玩家時間"), cmd: "ptime {val} {player}", options: ["day", "night", "noon", "midnight"] },
       { label: t("重置指定玩家時間"), cmd: "ptime reset {player}" },
-      { label: t("他的世界一直在下雨"), cmd: "pweather {val} {player}", options: ["storm", "sun", "clear"] },
-      { label: t("不下雨了"), cmd: "pweather reset {player}" },
-      { label: t("強制他人執行指令"), cmd: "sudo {player} {text}", placeholder: t("指令")" },
+      { label: t("個人天氣"), cmd: "pweather {val} {player}", options: ["storm", "sun", "clear"] },
+      { label: t("重置個人天氣"), cmd: "pweather reset {player}" },
+      // 修正：移除了 placeholder 後面多餘的引號
+      { label: t("強制他人執行指令"), cmd: "sudo {player} {text}", placeholder: [t("對象"), t("指令內容")] },
       { label: t("治療"), cmd: "heal {player}" },
-      { label: t("隱身"), cmd: "vanish {player} {val}", options: ["on", "off" },
+      // 修正：補齊了 options 的右括號 ] 
+      { label: t("隱身"), cmd: "vanish {player} {val}", options: ["on", "off"] },
     ]
   }
 ];
