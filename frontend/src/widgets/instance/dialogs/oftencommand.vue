@@ -9,15 +9,16 @@ import {
   SettingOutlined, 
   RocketOutlined, 
   UserOutlined,
-  ReloadOutlined 
+  ReloadOutlined,
+  HistoryOutlined
 } from "@ant-design/icons-vue";
 
-// --- 1. 定義類型接口，解決 TS2339 報錯 ---
+// --- 類型定義 ---
 interface CommandItem {
   label: string;
   cmd: string;
-  options?: string[];      // 可選屬性
-  placeholder?: string[];  // 可選屬性
+  options?: string[];
+  placeholder?: string[];
 }
 
 interface CommandGroup {
@@ -36,41 +37,34 @@ const onlinePlayers = ref<string[]>([]);
 const isFetchingPlayers = ref(false);
 const { sendCommand, isConnect } = props.useTerminalHook;
 
-// 用於儲存所有指令的動態輸入值 (格式：{ "指令Label_參數序號": "值" })
 const formState = reactive<Record<string, string>>({});
 
-// --- 2. 簡潔配置區 (你可以直接在這裡增加指令) ---
+// --- 簡潔配置 (如果沒有數據，畫面會保持空白) ---
 const COMMAND_GROUPS: CommandGroup[] = [
   {
-    group: "EssentialsX " + t("玩家管理"),
-    icon: UserOutlined,
+    group: t("常用指令"),
+    icon: RocketOutlined,
     commands: [
-      { label: t("傳送玩家至玩家"), cmd: "tp {player} {player}" }, 
+      { label: t("傳送玩家"), cmd: "tp {player} {player}" }, 
       { label: t("給予物品"), cmd: "give {player} {text} {text}", placeholder: [t("物品ID"), t("數量")] },
-      { label: t("私訊玩家"), cmd: "msg {player} {text}", placeholder: ["", t("訊息內容")] },
     ]
   },
   {
-    group: t("環境與遊戲規則"),
+    group: t("伺服器規則"),
     icon: SettingOutlined,
     commands: [
-      { label: t("生物自然生成"), cmd: "gamerule spawn_mobs {val}", options: ["true", "false"] },
-      { label: t("怪物自然生成"), cmd: "gamerule spawn_monsters {val}", options: ["true", "false"] },
-      { label: t("難度設置"), cmd: "difficulty {val}", options: ["peaceful", "easy", "normal", "hard"] },
-      { label: t("時間設置"), cmd: "time set {val}", options: ["day", "night", "noon", "midnight"] },
-      { label: t("死亡不掉落"), cmd: "gamerule keep_inventory {val}", options: ["true", "false"] },
-      { label: t("積雪厚度"), cmd: "gamerule max_snow_accumulation_height {text}", placeholder: [t("數字")] },
+      { label: t("生物生成"), cmd: "gamerule spawn_mobs {val}", options: ["true", "false"] },
+      { label: t("時間設置"), cmd: "time set {val}", options: ["day", "night"] },
     ]
   }
 ];
 
-// --- 3. 邏輯處理函數 ---
-
-// 解析指令中包含哪些參數類型
 const getParams = (cmd: string) => {
   const matches = cmd.match(/\{(player|val|text)\}/g) || [];
   return matches.map(m => m.replace(/[{}]/g, ''));
 };
+
+const getAvatar = (name: string) => `https://minotar.net/avatar/${name}/20`;
 
 const fetchPlayers = async () => {
   const { ip, port } = props.instanceInfo?.config?.pingConfig || {};
@@ -79,47 +73,34 @@ const fetchPlayers = async () => {
   try {
     const res = await fetch(`https://api.mcstatus.io/v2/status/java/${ip}:${port || 25565}?t=${Date.now()}`);
     const data = await res.json();
-    if (data.online && data.players?.list) {
-      onlinePlayers.value = data.players.list.map((p: any) => p.name_raw || p.name);
-    } else {
-      onlinePlayers.value = [];
-    }
+    onlinePlayers.value = data.online && data.players?.list 
+      ? data.players.list.map((p: any) => p.name_raw || p.name) 
+      : [];
   } catch (e) {
-    console.error("Fetch players error:", e);
+    console.error(e);
   } finally {
     isFetchingPlayers.value = false;
   }
 };
 
 const runCommand = async (item: CommandItem) => {
-  if (!isConnect.value) return message.error(t("終端連線尚未就緒，請檢查伺服器狀態"));
-  
+  if (!isConnect.value) return message.error(t("連線尚未就緒"));
   const params = getParams(item.cmd);
   let finalCmd = item.cmd;
-
-  // 按順序替換參數
   for (let i = 0; i < params.length; i++) {
     const val = formState[`${item.label}_${i}`];
-    if (!val && params[i] !== 'text') {
-      return message.warn(`${t("請完成所有輸入項目")}`);
-    }
-    // 每次只替換第一個匹配到的參數標籤
+    if (!val && params[i] !== 'text') return message.warn(t("請完整輸入項目"));
     finalCmd = finalCmd.replace(/\{(player|val|text)\}/, val || ""); 
   }
-
   try {
     await sendCommand(finalCmd);
-    message.success(`${t("指令發送成功")}: /${finalCmd}`);
+    message.success(`${t("發送成功")}: /${finalCmd}`);
   } catch (err: any) {
-    message.error(`${t("執行失敗")}: ${err.message || err}`);
+    message.error(err.message || String(err));
   }
 };
 
-const openDialog = () => {
-  open.value = true;
-  fetchPlayers();
-};
-
+const openDialog = () => { open.value = true; fetchPlayers(); };
 defineExpose({ openDialog });
 </script>
 
@@ -130,133 +111,201 @@ defineExpose({ openDialog });
     :footer="null"
     :width="750"
     centered
-    destroy-on-close
   >
-    <div class="command-container">
-      <div class="header-tip">
-        <a-typography-text type="secondary">
-          <ReloadOutlined :spin="isFetchingPlayers" @click="fetchPlayers" style="cursor: pointer" />
-          {{ t(" 數據可能有 1-5 分鐘延遲，取決於 API 延遲") }}
-        </a-typography-text>
+    <div v-if="COMMAND_GROUPS.length > 0" class="quick-cmd-container">
+      
+      <div class="header-toolbar">
+        <span class="desc-text">{{ t("點擊執行快捷指令，數據刷新可能有 1-5 分鐘延遲") }}</span>
+        <a-button class="refresh-btn" size="small" @click="fetchPlayers" :loading="isFetchingPlayers">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
       </div>
 
-      <a-collapse ghost expand-icon-position="right" :default-active-key="[COMMAND_GROUPS[0].group]">
-        <a-collapse-panel v-for="group in COMMAND_GROUPS" :key="group.group">
-          <template #header>
-            <span class="group-title"><component :is="group.icon" class="mr-8" /> {{ group.group }}</span>
-          </template>
+      <div v-for="group in COMMAND_GROUPS" :key="group.group" class="group-section">
+        <div class="group-header">
+          <component :is="group.icon" class="group-icon" />
+          <span>{{ group.group }}</span>
+        </div>
 
-          <div class="cmd-grid">
-            <div v-for="item in group.commands" :key="item.label" class="cmd-card">
+        <div class="cmd-grid">
+          <div v-for="item in group.commands" :key="item.label" class="cmd-card">
+            <div class="cmd-top">
               <span class="cmd-label">{{ item.label }}</span>
-              
-              <div class="cmd-controls">
+            </div>
+            
+            <div class="cmd-body">
+              <div class="inputs-group">
                 <template v-for="(type, index) in getParams(item.cmd)" :key="index">
-                  
                   <a-select
                     v-if="type === 'player'"
                     v-model:value="formState[`${item.label}_${index}`]"
                     :placeholder="t('玩家')"
                     size="small"
                     show-search
-                    class="ctrl-player"
-                    :loading="isFetchingPlayers"
+                    class="param-input player-select"
                   >
-                    <a-select-option v-for="n in onlinePlayers" :key="n" :value="n">{{ n }}</a-select-option>
+                    <a-select-option v-for="n in onlinePlayers" :key="n" :value="n">
+                      <div class="player-option">
+                        <img :src="getAvatar(n)" class="mini-avatar" />
+                        <span>{{ n }}</span>
+                      </div>
+                    </a-select-option>
                   </a-select>
 
                   <a-select
                     v-else-if="type === 'val'"
                     v-model:value="formState[`${item.label}_${index}`]"
                     size="small"
-                    class="ctrl-option"
+                    class="param-input val-select"
                   >
-                    <a-select-option v-for="opt in (item.options || [])" :key="opt" :value="opt">
-                      {{ opt }}
-                    </a-select-option>
+                    <a-select-option v-for="opt in (item.options || [])" :key="opt" :value="opt">{{ opt }}</a-select-option>
                   </a-select>
 
                   <a-input
                     v-else
                     v-model:value="formState[`${item.label}_${index}`]"
-                    :placeholder="(item.placeholder && item.placeholder[index]) || t('輸入...')"
+                    :placeholder="(item.placeholder && item.placeholder[index]) || t('輸入')"
                     size="small"
-                    class="ctrl-text"
+                    class="param-input text-input"
                   />
                 </template>
-
-                <a-button type="primary" size="small" shape="circle" @click="runCommand(item)">
-                  <template #icon><SendOutlined /></template>
-                </a-button>
               </div>
+
+              <a-button type="primary" size="small" class="exec-btn" @click="runCommand(item)">
+                <SendOutlined />
+              </a-button>
             </div>
           </div>
-        </a-collapse-panel>
-      </a-collapse>
+        </div>
+      </div>
     </div>
   </a-modal>
 </template>
 
-<style lang="scss" scoped>
-.command-container {
-  max-height: 65vh;
-  overflow-y: auto;
-  padding-right: 8px;
-}
-.header-tip {
-  margin-bottom: 12px;
-  padding-left: 12px;
-}
-.group-title {
-  font-weight: bold;
-  font-size: 15px;
-  display: flex;
-  align-items: center;
-}
-.mr-8 { margin-right: 8px; }
-
-.cmd-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+<style scoped>
+.quick-cmd-container {
+  padding: 4px;
 }
 
-.cmd-card {
+.header-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 10px;
-  background: #fdfdfd;
-  border: 1px solid #f0f0f0;
-  border-radius: 4px;
-  transition: all 0.2s;
-  &:hover {
-    border-color: #1890ff;
-    background: #f0f7ff;
-  }
+  margin-bottom: 20px;
+}
+
+.desc-text {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+.refresh-btn {
+  border-radius: 8px;
+  background: rgba(140, 140, 140, 0.1);
+  border: 1px solid rgba(140, 140, 140, 0.2);
+}
+
+/* --- 分組樣式 --- */
+.group-section {
+  margin-bottom: 24px;
+}
+
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+
+.group-icon {
+  color: #1677ff;
+}
+
+/* --- 網格佈局 --- */
+.cmd-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+/* --- 指令卡片設計 (參考你的 Java 切換組件) --- */
+.cmd-card {
+  background: rgba(22, 119, 255, 0.03);
+  border: 1px solid rgba(140, 140, 140, 0.15);
+  border-radius: 12px;
+  padding: 12px;
+  transition: all 0.2s ease;
+}
+
+.cmd-card:hover {
+  border-color: #1677ff;
+  background: rgba(22, 119, 255, 0.06);
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.08);
+}
+
+.cmd-top {
+  margin-bottom: 10px;
 }
 
 .cmd-label {
   font-size: 13px;
-  color: #333;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 110px;
+  font-weight: 600;
+  opacity: 0.9;
 }
 
-.cmd-controls {
+.cmd-body {
   display: flex;
-  gap: 4px;
+  justify-content: space-between;
   align-items: center;
+  gap: 8px;
 }
 
-// 根據不同輸入類型設定寬度，確保在雙列佈局下不擠擁
-.ctrl-player { width: 90px; }
-.ctrl-option { width: 80px; }
-.ctrl-text { width: 80px; }
+.inputs-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
 
-@media (max-width: 700px) {
+/* --- 輸入框樣式微調 --- */
+.param-input {
+  background: rgba(140, 140, 140, 0.05) !important;
+}
+
+.player-select { width: 100px; }
+.val-select { width: 80px; }
+.text-input { width: 90px; }
+
+/* 執行按鈕樣式 */
+.exec-btn {
+  border-radius: 8px;
+  height: 28px;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: #1677ff;
+}
+
+/* --- 玩家下拉選項 (頭像) --- */
+.player-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+/* --- 響應式 --- */
+@media (max-width: 650px) {
   .cmd-grid {
     grid-template-columns: 1fr;
   }
