@@ -9,7 +9,9 @@ import {
   SettingOutlined, 
   RocketOutlined, 
   ReloadOutlined,
-  HistoryOutlined
+  HistoryOutlined,
+  ExperimentOutlined,
+  ThunderboltOutlined
 } from "@ant-design/icons-vue";
 
 // --- 類型定義 ---
@@ -71,7 +73,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
   },
   {
     group: t("生成（敵對生物）"),
-    icon: HistoryOutlined,
+    icon: ThunderboltOutlined,
     commands: [
       { label: t("殭尸"), cmd: "execute at {player} run summon zombie ~ ~ ~" }, 
       { label: t("骷髏"), cmd: "execute at {player} run summon skeleton ~ ~ ~" }, 
@@ -90,7 +92,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
   },
   {
     group: t("生成（中立生物）"),
-    icon: HistoryOutlined,
+    icon: ThunderboltOutlined,
     commands: [
       { label: t("末影人"), cmd: "execute at {player} run summon enderman ~ ~ ~" }, 
       { label: t("狼 (狗)"), cmd: "execute at {player} run summon wolf ~ ~ ~" }, 
@@ -103,7 +105,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
   },
   {
     group: t("生成（友好生物）"),
-    icon: HistoryOutlined,
+    icon: ThunderboltOutlined,
     commands: [
       { label: t("村民"), cmd: "execute at {player} run summon villager ~ ~ ~" }, 
       { label: t("豬"), cmd: "execute at {player} run summon pig ~ ~ ~" }, 
@@ -120,42 +122,34 @@ const COMMAND_GROUPS: CommandGroup[] = [
   },
   {
     group: t("生成（特殊實體）"),
-    icon: HistoryOutlined,
+    icon: ThunderboltOutlined,
     commands: [
       { label: t("閃電"), cmd: "execute at {player} run summon lightning_bolt ~ ~ ~" }, 
       { label: t("盔甲架"), cmd: "execute at {player} run summon armor_stand ~ ~ ~" }, 
       { label: t("船"), cmd: "execute at {player} run summon boat ~ ~ ~" }, 
-      { label: t("羊"), cmd: "execute at {player} run summon sheep ~ ~ ~" }, 
-      { label: t("雞"), cmd: "execute at {player} run summon chicken ~ ~ ~" }, 
-      { label: t("馬"), cmd: "execute at {player} run summon horse ~ ~ ~" }, 
-      { label: t("貓"), cmd: "execute at {player} run summon cat ~ ~ ~" }, 
-      { label: t("Allay"), cmd: "execute at {player} run summon allay ~ ~ ~" }, 
-      { label: t("Sniffer"), cmd: "execute at {player} run summon sniffer ~ ~ ~" }, 
-      { label: t("犰狳"), cmd: "execute at {player} run summon armadillo ~ ~ ~" }, 
-      { label: t("青蛙"), cmd: "execute at {player} run summon frog ~ ~ ~" }, 
     ]
   },
   {
     group: t("效果"),
-    icon: HistoryOutlined,
+    icon: ExperimentOutlined,
     commands: [
-      { label: t("迅捷"), cmd: "effect give {player} speed {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("急迫"), cmd: "effect give {player} haste {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("力量"), cmd: "effect give {player} strength {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("再生"), cmd: "effect give {player} regeneration {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("抗性"), cmd: "effect give {player} resistance {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("水中呼吸"), cmd: "effect give {player} water_breathing {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("隱形"), cmd: "effect give {player} invisibility {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("夜視"), cmd: "effect give {player} night_vision {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("失明"), cmd: "effect give {player} slowness {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("飢餓"), cmd: "effect give {player} blindness {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("虛弱"), cmd: "effect give {player} hunger {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("中毒"), cmd: "effect give {player} weakness {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("凋零"), cmd: "effect give {player} poison {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("飄浮"), cmd: "effect give {player} levitation {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("緩降"), cmd: "effect give {player} slow_falling {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("導引神力"), cmd: "effect give {player} conduit_power {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
-      { label: t("不祥之兆"), cmd: "effect give {player} bad_omen {val} {val}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("迅捷"), cmd: "effect give {player} speed {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("急迫"), cmd: "effect give {player} haste {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("力量"), cmd: "effect give {player} strength {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("再生"), cmd: "effect give {player} regeneration {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("抗性"), cmd: "effect give {player} resistance {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("水中呼吸"), cmd: "effect give {player} water_breathing {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("隱形"), cmd: "effect give {player} invisibility {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("夜視"), cmd: "effect give {player} night_vision {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("失明"), cmd: "effect give {player} slowness {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("飢餓"), cmd: "effect give {player} blindness {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("虛弱"), cmd: "effect give {player} hunger {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("中毒"), cmd: "effect give {player} weakness {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("凋零"), cmd: "effect give {player} poison {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("飄浮"), cmd: "effect give {player} levitation {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("緩降"), cmd: "effect give {player} slow_falling {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("導引神力"), cmd: "effect give {player} conduit_power {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
+      { label: t("不祥之兆"), cmd: "effect give {player} bad_omen {text} {text}", placeholder: [t("秒數"), t("等級")] }, 
     ]
   },
   {
