@@ -13,6 +13,8 @@ import {
   HistoryOutlined
 } from "@ant-design/icons-vue";
 
+  // ... (之前的 script 邏輯保持不變，只需增加一個 activeKeys)
+const activeKeys = ref([COMMAND_GROUPS[0].group]); // 預設展開第一組
 // --- 類型定義修正 ---
 interface CommandItem {
   label: string;
@@ -275,11 +277,6 @@ defineExpose({ openDialog });
     </div>
   </a-modal>
 </template>
-
-<script setup lang="ts">
-// ... (之前的 script 邏輯保持不變，只需增加一個 activeKeys)
-const activeKeys = ref([COMMAND_GROUPS[0].group]); // 預設展開第一組
-</script>
 
 <style scoped>
 .quick-cmd-container {
