@@ -151,22 +151,24 @@ const btns = computed(() => {
   title: t("玩家管理"),
   icon: UsergroupDeleteOutlined,
   click: async () => {
-    // 1. 先判斷是否已經連線，如果沒連線才執行 execute
+    // 1. 如果尚未連線，則在背景執行 execute
     if (!terminalHook.isConnect.value) {
       try {
-        message.loading({ content: t("正在建立加密連線..."), key: "terminal_conn" });
+        // 靜默連線，不彈出任何 loading 提示
         await terminalHook.execute({
           instanceId: instanceId!,
           daemonId: daemonId!
         });
-        message.success({ content: t("連線就緒"), key: "terminal_conn", duration: 1 });
       } catch (err) {
-        message.error({ content: t("連線失敗"), key: "terminal_conn" });
-        return; // 連線失敗就不打開對話框
+        // 僅在控制台打印錯誤，方便調試，不干擾用戶
+        console.error("PlayerManager Connection Failed:", err);
+        return; 
       }
     }
     
-    // 2. 連線成功後，再打開對話框
+    // 2. 直接打開對話框
+    // 提示：子組件 playermanagement.vue 內部已有 :disabled="!isConnect" 
+    // 所以即便連線中，按鈕也會是禁用狀態，直到連線完成。
     playermanagementDialog.value?.openDialog();
   },
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
