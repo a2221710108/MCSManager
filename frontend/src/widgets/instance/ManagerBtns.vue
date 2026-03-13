@@ -170,7 +170,7 @@ const btns = computed(() => {
     playermanagementDialog.value?.openDialog();
   },
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
-}
+},
     {
   title: t("切換 Java"),
   icon: CoffeeOutlined,
