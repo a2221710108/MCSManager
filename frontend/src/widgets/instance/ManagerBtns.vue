@@ -141,7 +141,7 @@ const btns = computed(() => {
      condition: () => isAdmin.value && (instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false)
     },
     {
-      title: t("常用指令"),
+      title: t("快捷指令"),
       // 建議換成閃電圖標，區分於玩家管理
       icon: ControlOutlined, 
       click: async () => {
