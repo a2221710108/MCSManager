@@ -45,6 +45,9 @@ import type { TagInfo } from "../../components/interface";
 import { GLOBAL_INSTANCE_NAME } from "../../config/const";
 import { useTerminal, type UseTerminalHook } from "../../hooks/useTerminal";
 import { arrayFilter } from "../../tools/array";
+import { ref } from "vue";
+
+const activeTab = ref("ALL");
 
 const props = defineProps<{
   card: LayoutCard;
@@ -418,13 +421,13 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 </div>
     
     <TerminalCore
-      v-if="instanceId && daemonId"
-      :use-terminal-hook="terminalHook"
-      :instance-id="instanceId"
-      :daemon-id="daemonId"
-      :height="card.height"
-    />
-  </div>
+  v-if="instanceId && daemonId"
+  :instance-id="instanceId"
+  :daemon-id="daemonId"
+  :use-terminal-hook="terminalHook"
+  :height="card.height"
+  :filter-type="activeTab" 
+/>
 
   <!-- Other Page View -->
   <CardPanel v-else class="containerWrapper" style="height: 100%">
