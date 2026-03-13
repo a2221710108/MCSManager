@@ -71,7 +71,7 @@ const { getMetaOrRouteValue } = useLayoutCardTools(props.card);
 const instanceId = getMetaOrRouteValue("instanceId");
 const daemonId = getMetaOrRouteValue("daemonId");
 
-const { instanceInfo, execute, isGlobalTerminal, useTerminalHook } = useInstanceInfo({
+const { instanceInfo, execute, isGlobalTerminal } = useInstanceInfo({
   instanceId,
   daemonId,
   autoRefresh: true
@@ -353,7 +353,7 @@ watch(instanceInfo, (cfg, oldCfg) => {
    :instance-info="instanceInfo"
    :instance-id="instanceId"
    :daemon-id="daemonId"
-   :use-terminal-hook="useTerminalHook"
+   :use-terminal-hook="terminalHook"
    @update="refreshInstanceInfo"
  /> 
 
