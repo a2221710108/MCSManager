@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive, watch, nextTick, onBeforeUnmount } from "vue";
+import { onMounted, ref, reactive, watch, nextTick } from "vue";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { message } from "ant-design-vue";
 import { LoadingOutlined, DeleteOutlined, CodeOutlined } from "@ant-design/icons-vue";
 
-// 導入所需的工具和 Hook
 import { t } from "@/lang/i18n";
 import { getRandomId } from "../tools/randId";
 import { useLayoutContainerStore } from "@/stores/useLayoutContainerStore";
@@ -41,10 +40,9 @@ const {
   clearTerminal
 } = props.useTerminalHook;
 
-// --- 標籤頁與多終端管理 ---
+// --- 標籤頁狀態 ---
 const activeTab = ref("ALL");
 const isMinecraft = ref(false);
-const terminalDomId = `terminal-window-${getRandomId()}`;
 
 const terminals = reactive({
   ALL: { term: null as Terminal | null, id: `term-all-${getRandomId()}`, fit: null as FitAddon | null },
@@ -54,15 +52,25 @@ const terminals = reactive({
 
 const inputRef = ref<HTMLElement | null>(null);
 
-// 核心分流邏輯
+// --- 工具函數：移除 ANSI 顏色代碼以便正確過濾 ---
+const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[a-zA-Z\d\n\r]*(?:;[a-zA-Z\d\n\r]*)*)?/g, "");
+
+// --- 核心分流寫入邏輯 ---
 const writeToTabs = (data: string) => {
+  if (!data) return;
+  
+  // 1. 寫入主終端
   terminals.ALL.term?.write(data);
+
+  // 2. 只有 Minecraft 實例執行過濾
   if (isMinecraft.value) {
-    // 匹配 Minecraft WARN/ERROR 格式
-    if (data.includes("/WARN") || /WARN/i.test(data)) {
+    const cleanData = stripAnsi(data);
+    // 匹配 [Server thread/WARN]: 或包含 WARN 關鍵字
+    if (/\[.*WARN\]/i.test(cleanData) || cleanData.includes("WARN")) {
       terminals.WARN.term?.write(data);
     }
-    if (data.includes("/ERROR") || /ERROR/i.test(data)) {
+    // 匹配 [Server thread/ERROR]: 或包含 ERROR 關鍵字
+    if (/\[.*ERROR\]/i.test(cleanData) || cleanData.includes("ERROR")) {
       terminals.ERROR.term?.write(data);
     }
   }
@@ -85,22 +93,18 @@ const interceptDSR = (term: any) => {
 const initAllTerminals = async () => {
   if (containerState.isDesignMode) return;
   
-  // 1. 初始化主終端 (ALL)
   const domAll = document.getElementById(terminals.ALL.id);
   if (domAll) {
     terminals.ALL.term = initTerminalWindow(domAll);
     interceptDSR(terminals.ALL.term);
-    // 獲取 fitAddon (假設 initTerminalWindow 已綁定，若無則手動添加)
     const fit = new FitAddon();
     terminals.ALL.term.loadAddon(fit);
     terminals.ALL.fit = fit;
   }
 
-  // 2. 初始化副終端 (WARN & ERROR)
   if (isMinecraft.value) {
     await nextTick();
-    const subTabs = ["WARN", "ERROR"] as const;
-    subTabs.forEach(tab => {
+    (["WARN", "ERROR"] as const).forEach(tab => {
       const dom = document.getElementById(terminals[tab].id);
       if (dom) {
         const tObj = new Terminal((terminals.ALL.term as any).options);
@@ -115,21 +119,44 @@ const initAllTerminals = async () => {
   }
 };
 
-// 事件監聽
+// --- 監聽事件 ---
+
+// 1. 即時數據流
 events.on("data", (data: string) => writeToTabs(data));
+
+// 2. 歷史記錄加載 (修復刷新後空白的問題)
+events.once("detail", async () => {
+  try {
+    const { value } = await getInstanceOutputLog().execute({
+      params: { uuid: props.instanceId || "", daemonId: props.daemonId || "" }
+    });
+
+    if (value) {
+      const finalLog = state.value?.config?.terminalOption?.haveColor 
+        ? encodeConsoleColor(value) 
+        : value;
+
+      // 歷史記錄通常是一大塊字串，我們按行拆分後過濾，確保 WARN/ERROR 分頁能收到數據
+      const lines = finalLog.split(/\r?\n/);
+      lines.forEach(line => {
+        writeToTabs(line + "\r\n");
+      });
+    }
+  } catch (error: any) {
+    console.error("History Log Error:", error);
+  }
+});
+
 events.on("opened", () => message.success(t("TXT_CODE_e13abbb1")));
 events.on("stopped", () => message.success(t("TXT_CODE_efb6d377")));
 
-// 監聽實例類型
 watch(() => state.value?.config?.type, (type) => {
   isMinecraft.value = !!(type && type.includes("minecraft"));
 }, { immediate: true });
 
-// 監聽標籤切換調整大小
 watch(activeTab, async () => {
   await nextTick();
-  const current = (terminals as any)[activeTab.value];
-  current?.fit?.fit();
+  (terminals as any)[activeTab.value]?.fit?.fit();
 });
 
 const handleSendCommand = () => {
@@ -192,8 +219,11 @@ onMounted(async () => {
     <div class="terminal-wrapper global-card-container-shadow position-relative">
       <div class="terminal-container">
         <div v-show="activeTab === 'ALL'" :id="terminals.ALL.id" :style="{ height: props.height }"></div>
-        <div v-if="isMinecraft" v-show="activeTab === 'WARN'" :id="terminals.WARN.id" :style="{ height: props.height }"></div>
-        <div v-if="isMinecraft" v-show="activeTab === 'ERROR'" :id="terminals.ERROR.id" :style="{ height: props.height }"></div>
+        
+        <template v-if="isMinecraft">
+          <div v-show="activeTab === 'WARN'" :id="terminals.WARN.id" :style="{ height: props.height }"></div>
+          <div v-show="activeTab === 'ERROR'" :id="terminals.ERROR.id" :style="{ height: props.height }"></div>
+        </template>
 
         <div v-if="containerState.isDesignMode" :style="{ height: props.height }">
           <p class="terminal-design-tip">{{ t("TXT_CODE_7ac6f85c") }}</p>
