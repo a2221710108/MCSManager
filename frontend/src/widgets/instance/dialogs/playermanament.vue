@@ -3,45 +3,44 @@ import { ref, computed } from "vue";
 import { t } from "@/lang/i18n";
 import type { InstanceDetail } from "@/types";
 import { message } from "ant-design-vue";
-// 確保路徑指向你的 useTerminal hook
-import { useTerminal } from "../../../hooks/useTerminal";
+// 引入類型定義，不重新建立 Hook
+import type { UseTerminalHook } from "../hooks/useTerminal";
 import {
   UserOutlined,
   CrownOutlined,
   StopOutlined,
   LogoutOutlined,
   ReloadOutlined,
-  ThunderboltOutlined,
   SmileOutlined
 } from "@ant-design/icons-vue";
 
+// 增加 useTerminalHook 作為 Prop 傳入，這樣才能共用父組件已連線的 Socket
 const props = defineProps<{
   instanceInfo?: InstanceDetail;
   instanceId?: string;
   daemonId?: string;
+  useTerminalHook: UseTerminalHook; 
 }>();
-
-const { sendCommand } = useTerminal();
 
 const open = ref(false);
 const onlinePlayers = ref<any[]>([]);
 const isLoading = ref(false);
 
-// 模擬 OP 玩家名單（之後可透過讀取 ops.json 的 API 替換）
-const opPlayers = ref<string[]>(["LazyCloud_Admin"]); 
+// 模擬 OP 列表
+const opPlayers = ref<string[]>([]); 
 
-// 獲取 mcping 填寫的配置
+// 從父組件傳進來的 Hook 中解構出發送指令的方法
+const { sendCommand, isConnect } = props.useTerminalHook;
+
 const pingConfig = computed(() => ({
   ip: props.instanceInfo?.config?.pingConfig.ip || "",
   port: props.instanceInfo?.config?.pingConfig.port || 25565
 }));
 
-// 獲取玩家列表
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) return;
   isLoading.value = true;
   try {
-    // 使用公共 API 獲取 Java 版伺服器在線玩家
     const res = await fetch(
       `https://api.mcstatus.io/v2/status/java/${pingConfig.value.ip}:${pingConfig.value.port}`
     );
@@ -53,33 +52,40 @@ const fetchPlayers = async () => {
     }
   } catch (err) {
     console.error("Fetch players error:", err);
-    message.error(t("無法連接到 Ping API"));
   } finally {
     isLoading.value = false;
   }
 };
 
-// 執行指令
-const runCommand = (cmd: string, playerName: string) => {
+// 核心修正：增加 async/await 與 try-catch 攔截「實例沒有在運作」錯誤
+const runCommand = async (cmd: string, playerName: string) => {
   const fullCommand = cmd.replace("{player}", playerName);
-  sendCommand(fullCommand);
-  // 使用你專案中已有的成功提示 i18n key，或直接顯示文字
-  message.success(`${t("指令已發送")}: ${fullCommand}`);
+  
+  // 安全檢查：如果 Socket 沒連上，直接攔截
+  if (!isConnect.value) {
+    return message.error(t("終端連線尚未就緒，請稍後"));
+  }
+
+  try {
+    // 等待指令發送，若報錯則會進入 catch
+    await sendCommand(fullCommand);
+    message.success(`${t("指令已發送")}: ${fullCommand}`);
+  } catch (err: any) {
+    console.error("LazyCloud PlayerManager Command Error:", err);
+    // 捕獲錯誤並提示，防止 LayoutCard 崩潰
+    const errorMsg = err.message || String(err);
+    message.error(`${t("執行失敗")}: ${errorMsg}`);
+  }
 };
 
-// 判斷是否為 OP
 const isOp = (name: string) => opPlayers.value.includes(name);
-
-// 獲取頭像
 const getAvatar = (name: string) => `https://minotar.net/avatar/${name}/32`;
 
-// 打開對話框的方法
 const openDialog = () => {
   open.value = true;
   fetchPlayers();
 };
 
-// 暴露給父組件 ManagerBtns.vue 呼叫
 defineExpose({
   openDialog
 });
@@ -98,6 +104,7 @@ defineExpose({
       <div class="header-actions">
         <a-typography-text type="secondary">
           <SmileOutlined /> {{ t("當前在線") }}: {{ onlinePlayers.length }}
+          <a-badge v-if="isConnect" status="processing" color="green" class="ml-12" text="Socket Ready" />
         </a-typography-text>
         <a-button type="link" size="small" :loading="isLoading" @click="fetchPlayers">
           <template #icon><ReloadOutlined /></template>
@@ -123,20 +130,18 @@ defineExpose({
                 </div>
 
                 <div class="player-ops">
-                  <a-button-group>
+                  <a-button-group :disabled="!isConnect">
                     <a-tooltip :title="t('設為管理員')">
                       <a-button @click="runCommand('op {player}', item.name_raw || item.name)">
                         <template #icon><CrownOutlined /></template>
                       </a-button>
                     </a-tooltip>
-
                     <a-tooltip :title="t('生存模式')">
                       <a-button @click="runCommand('gamemode survival {player}', item.name_raw || item.name)">S</a-button>
                     </a-tooltip>
                     <a-tooltip :title="t('創造模式')">
                       <a-button @click="runCommand('gamemode creative {player}', item.name_raw || item.name)">C</a-button>
                     </a-tooltip>
-
                     <a-popconfirm :title="t('確定踢出玩家？')" @confirm="runCommand('kick {player}', item.name_raw || item.name)">
                       <a-button danger><LogoutOutlined /></a-button>
                     </a-popconfirm>
@@ -159,59 +164,28 @@ defineExpose({
 </template>
 
 <style lang="scss" scoped>
-.player-management-container {
-  min-height: 300px;
-}
-
 .header-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 8px;
 }
-
 .player-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
 }
-
 .player-identity {
   display: flex;
   align-items: center;
   gap: 12px;
-
   .player-name-group {
     display: flex;
     flex-direction: column;
-    
-    span {
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .is-op {
-      color: #ff4d4f; /* OP 玩家名字變紅 */
-      font-weight: bold;
-    }
+    .is-op { color: #ff4d4f; font-weight: bold; }
   }
 }
-
-.player-list-wrapper {
-  max-height: 450px;
-  overflow-y: auto;
-}
-
-.empty-state {
-  padding: 40px 0;
-  text-align: center;
-}
-
-// 讓按鈕組在移動端也整齊
-.player-ops {
-  .ant-btn-group {
-    display: flex;
-    align-items: center;
-  }
-}
+.ml-12 { margin-left: 12px; }
+.empty-state { padding: 40px 0; text-align: center; }
 </style>
