@@ -344,15 +344,14 @@ watch(instanceInfo, (cfg, oldCfg) => {
   @update="refreshInstanceInfo"
 />
 
-  <playermanament
+  <playermanagement
   ref="playermanamentDialog"
   :instance-info="instanceInfo"
-  :instance-id="instanceId ?? ''"
-  :daemon-id="daemonId ?? ''"
+  :instance-id="instanceId"
+  :daemon-id="daemonId"
   @update="refreshInstanceInfo"
+  :use-terminal-hook="useTerminalHook"  
 />
-  
-</template>
 
 <style lang="scss" scoped>
 .function-btns-container {
