@@ -406,6 +406,17 @@ const terminalTopTags = computed<TagInfo[]>(() => {
     <div class="mb-10 justify-end">
       <TerminalTags :tags="terminalTopTags" />
     </div>
+    
+    // 注意：下面的div是我自己家的
+    <div v-if="instanceInfo?.config?.type?.startsWith('minecraft')" class="mb-10">
+  <a-tabs v-model:activeKey="activeTab" type="card" size="small">
+    <a-tab-pane key="ALL" tab="全部" />
+    <a-tab-pane key="WARN" tab="警告" />
+    <a-tab-pane key="ERROR" tab="錯誤" />
+    <a-tab-pane key="CHAT" tab="聊天" />
+  </a-tabs>
+</div>
+    
     <TerminalCore
       v-if="instanceId && daemonId"
       :use-terminal-hook="terminalHook"
