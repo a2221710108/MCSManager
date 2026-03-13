@@ -33,14 +33,12 @@ const {
   state,
   events,
   isConnect,
-  socketAddress,
   execute: setUpTerminal,
   initTerminalWindow,
   sendCommand,
   clearTerminal
 } = props.useTerminalHook;
 
-// --- 標籤頁狀態 ---
 const activeTab = ref("ALL");
 const isMinecraft = ref(false);
 
@@ -52,25 +50,23 @@ const terminals = reactive({
 
 const inputRef = ref<HTMLElement | null>(null);
 
-// --- 工具函數：移除 ANSI 顏色代碼以便正確過濾 ---
+// 移除顏色代碼以便過濾
 const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[a-zA-Z\d\n\r]*(?:;[a-zA-Z\d\n\r]*)*)?/g, "");
 
-// --- 核心分流寫入邏輯 ---
+// --- 核心分流寫入邏輯 (優化匹配規則) ---
 const writeToTabs = (data: string) => {
   if (!data) return;
-  
-  // 1. 寫入主終端
   terminals.ALL.term?.write(data);
 
-  // 2. 只有 Minecraft 實例執行過濾
   if (isMinecraft.value) {
     const cleanData = stripAnsi(data);
-    // 匹配 [Server thread/WARN]: 或包含 WARN 關鍵字
-    if (/\[.*WARN\]/i.test(cleanData) || cleanData.includes("WARN")) {
+    
+    // 改用更寬鬆的正則，匹配包含 WARN 或 ERROR 的日誌行
+    // 例如 [02:15:43 WARN]: 
+    if (/WARN/i.test(cleanData)) {
       terminals.WARN.term?.write(data);
     }
-    // 匹配 [Server thread/ERROR]: 或包含 ERROR 關鍵字
-    if (/\[.*ERROR\]/i.test(cleanData) || cleanData.includes("ERROR")) {
+    if (/ERROR/i.test(cleanData)) {
       terminals.ERROR.term?.write(data);
     }
   }
@@ -80,14 +76,6 @@ const interceptDSR = (term: any) => {
   if (!term) return;
   term.parser.registerOscHandler(11, () => true);
   term.parser.registerOscHandler(10, () => true);
-  const core = term._core;
-  if (core?.coreService) {
-    const originalTriggerData = core.coreService.triggerDataEvent.bind(core.coreService);
-    core.coreService.triggerDataEvent = (data: string) => {
-      if (data.includes('\x1b[') && data.endsWith('R')) return;
-      originalTriggerData(data);
-    };
-  }
 };
 
 const initAllTerminals = async () => {
@@ -119,12 +107,8 @@ const initAllTerminals = async () => {
   }
 };
 
-// --- 監聽事件 ---
-
-// 1. 即時數據流
 events.on("data", (data: string) => writeToTabs(data));
 
-// 2. 歷史記錄加載 (修復刷新後空白的問題)
 events.once("detail", async () => {
   try {
     const { value } = await getInstanceOutputLog().execute({
@@ -136,9 +120,9 @@ events.once("detail", async () => {
         ? encodeConsoleColor(value) 
         : value;
 
-      // 歷史記錄通常是一大塊字串，我們按行拆分後過濾，確保 WARN/ERROR 分頁能收到數據
       const lines = finalLog.split(/\r?\n/);
       lines.forEach(line => {
+        // 歷史記錄每一行手動補上換行符以便 xterm 渲染
         writeToTabs(line + "\r\n");
       });
     }
@@ -163,11 +147,6 @@ const handleSendCommand = () => {
   if (focusHistoryList.value) return;
   sendCommand(commandInputValue.value || "");
   commandInputValue.value = "";
-};
-
-const handleClickHistoryItem = (item: string) => {
-  clickHistoryItem(item);
-  inputRef.value?.focus();
 };
 
 const handleClearAll = () => {
@@ -201,11 +180,11 @@ onMounted(async () => {
         :class="['tab-item', activeTab === tab ? 'active' : '']"
         @click="activeTab = tab"
       >
-        {{ tab === 'ALL' ? t('TXT_CODE_555e2c1b').replace(':','') : tab }}
+        {{ tab === 'ALL' ? 'ALL' : tab }}
       </div>
     </div>
 
-    <div class="terminal-button-group position-absolute-right position-absolute-top">
+    <div class="terminal-button-group position-absolute-right">
       <ul>
         <li @click="handleClearAll">
           <a-tooltip placement="top">
@@ -219,12 +198,10 @@ onMounted(async () => {
     <div class="terminal-wrapper global-card-container-shadow position-relative">
       <div class="terminal-container">
         <div v-show="activeTab === 'ALL'" :id="terminals.ALL.id" :style="{ height: props.height }"></div>
-        
         <template v-if="isMinecraft">
           <div v-show="activeTab === 'WARN'" :id="terminals.WARN.id" :style="{ height: props.height }"></div>
           <div v-show="activeTab === 'ERROR'" :id="terminals.ERROR.id" :style="{ height: props.height }"></div>
         </template>
-
         <div v-if="containerState.isDesignMode" :style="{ height: props.height }">
           <p class="terminal-design-tip">{{ t("TXT_CODE_7ac6f85c") }}</p>
         </div>
@@ -234,7 +211,7 @@ onMounted(async () => {
     <div class="command-input">
       <div v-show="focusHistoryList" class="history">
         <li v-for="(item, key) in history" :key="item">
-          <a-tag :color="key !== selectLocation ? 'blue' : '#108ee9'" @click="handleClickHistoryItem(item)">
+          <a-tag :color="key !== selectLocation ? 'blue' : '#108ee9'" @click="clickHistoryItem(item)">
             {{ item.length > 14 ? item.slice(0, 14) + "..." : item }}
           </a-tag>
         </li>
@@ -253,79 +230,11 @@ onMounted(async () => {
   </div>
 </template>
 
-<style lang="scss" scoped>
-/* 新增：標籤頁樣式，採用簡約深色風格 */
-.terminal-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 8px;
-  
-  .tab-item {
-    padding: 4px 16px;
-    background: #2a2a2a;
-    color: #999;
-    border-radius: 4px 4px 0 0;
-    cursor: pointer;
-    font-size: 12px;
-    transition: all 0.3s;
-    border: 1px solid transparent;
-    border-bottom: none;
-
-    &:hover {
-      background: #333;
-      color: #eee;
-    }
-
-    &.active {
-      background: #1e1e1e;
-      color: #fff;
-      border-color: var(--card-border-color);
-      font-weight: bold;
-    }
-
-    .dot-error {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      background: #ff4d4f;
-      border-radius: 50%;
-      margin-left: 4px;
-      vertical-align: middle;
-    }
-  }
-}
-
-.error-card {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: 0;
-  z-index: 10;
-  border-radius: 20px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  .error-card-container {
-    overflow: hidden;
-    max-width: 440px;
-    border: 1px solid var(--color-gray-6) !important;
-    background-color: var(--color-gray-1);
-    border-radius: 4px;
-    padding: 12px;
-    box-shadow: 0px 0px 2px var(--color-gray-7);
-  }
-
-  @media (max-width: 992px) {
-    .error-card-container {
-      max-width: 90vw !important;
-    }
-  }
-}
+<style lang="ts" scoped>
 .console-wrapper {
   position: relative;
+  display: flex;
+  flex-direction: column;
 
   .terminal-loading {
     z-index: 12;
@@ -335,93 +244,161 @@ onMounted(async () => {
     transform: translate(-50%, -50%);
   }
 
-  .terminal-button-group {
-    z-index: 11;
-    margin-right: 20px;
-    padding-bottom: 50px;
-    padding-left: 50px;
-    border-radius: 6px;
-    color: #fff;
+  // 標籤導航欄
+  .terminal-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 0px; // 關鍵：消除底部間距
+    padding-left: 2px;
+    z-index: 2;
 
-    &:hover {
-      ul {
-        transition: all 1s;
-        opacity: 0.8;
+    .tab-item {
+      padding: 6px 20px;
+      background: #252525;
+      color: #777;
+      border-radius: 6px 6px 0 0;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+      border-bottom: none;
+      user-select: none;
+      
+      &:hover {
+        color: #bbb;
+        background: #2d2d2d;
+      }
+      
+      &.active {
+        background: #1e1e1e;
+        color: #fff;
+        font-weight: 600;
+        border: 1px solid var(--card-border-color);
+        border-bottom: 1px solid #1e1e1e; // 覆蓋掉下方邊框，形成連通感
+        margin-bottom: -1px; // 關鍵：向下壓住終端框的邊框
       }
     }
+  }
+
+  // 終端按鈕組 (清空按鈕)
+  .terminal-button-group {
+    z-index: 11;
+    position: absolute;
+    right: 0;
+    top: 0;
 
     ul {
       display: flex;
-      opacity: 0;
-
+      margin: 0;
+      padding: 0;
+      opacity: 0.3;
+      transition: opacity 0.3s;
+      
       li {
         cursor: pointer;
         list-style: none;
-        padding: 5px;
-        margin-left: 5px;
-        border-radius: 6px;
-        font-size: 20px;
-
+        padding: 6px;
+        font-size: 18px;
+        color: #eee;
+        display: flex;
+        align-items: center;
+        
         &:hover {
           background-color: #3e3e3e;
+          border-radius: 6px;
+          color: #ff4d4f;
         }
       }
     }
+    &:hover ul {
+      opacity: 1;
+    }
   }
 
+  // 終端主體容器
   .terminal-wrapper {
     border: 1px solid var(--card-border-color);
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 0 8px 8px 8px; // 左上角設為直角，與標籤貼合
     position: relative;
     overflow: hidden;
-    height: 100%;
-    background-color: #1e1e1e;
-    padding: 8px;
-    border-radius: 6px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    .terminal-container {
-      // min-width: 1200px;
-      height: 100%;
-    }
+    z-index: 1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 
-    margin-bottom: 12px;
+    .terminal-container {
+      height: 100%;
+      width: 100%;
+    }
   }
 
+  // 指令輸入框部分
   .command-input {
     position: relative;
+    margin-top: 12px;
 
     .history {
       display: flex;
       max-width: 100%;
-      overflow: scroll;
+      overflow-x: auto;
+      gap: 6px;
       z-index: 10;
       position: absolute;
-      top: -35px;
+      top: -38px;
       left: 0;
+      padding: 2px 0;
+
+      // 隱藏滾動條
+      &::-webkit-scrollbar {
+        height: 0 !important;
+        display: none;
+      }
 
       li {
         list-style: none;
-        span {
-          padding: 3px 20px;
-          max-width: 300px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          cursor: pointer;
-        }
+        flex-shrink: 0;
+      }
+    }
+
+    :deep(.ant-input-affine-wrapper) {
+      background-color: #1e1e1e;
+      border-color: var(--card-border-color);
+      border-radius: 6px;
+      
+      input {
+        color: #ccc;
+        font-family: 'Fira Code', 'JetBrains Mono', monospace;
       }
 
-      &::-webkit-scrollbar {
-        width: 0 !important;
-        height: 0 !important;
+      &:hover, &-focused {
+        border-color: #40a9ff;
+        box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
       }
     }
   }
 
   .terminal-design-tip {
-    color: rgba(255, 255, 255, 0.584);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666;
+    font-style: italic;
   }
 }
 
-
+// 針對手機端的優化
+@media (max-width: 768px) {
+  .console-wrapper {
+    .terminal-tabs {
+      .tab-item {
+        padding: 4px 12px;
+        font-size: 12px;
+      }
+    }
+    .terminal-wrapper {
+      padding: 4px;
+    }
+  }
+}
 </style>
