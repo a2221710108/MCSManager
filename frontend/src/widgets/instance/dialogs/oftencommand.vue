@@ -385,8 +385,8 @@ defineExpose({ openDialog });
 }
 
 .player-select { width: 110px; }
-.val-select { width: 90px; }
-.text-input { width: 100px; }
+.val-select { width: 110px; }
+.text-input { width: 110px; }
 
 .exec-btn {
   border-radius: 6px;
