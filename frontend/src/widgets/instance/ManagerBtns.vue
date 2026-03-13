@@ -41,7 +41,7 @@ import TermConfig from "./dialogs/TermConfig.vue";
 import backup from "./dialogs/backup.vue";
 import java from "./dialogs/java.vue";
 import srv from "./dialogs/srv.vue";
-import playermanament from "./dialogs/playermanament.vue";
+import playermanagement from "./dialogs/playermanagement.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -53,7 +53,7 @@ const instanceFundamentalDetailDialog = ref<InstanceType<typeof InstanceFundamen
 const backupDialog = ref<InstanceType<typeof backup>>();
 const javaDialog = ref<InstanceType<typeof java>>();
 const srvDialog = ref<InstanceType<typeof srv>>();
-const playermanamentDialog = ref<InstanceType<typeof playermanament>>();
+const playermanagementDialog = ref<InstanceType<typeof playermanagement>>();
   
 const { toPage: toOtherPager } = useAppRouters();
 
@@ -145,10 +145,10 @@ const btns = computed(() => {
       condition: () => state.settings.canFileManager || isAdmin.value
     },
     {
-  title: t("玩家 Java"),
+  title: t("玩家管理"),
   icon: UsergroupDeleteOutlined,
   click: () => {
-    playermanamentDialog.value?.openDialog();
+    playermanamentgeDialog.value?.openDialog();
   },
   // 僅限 Minecraft Java 版顯示
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
@@ -345,7 +345,7 @@ watch(instanceInfo, (cfg, oldCfg) => {
 />
 
   <playermanagement
-  ref="playermanamentDialog"
+  ref="playermanagementDialog"
   :instance-info="instanceInfo"
   :instance-id="instanceId"
   :daemon-id="daemonId"
