@@ -334,19 +334,19 @@ const terminalTopTags = computed<TagInfo[]>(() => {
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
 
               <span
-                v-if="instanceInfo?.watcher && instanceInfo?.watcher > 1 && !isPhone"
-                class="ml-16"
-              >
-                <a-tooltip>
-                  <template #title>
-                    {{ t("TXT_CODE_4a37ec9c") }}
-                  </template>
-                  <LaptopOutlined />
-                </a-tooltip>
-                <span class="ml-6" style="opacity: 0.8">
-                  {{ instanceInfo?.watcher }}
-                </span>
-              </span>
+  v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 0"
+  class="ml-16"
+>
+  <a-tooltip>
+    <template #title>
+      {{ t("TXT_CODE_4a37ec9c") }}
+    </template>
+    <LaptopOutlined />
+  </a-tooltip>
+  <span class="ml-6" style="opacity: 0.8">
+    {{ instanceInfo?.watcher }}
+  </span>
+</span>
             </a-typography-paragraph>
           </div>
         </template>
