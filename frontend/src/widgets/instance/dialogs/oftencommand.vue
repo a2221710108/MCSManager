@@ -89,8 +89,9 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("PVP"), cmd: "gamerule pvp {val}", options: ["true", "false"] },
       { label: t("藤蔓蔓延"), cmd: "gamerule spread_vines {val}", options: ["true", "false"] },
       { label: t("TNT爆炸"), cmd: "gamerule tnt_explodes {val}", options: ["true", "false"] },
-      { label: t("設定世界中心"), cmd: "worldborder center {text}", placeholder: "x y" },
-      { label: t("設定世界邊界"), cmd: "worldborder add {text}", placeholder: "" },
+      { label: t("設定世界中心"), cmd: "worldborder center {text}", placeholder: "x z" },
+      { label: t("設定世界邊界"), cmd: "worldborder set {text}", placeholder: "" },
+      { label: t("重置世界邊界"), cmd: "worldborder set 59999968" },
     ]
   },
   {
