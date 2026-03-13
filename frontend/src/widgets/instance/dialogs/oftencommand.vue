@@ -46,30 +46,59 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("遊戲難度"), cmd: "difficulty {val}", type: "option", options: ["peaceful", "easy", "normal", "hard"] },
       { label: t("天氣切換"), cmd: "weather {val}", type: "option", options: ["clear", "rain", "thunder"] },
       { label: t("時間設置"), cmd: "time set {val}", type: "option", options: ["day", "night", "noon", "midnight"] },
+      { label: t("發送全服信息"), cmd: "say {text}", type: "input", placeholder: t("") },
+      { label: t("發送標題文字"), cmd: "title {text}", type: "input", placeholder: t("") },
     ]
   },
   {
-    group: t("遊戲規則 (Gamerule)"),
+    group: t("遊戲規則 (傷害)"),
     icon: SettingOutlined,
     commands: [
-      { label: t("死亡不掉落"), cmd: "gamerule keepInventory {val}", type: "option", options: ["true", "false"] },
-      { label: t("生物破壞地形"), cmd: "gamerule mobGriefing {val}", type: "option", options: ["true", "false"] },
-      { label: t("自然回血"), cmd: "gamerule naturalRegeneration {val}", type: "option", options: ["true", "false"] },
-      { label: t("日夜循環"), cmd: "gamerule doDaylightCycle {val}", type: "option", options: ["true", "false"] },
+      { label: t("自然回血"), cmd: "gamerule natural_health_regeneration {val}", type: "option", options: ["true", "false"] },
+      { label: t("溺水傷害"), cmd: "gamerule drowning_damage {val}", type: "option", options: ["true", "false"] },
+      { label: t("摔落傷害"), cmd: "gamerule fall_damage {val}", type: "option", options: ["true", "false"] },
+      { label: t("火焰傷害"), cmd: "gamerule fire_damage {val}", type: "option", options: ["true", "false"] },
+      { label: t("冰凍傷害"), cmd: "gamerule freeze_damage {val}", type: "option", options: ["true", "false"] },
+      { label: t("原諒死者"), cmd: "gamerule forgive_dead_players {val}", type: "option", options: ["true", "false"] },
+      { label: t("誰都不原諒"), cmd: "gamerule universal_anger {val}", type: "option", options: ["true", "false"] },
     ]
   },
   {
-    group: "EssentialsX " + t("常用插件指令"),
-    icon: RocketOutlined,
-    isPlugin: true,
+    group: t("遊戲規則 (上帝)"),
+    icon: SettingOutlined,
     commands: [
-      { label: t("傳送至出生點"), cmd: "spawn", type: "instant" },
-      { label: t("設置出生點"), cmd: "setspawn", type: "instant" },
-      { label: t("個人飛行狀態"), cmd: "fly {val}", type: "option", options: ["on", "off"] },
-      { label: t("清理地面物品"), cmd: "remove drops 99999", type: "instant" },
-      { label: t("全服公告"), cmd: "broadcast {text}", type: "input", placeholder: t("輸入公告內容") },
+      { label: t("死亡不掉落"), cmd: "gamerule keep_inventory {val}", type: "option", options: ["true", "false"] },
+      { label: t("生物破壞地形"), cmd: "gamerule mob_griefing {val}", type: "option", options: ["true", "false"] },
+      { label: t("日夜循環"), cmd: "gamerule advance_time {val}", type: "option", options: ["true", "false"] },
+      { label: t("指令方塊"), cmd: "gamerule command_blocks_work {val}", type: "option", options: ["true", "false"] },
+      { label: t("鞘翅移動檢測"), cmd: "gamerule elytra_movement_check {val}", type: "option", options: ["true", "false"] },
+      { label: t("玩家移動檢測"), cmd: "gamerule player_movement_check {val}", type: "option", options: ["true", "false"] },
+      { label: t("玩家定位條"), cmd: "gamerule locator_bar {val}", type: "option", options: ["true", "false"] },
+      { label: t("積雪厚度"), cmd: "gamerule max_snow_accumulation_height {text}", type: "input", placeholder: t("1 表示一格") },
+      { label: t("創造模式傳送門等待時間"), cmd: "gamerule players_nether_portal_creative_delay {text}", type: "input", placeholder: t("20 代表一秒") },
+      { label: t("生存模式傳送門等待時間"), cmd: "gamerule players_nether_portal_default_delay {text}", type: "input", placeholder: t("80") },
+      { label: t("進入地獄"), cmd: "gamerule allow_entering_nether_using_portals {val}", type: "option", options: ["true", "false"] },
+      { label: t("跳過夜晚睡眠比例"), cmd: "gamerule players_sleeping_percentage {text}", type: "input", placeholder: t("大於100將無法跳過") },
+      { label: t("PVP"), cmd: "gamerule pvp {val}", type: "option", options: ["true", "false"] },
+      { label: t("藤蔓蔓延"), cmd: "gamerule spread_vines {val}", type: "option", options: ["true", "false"] },
+      { label: t("TNT爆炸"), cmd: "gamerule tnt_explodes {val}", type: "option", options: ["true", "false"] },
+      { label: t("世界邊界"), cmd: "worldborder {text}", type: "input", placeholder: t("") },
     ]
-  }
+  },
+  {
+    group: t("遊戲規則 (生成)"),
+    icon: SettingOutlined,
+    commands: [
+      { label: t("生物自然生成"), cmd: "gamerule spawn_mobs {val}", type: "option", options: ["true", "false"] },
+      { label: t("怪物自然生成"), cmd: "gamerule spawn_monsters {val}", type: "option", options: ["true", "false"] },
+      { label: t("掠奪者巡邏隊"), cmd: "gamerule spawn_patrols {val}", type: "option", options: ["true", "false"] },
+      { label: t("夜魅"), cmd: "gamerule spawn_phantoms {val}", type: "option", options: ["true", "false"] },
+      { label: t("流浪商人"), cmd: "gamerule spawn_wandering_traders {val}", type: "option", options: ["true", "false"] },
+      { label: t("伏守者"), cmd: "gamerule spawn_wardens {val}", type: "option", options: ["true", "false"] },
+      { label: t("生怪磚"), cmd: "gamerule spawner_blocks_work {val}", type: "option", options: ["true", "false"] },
+      { label: t("突襲事件"), cmd: "gamerule raids {val}", type: "option", options: ["true", "false"] },
+    ]
+  },
 ];
 
 // 3. 響應式表單狀態 (用於存儲選中的值或輸入的文字)
@@ -123,7 +152,7 @@ defineExpose({ openDialog });
 <template>
   <a-modal
     v-model:open="open"
-    :title="t('快捷指令管理')"
+    :title="t('快捷指令')"
     :footer="null"
     :width="750"
     centered
@@ -132,7 +161,7 @@ defineExpose({ openDialog });
     <div class="command-container">
       <a-alert type="info" show-icon class="mb-16">
         <template #message>
-          {{ t("點擊執行快捷指令。部分指令可能需要管理員 (OP) 權限或特定插件支持。") }}
+          {{ t("點擊執行快捷指令。部分指令可能只支持 Minecraft Java 版較新版本。") }}
         </template>
         <template #icon><InfoCircleOutlined /></template>
       </a-alert>
