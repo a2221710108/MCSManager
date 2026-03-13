@@ -45,9 +45,6 @@ import type { TagInfo } from "../../components/interface";
 import { GLOBAL_INSTANCE_NAME } from "../../config/const";
 import { useTerminal, type UseTerminalHook } from "../../hooks/useTerminal";
 import { arrayFilter } from "../../tools/array";
-import { ref } from "vue";
-
-const activeTab = ref("ALL");
 
 const props = defineProps<{
   card: LayoutCard;
@@ -57,9 +54,7 @@ const { isPhone } = useScreen();
 const { state, isAdmin } = useAppStateStore();
 const { getMetaOrRouteValue } = useLayoutCardTools(props.card);
 
-// The `useTerminal` is shared by this component and `TerminalCore`.
-// Please do not initialize `useTerminal` in this component; all initialization logic should be placed in its child component `TerminalCore.vue`.
-// The state of the shared terminal is used here.
+// 核心 Hook，將傳遞給 TerminalCore
 const terminalHook: UseTerminalHook = useTerminal();
 const {
   state: instanceInfo,
@@ -74,7 +69,10 @@ const {
 const instanceId = getMetaOrRouteValue("instanceId");
 const daemonId = getMetaOrRouteValue("daemonId");
 const viewType = getMetaOrRouteValue("viewType", false);
+
+// 判斷是否為大屏詳情模式
 const innerTerminalType = computed(() => props.card.width === 12 && viewType === "inner");
+
 const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
@@ -103,6 +101,8 @@ const toOpenInstance = async () => {
 
 const updateCmd = computed(() => (instanceInfo.value?.config.updateCommand ? true : false));
 const instanceStatusText = computed(() => INSTANCE_STATUS[instanceInfo.value?.status ?? -1]);
+
+// 快速操作按鈕邏輯 (保持不變)
 const quickOperations = computed(() =>
   arrayFilter([
     {
@@ -122,22 +122,19 @@ const quickOperations = computed(() =>
       click: async () => {
         try {
           await stopInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || ""
-            }
+            params: { uuid: instanceId || "", daemonId: daemonId || "" }
           });
         } catch (error: any) {
           reportErrorMsg(error);
         }
       },
-      props: {
-        danger: true
-      },
+      props: { danger: true },
       condition: () => isRunning.value
     }
   ])
 );
+
+// 更多實例操作邏輯 (保持不變)
 const instanceOperations = computed(() =>
   arrayFilter([
     {
@@ -148,10 +145,7 @@ const instanceOperations = computed(() =>
       click: async () => {
         try {
           await restartInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || ""
-            }
+            params: { uuid: instanceId || "", daemonId: daemonId || "" }
           });
         } catch (error: any) {
           reportErrorMsg(error);
@@ -167,10 +161,7 @@ const instanceOperations = computed(() =>
       click: async () => {
         try {
           await killInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || ""
-            }
+            params: { uuid: instanceId || "", daemonId: daemonId || "" }
           });
         } catch (error: any) {
           reportErrorMsg(error);
@@ -191,9 +182,7 @@ const instanceOperations = computed(() =>
               daemonId: daemonId || "",
               task_name: "update"
             },
-            data: {
-              time: new Date().getTime()
-            }
+            data: { time: new Date().getTime() }
           });
         } catch (error: any) {
           reportErrorMsg(error);
@@ -212,9 +201,7 @@ const instanceOperations = computed(() =>
             autoInstall: true,
             onlyDockerTemplate: isDockerMode.value
           });
-        } catch (error: any) {
-          // ignore
-        }
+        } catch (error: any) {}
       },
       props: {},
       condition: () =>
@@ -247,7 +234,7 @@ const getInstanceName = computed(() => {
   }
 });
 
-const useByteUnit = useLocalStorage("useByteUnit", true); // true: bytes, false: bits
+const useByteUnit = useLocalStorage("useByteUnit", true);
 const prettyBytesConfig: PrettyOptions = {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -264,15 +251,13 @@ const getUsageColor = (percentage?: number) => {
 const formatMemoryUsage = (usage?: number, limit?: number) => {
   const fUsage = prettyBytes(usage ?? 0, prettyBytesConfig);
   const fLimit = prettyBytes(limit ?? 0, prettyBytesConfig);
-
   return limit ? `${fUsage} / ${fLimit}` : fUsage;
 };
 
 const formatNetworkSpeed = (bytes?: number) =>
   useByteUnit.value
     ? prettyBytes(bytes ?? 0, { ...prettyBytesConfig, binary: false }) + "/s"
-    : prettyBytes((bytes ?? 0) * 8, { ...prettyBytesConfig, bits: true, binary: false }).replace(/bit$/, "b") +
-      "ps";
+    : prettyBytes((bytes ?? 0) * 8, { ...prettyBytesConfig, bits: true, binary: false }).replace(/bit$/, "b") + "ps";
 
 const terminalTopTags = computed<TagInfo[]>(() => {
   const info = instanceInfo.value?.info;
@@ -299,9 +284,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       value: `↓${formatNetworkSpeed(rxBytes)} · ↑${formatNetworkSpeed(txBytes)}`,
       icon: ApartmentOutlined,
       condition: () => rxBytes != null || txBytes != null,
-      onClick: () => {
-        useByteUnit.value = !useByteUnit.value;
-      }
+      onClick: () => { useByteUnit.value = !useByteUnit.value; }
     }
   ]);
 });
@@ -332,22 +315,14 @@ const terminalTopTags = computed<TagInfo[]>(() => {
                   {{ instanceStatusText }}
                 </a-tag>
               </span>
-
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
-
-              <span
-                v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 0"
-                class="ml-16"
-              >
+              
+              <span v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 0" class="ml-16">
                 <a-tooltip>
-                  <template #title>
-                    {{ t("TXT_CODE_4a37ec9c") }}
-                  </template>
+                  <template #title> {{ t("TXT_CODE_4a37ec9c") }} </template>
                   <LaptopOutlined />
                 </a-tooltip>
-                <span class="ml-6" style="opacity: 0.8">
-                  {{ instanceInfo?.watcher }}
-                </span>
+                <span class="ml-6" style="opacity: 0.8"> {{ instanceInfo?.watcher }} </span>
               </span>
             </a-typography-paragraph>
           </div>
@@ -383,7 +358,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
               </a-popconfirm>
             </template>
           </div>
-
           <a-dropdown v-else>
             <template #overlay>
               <a-menu>
@@ -405,29 +379,21 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         </template>
       </BetweenMenus>
     </div>
-
+    
     <div class="mb-10 justify-end">
       <TerminalTags :tags="terminalTopTags" />
     </div>
 
-    <div v-if="instanceInfo?.config?.type?.startsWith('minecraft')" class="mb-10">
-      <a-tabs v-model:activeKey="activeTab" type="card" size="small">
-        <a-tab-pane key="ALL" tab="全部" />
-        <a-tab-pane key="WARN" tab="警告" />
-        <a-tab-pane key="ERROR" tab="錯誤" />
-        <a-tab-pane key="CHAT" tab="聊天" />
-      </a-tabs>
-    </div>
-
     <TerminalCore
       v-if="instanceId && daemonId"
+      :use-terminal-hook="terminalHook"
       :instance-id="instanceId"
       :daemon-id="daemonId"
-      :use-terminal-hook="terminalHook"
       :height="card.height"
-      :filter-type="activeTab"
     />
-  </div> <CardPanel v-else class="containerWrapper" style="height: 100%">
+  </div>
+
+  <CardPanel v-else class="containerWrapper" style="height: 100%">
     <template #title>
       <CloudServerOutlined />
       <span class="ml-8"> {{ getInstanceName }} </span>
@@ -447,14 +413,9 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         <a-tag color="purple"> {{ instanceTypeText }} </a-tag>
       </span>
     </template>
+    
     <template #operator>
-      <span
-        v-for="item in quickOperations"
-        :key="item.title"
-        size="default"
-        class="mr-2"
-        v-bind="item.props"
-      >
+      <span v-for="item in quickOperations" :key="item.title" class="mr-2" v-bind="item.props">
         <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
       </span>
       <a-dropdown>
@@ -471,6 +432,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         </span>
       </a-dropdown>
     </template>
+    
     <template #body>
       <div class="mb-6">
         <TerminalTags :tags="terminalTopTags" />
@@ -481,100 +443,17 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         :instance-id="instanceId"
         :daemon-id="daemonId"
         :height="card.height"
-        :filter-type="activeTab"
       />
     </template>
   </CardPanel>
 </template>
 
 <style lang="scss" scoped>
-.error-card {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: 0;
-  z-index: 10;
-  border-radius: 20px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  .error-card-container {
-    overflow: hidden;
-    max-width: 440px;
-    border: 1px solid var(--color-gray-6) !important;
-    background-color: var(--color-gray-1);
-    border-radius: 4px;
-    padding: 12px;
-    box-shadow: 0px 0px 2px var(--color-gray-7);
-  }
-
-  @media (max-width: 992px) {
-    .error-card-container {
-      max-width: 90vw !important;
-    }
-  }
-}
+/* 保持原有佈局樣式，避免與 TerminalCore 的內部滾動條衝突 */
 .console-wrapper {
   position: relative;
-
-  .terminal-loading {
-    z-index: 12;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-  .terminal-wrapper {
-    border: 1px solid var(--card-border-color);
-    position: relative;
-    overflow: hidden;
-    height: 100%;
-    background-color: #1e1e1e;
-    padding: 8px;
-    border-radius: 6px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    .terminal-container {
-      // min-width: 1200px;
-      height: 100%;
-    }
-
-    margin-bottom: 12px;
-  }
-
-  .command-input {
-    position: relative;
-
-    .history {
-      display: flex;
-      max-width: 100%;
-      overflow: scroll;
-      z-index: 10;
-      position: absolute;
-      top: -35px;
-      left: 0;
-
-      li {
-        list-style: none;
-        span {
-          padding: 3px 20px;
-          max-width: 300px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          cursor: pointer;
-        }
-      }
-
-      &::-webkit-scrollbar {
-        width: 0 !important;
-        height: 0 !important;
-      }
-    }
-  }
+}
+.containerWrapper {
+  overflow: hidden;
 }
 </style>
