@@ -356,6 +356,7 @@ onMounted(async () => {
       }
     }
 
+    // 修復這裡的選擇器報錯
     :deep(.ant-input-affine-wrapper) {
       background-color: #1e1e1e;
       border-color: var(--card-border-color);
@@ -366,10 +367,16 @@ onMounted(async () => {
         font-family: 'Fira Code', 'JetBrains Mono', monospace;
       }
 
-      &:hover, &-focused {
+      // 不使用後綴拼接，改用完整類名或分開寫
+      &:hover {
         border-color: #40a9ff;
-        box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
       }
+    }
+
+    // 處理聚焦狀態
+    :deep(.ant-input-affine-wrapper-focused) {
+      border-color: #40a9ff;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
     }
   }
 
