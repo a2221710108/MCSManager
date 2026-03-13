@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, reactive } from "vue";
+import { ref, reactive } from "vue";
 import { t } from "@/lang/i18n";
 import { message } from "ant-design-vue";
 import type { InstanceDetail } from "@/types";
@@ -7,12 +7,27 @@ import type { UseTerminalHook } from "../../../hooks/useTerminal";
 import {
   SettingOutlined,
   ThunderboltOutlined,
-  ClockCircleOutlined,
-  SafetyCertificateOutlined,
   RocketOutlined,
   InfoCircleOutlined,
-  SendOutlined
+  SendOutlined,
+  HistoryOutlined
 } from "@ant-design/icons-vue";
+
+// 1. 定義類型接口以解決 TS2339 錯誤
+interface CommandItem {
+  label: string;
+  cmd: string;
+  type: "option" | "input" | "instant";
+  options?: string[];
+  placeholder?: string;
+}
+
+interface CommandGroup {
+  group: string;
+  icon: any;
+  isPlugin?: boolean;
+  commands: CommandItem[];
+}
 
 const props = defineProps<{
   instanceInfo?: InstanceDetail;
@@ -22,43 +37,43 @@ const props = defineProps<{
 const open = ref(false);
 const { sendCommand, isConnect } = props.useTerminalHook;
 
-// --- 指令配置區 ---
-const COMMAND_GROUPS = [
+// 2. 指令數據配置
+const COMMAND_GROUPS: CommandGroup[] = [
   {
-    group: t("環境與難度"),
-    icon: ThunderboltOutlined,
+    group: t("環境與時間"),
+    icon: HistoryOutlined,
     commands: [
-      { label: t("遊戲難度"), cmd: "difficulty {val}", options: ["peaceful", "easy", "normal", "hard"] },
-      { label: t("切換天氣"), cmd: "weather {val}", options: ["clear", "rain", "thunder"] },
-      { label: t("更改時間"), cmd: "time set {val}", options: ["day", "night", "noon", "midnight"] },
+      { label: t("遊戲難度"), cmd: "difficulty {val}", type: "option", options: ["peaceful", "easy", "normal", "hard"] },
+      { label: t("天氣切換"), cmd: "weather {val}", type: "option", options: ["clear", "rain", "thunder"] },
+      { label: t("時間設置"), cmd: "time set {val}", type: "option", options: ["day", "night", "noon", "midnight"] },
     ]
   },
   {
     group: t("遊戲規則 (Gamerule)"),
     icon: SettingOutlined,
     commands: [
-      { label: t("死亡不掉落"), cmd: "gamerule keepInventory {val}", options: ["true", "false"] },
-      { label: t("生物破壞地形"), cmd: "gamerule mobGriefing {val}", options: ["true", "false"] },
-      { label: t("啟用自然回血"), cmd: "gamerule naturalRegeneration {val}", options: ["true", "false"] },
-      { label: t("日夜循環"), cmd: "gamerule doDaylightCycle {val}", options: ["true", "false"] },
+      { label: t("死亡不掉落"), cmd: "gamerule keepInventory {val}", type: "option", options: ["true", "false"] },
+      { label: t("生物破壞地形"), cmd: "gamerule mobGriefing {val}", type: "option", options: ["true", "false"] },
+      { label: t("自然回血"), cmd: "gamerule naturalRegeneration {val}", type: "option", options: ["true", "false"] },
+      { label: t("日夜循環"), cmd: "gamerule doDaylightCycle {val}", type: "option", options: ["true", "false"] },
     ]
   },
   {
-    group: "EssentialsX " + t("常用"),
+    group: "EssentialsX " + t("常用插件指令"),
     icon: RocketOutlined,
     isPlugin: true,
     commands: [
-      { label: t("傳送到出生點"), cmd: "spawn", type: "instant" },
-      { label: t("設置當前為出生點"), cmd: "setspawn", type: "instant" },
-      { label: t("切換全體飛行"), cmd: "fly {val}", options: ["on", "off"] },
-      { label: t("清理地面物品"), cmd: "remove drops 999999", type: "instant" },
-      { label: t("全服公告"), cmd: "broadcast {text}", type: "input" },
+      { label: t("傳送至出生點"), cmd: "spawn", type: "instant" },
+      { label: t("設置出生點"), cmd: "setspawn", type: "instant" },
+      { label: t("個人飛行狀態"), cmd: "fly {val}", type: "option", options: ["on", "off"] },
+      { label: t("清理地面物品"), cmd: "remove drops 99999", type: "instant" },
+      { label: t("全服公告"), cmd: "broadcast {text}", type: "input", placeholder: t("輸入公告內容") },
     ]
   }
 ];
 
-// 用於存儲下拉選單或輸入框的臨時值
-const formState = reactive<Record<string, any>>({
+// 3. 響應式表單狀態 (用於存儲選中的值或輸入的文字)
+const formState = reactive<Record<string, string>>({
   "difficulty": "normal",
   "weather": "clear",
   "time set": "day",
@@ -70,67 +85,77 @@ const formState = reactive<Record<string, any>>({
   "broadcast": ""
 });
 
-// --- 執行邏輯 ---
-const runCommand = async (baseCmd: string, type: string = "option") => {
-  if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
+// 4. 指令執行邏輯
+const runCommand = async (item: CommandItem) => {
+  if (!isConnect.value) {
+    return message.error(t("終端連線尚未就緒，請檢查伺服器狀態"));
+  }
 
-  let finalCmd = baseCmd;
-  
-  if (type === "option" || type === "input") {
-    // 提取 key 用於尋找 formState 中的值 (例如 "difficulty {val}" -> "difficulty")
-    const stateKey = baseCmd.replace(" {val}", "").replace(" {text}", "");
-    const val = formState[stateKey];
-    
-    if (type === "input" && !val) return message.warn(t("請輸入內容"));
-    finalCmd = baseCmd.replace("{val}", val).replace("{text}", val);
+  let finalCmd = item.cmd;
+
+  if (item.type === "option") {
+    // 獲取 key (例如 "difficulty") 並從 formState 拿值
+    const key = item.cmd.replace(" {val}", "");
+    const val = formState[key];
+    finalCmd = item.cmd.replace("{val}", val);
+  } else if (item.type === "input") {
+    const key = item.cmd.replace(" {text}", "");
+    const val = formState[key];
+    if (!val) return message.warn(t("請先輸入內容"));
+    finalCmd = item.cmd.replace("{text}", val);
   }
 
   try {
     await sendCommand(finalCmd);
-    message.success(`${t("執行成功")}: /${finalCmd}`);
+    message.success(`${t("指令發送成功")}: /${finalCmd}`);
   } catch (err: any) {
-    message.error(`${t("執行失敗")}: ${err.message}`);
+    message.error(`${t("執行失敗")}: ${err.message || err}`);
   }
 };
 
-const openDialog = () => (open.value = true);
+const openDialog = () => {
+  open.value = true;
+};
+
 defineExpose({ openDialog });
 </script>
 
 <template>
   <a-modal
     v-model:open="open"
-    :title="t('快捷指令控制台')"
+    :title="t('快捷指令管理')"
     :footer="null"
-    :width="700"
+    :width="750"
     centered
+    destroy-on-close
   >
-    <div class="cmd-manager">
-      <a-alert
-        type="info"
-        show-icon
-        class="mb-16"
-        :message="t('溫馨提示：EssentialsX 指令需要伺服器已安裝該插件方可生效。')"
-      >
+    <div class="command-container">
+      <a-alert type="info" show-icon class="mb-16">
+        <template #message>
+          {{ t("點擊執行快捷指令。部分指令可能需要管理員 (OP) 權限或特定插件支持。") }}
+        </template>
         <template #icon><InfoCircleOutlined /></template>
       </a-alert>
 
-      <div v-for="group in COMMAND_GROUPS" :key="group.group" class="cmd-group">
-        <h3 class="group-title">
-          <component :is="group.icon" /> {{ group.group }}
+      <div v-for="group in COMMAND_GROUPS" :key="group.group" class="cmd-group-section">
+        <div class="group-header">
+          <component :is="group.icon" class="mr-8" />
+          <span class="group-name">{{ group.group }}</span>
           <a-tag v-if="group.isPlugin" color="blue" class="ml-8">Plugin</a-tag>
-        </h3>
-        
+        </div>
+
         <div class="cmd-grid">
-          <div v-for="item in group.commands" :key="item.label" class="cmd-item">
-            <span class="cmd-label">{{ item.label }}</span>
-            
-            <div class="cmd-actions">
+          <div v-for="item in group.commands" :key="item.label" class="cmd-card">
+            <div class="cmd-info">
+              <span class="cmd-label">{{ item.label }}</span>
+            </div>
+
+            <div class="cmd-control">
               <a-select
-                v-if="item.options"
+                v-if="item.type === 'option'"
                 v-model:value="formState[item.cmd.replace(' {val}', '')]"
                 size="small"
-                style="width: 110px"
+                class="ctrl-select"
               >
                 <a-select-option v-for="opt in item.options" :key="opt" :value="opt">
                   {{ opt }}
@@ -141,81 +166,96 @@ defineExpose({ openDialog });
                 v-if="item.type === 'input'"
                 v-model:value="formState[item.cmd.replace(' {text}', '')]"
                 size="small"
-                placeholder="..."
-                style="width: 110px"
+                :placeholder="item.placeholder"
+                class="ctrl-input"
               />
 
-              <a-button 
-                type="primary" 
-                ghost 
-                size="small" 
+              <a-button
+                type="primary"
+                size="small"
                 :disabled="!isConnect"
-                @click="runCommand(item.cmd, item.type)"
+                @click="runCommand(item)"
               >
                 <template #icon><SendOutlined /></template>
-                {{ item.type === 'instant' ? t('執行') : '' }}
+                <span v-if="item.type === 'instant'">{{ t("執行") }}</span>
               </a-button>
             </div>
           </div>
         </div>
-        <a-divider />
+        <a-divider style="margin: 20px 0" />
       </div>
     </div>
   </a-modal>
 </template>
 
 <style lang="scss" scoped>
-.cmd-manager {
-  max-height: 550px;
+.command-container {
+  max-height: 600px;
   overflow-y: auto;
-  padding-right: 8px;
+  padding: 4px;
 }
+
 .mb-16 { margin-bottom: 16px; }
 .ml-8 { margin-left: 8px; }
+.mr-8 { margin-right: 8px; }
 
-.group-title {
-  display: flex;
-  align-items: center;
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 16px;
-  color: #333;
+.cmd-group-section {
+  .group-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    .group-name {
+      font-size: 15px;
+      font-weight: bold;
+      color: var(--color-text-1);
+    }
+  }
 }
 
 .cmd-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: repeat(2, 1fr); // 雙列佈局
+  gap: 12px;
 }
 
-.cmd-item {
+.cmd-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
-  background: #f8f9fa;
-  border-radius: 6px;
+  padding: 8px 12px;
+  background-color: rgba(0, 0, 0, 0.02);
   border: 1px solid #f0f0f0;
-  transition: all 0.3s;
+  border-radius: 8px;
+  transition: all 0.2s;
 
   &:hover {
     border-color: #1890ff;
-    background: #fff;
+    background-color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   }
 }
 
 .cmd-label {
-  font-size: 14px;
+  font-size: 13px;
   color: #555;
 }
 
-.cmd-actions {
+.cmd-control {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 8px;
+
+  .ctrl-select {
+    width: 100px;
+  }
+  .ctrl-input {
+    width: 120px;
+  }
 }
 
-:deep(.ant-divider-horizontal) {
-  margin: 16px 0;
+@media (max-width: 600px) {
+  .cmd-grid {
+    grid-template-columns: 1fr; // 手機端切換為單列
+  }
 }
 </style>
