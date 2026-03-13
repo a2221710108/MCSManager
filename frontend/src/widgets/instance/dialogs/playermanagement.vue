@@ -151,12 +151,12 @@ defineExpose({
                   <a-button-group :disabled="!isConnect">
                     <a-tooltip :title="t('設為管理員')">
                       <a-button @click="runCommand('op {player}', item.name_raw || item.name)">
-                        <template #icon><CrownOutlined /></template>
+                        <template #icon><CrownFilled /></template>
                       </a-button>
                     </a-tooltip>
                     <a-tooltip :title="t('撤銷管理員')">
                       <a-button @click="runCommand('deop {player}', item.name_raw || item.name)">
-                        <template #icon><CrownFilled /></template>
+                        <template #icon><CrownOutlined /></template>
                       </a-button>
                     </a-tooltip>
                     <a-tooltip :title="t('生存模式')">
