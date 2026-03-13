@@ -8,7 +8,7 @@ import { useLayoutContainerStore } from "@/stores/useLayoutContainerStore";
 import { CodeOutlined, DeleteOutlined, LoadingOutlined } from "@ant-design/icons-vue";
 import { Terminal } from "@xterm/xterm";
 import { message } from "ant-design-vue";
-import { onMounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue"; // 增加 watch
 import { encodeConsoleColor, type UseTerminalHook } from "../hooks/useTerminal";
 import { getRandomId } from "../tools/randId";
 
@@ -17,7 +17,7 @@ const props = defineProps<{
   daemonId: string;
   height: string;
   useTerminalHook: UseTerminalHook;
-  filterType: string; // 新增：分頁類型 (ALL, WARN, ERROR, CHAT)
+  filterType: string; // 必須保留此屬性以接收 Terminal.vue 的切換信號
 }>();
 
 const { containerState } = useLayoutContainerStore();
@@ -51,8 +51,9 @@ const { isXhrPollError, xhrPollErrorReason } = useXhrPollError(socketError);
 let term: Terminal | undefined;
 let inputRef = ref<HTMLElement | null>(null);
 
-// --- 新增：Minecraft 日誌過濾邏輯 ---
-const filterLog = (text: string, type: string): string => {
+// --- 核心功能：日誌過濾邏輯 ---
+const filterLog = (text: string): string => {
+  const type = props.filterType;
   if (!text || type === "ALL") return text;
   
   const lines = text.split(/\r?\n/);
@@ -60,10 +61,6 @@ const filterLog = (text: string, type: string): string => {
     const upperLine = line.toUpperCase();
     if (type === "WARN") return upperLine.includes("WARN") || upperLine.includes("WARNING");
     if (type === "ERROR") return upperLine.includes("ERROR") || upperLine.includes("FATAL") || upperLine.includes("EXCEPTION");
-    if (type === "CHAT") {
-      // 匹配 [INFO]: <Player> 或 [INFO]: [Notch: ... ] 
-      return /\[.*\/INFO\]: <.*>/.test(line) || /\[.*\/INFO\]: \[.*:.*\]/.test(line);
-    }
     return false;
   });
   
@@ -91,28 +88,28 @@ const initTerminal = async () => {
   throw new Error(t("TXT_CODE_42bcfe0c"));
 };
 
-// --- 事件監聽 ---
+// --- 原始事件處理 ---
 events.on("opened", () => message.success(t("TXT_CODE_e13abbb1")));
 events.on("stopped", () => message.success(t("TXT_CODE_efb6d377")));
 events.on("error", (error: Error) => (socketError.value = error));
 
-// 修改：攔截實時數據流
+// 修改：實時輸出增加過濾
 events.on("stdout", (data: any) => {
   const rawText = typeof data === 'string' ? data : data.text;
-  const processed = filterLog(rawText, props.filterType);
+  const processed = filterLog(rawText);
   if (processed && term) {
     term.write(state.value?.config?.terminalOption?.haveColor ? encodeConsoleColor(processed) : processed);
   }
 });
 
-// 修改：獲取歷史日誌的過濾邏輯
+// 將原有的 detail 邏輯提取出來，以便重複調用
 const loadHistoryLog = async () => {
   try {
     const { value } = await getInstanceOutputLog().execute({
       params: { uuid: instanceId || "", daemonId: daemonId || "" }
     });
     if (value && term) {
-      const processed = filterLog(value, props.filterType);
+      const processed = filterLog(value);
       if (processed) {
         term.write(state.value?.config?.terminalOption?.haveColor ? encodeConsoleColor(processed) : processed);
       }
@@ -120,13 +117,14 @@ const loadHistoryLog = async () => {
   } catch (error: any) {}
 };
 
-events.on("detail", loadHistoryLog);
+// 原始代碼的一次性加載
+events.once("detail", loadHistoryLog);
 
-// --- 監聽分頁切換 ---
+// --- 監聽分頁切換：點擊標籤時重新加載日誌 ---
 watch(() => props.filterType, () => {
   if (term) {
-    term.reset(); // 清空終端顯示
-    loadHistoryLog(); // 重新加載過濾後的歷史日誌
+    term.reset(); // 清空終端
+    loadHistoryLog(); // 重新拉取並過濾
   }
 });
 
@@ -213,7 +211,42 @@ onMounted(async () => {
     </div>
 
     <div v-if="socketError" class="error-card">
-       </div>
+      <div class="error-card-container">
+        <a-typography-title :level="5">{{ $t("TXT_CODE_6929b0b2") }}</a-typography-title>
+        <a-typography-paragraph>
+          {{ $t("TXT_CODE_812a629e") + socketAddress }}
+        </a-typography-paragraph>
+        <div>
+          <img :src="connectErrorImage" style="width: 100%; height: 110px" />
+        </div>
+        <a-typography-title :level="5">{{ $t("TXT_CODE_9c95b60f") }}</a-typography-title>
+        <a-typography-paragraph>
+          <pre style="font-size: 12px"><code>{{ socketError?.message||"" }}</code></pre>
+          <div v-if="isXhrPollError" style="font-size: 12px">
+            <span> {{ xhrPollErrorReason }}</span>
+          </div>
+        </a-typography-paragraph>
+        <a-typography-paragraph v-if="isXhrPollError">
+          <div class="flex" style="gap: 8px; font-size: 12px">
+            <span><strong>{{ $t("TXT_CODE_d4c8fb3b") }}</strong></span>
+            <a href="https://discord.gg/auDk2Rj7aD" target="_blank">{{ $t("TXT_CODE_9b3ce825") }}</a>
+            <span>|</span>
+            <a href="https://news.lazycloud.one/" target="_blank">{{ $t("TXT_CODE_10cc2794") }}</a>
+          </div>
+        </a-typography-paragraph>
+        <a-typography-title :level="5">{{ $t("TXT_CODE_f1c96d8a") }}</a-typography-title>
+        <a-typography-paragraph>
+          <ul>
+            <li>{{ $t("TXT_CODE_ceba9262") }}</li>
+            <li>{{ $t("TXT_CODE_84099e5") }}</li>
+            <li>{{ $t("TXT_CODE_86ff658a") }}</li>
+          </ul>
+          <div class="flex flex-center">
+            <a-typography-link @click="refreshPage">{{ $t("TXT_CODE_f8b28901") }}</a-typography-link>
+          </div>
+        </a-typography-paragraph>
+      </div>
+    </div>
   </div>
 </template>
 
