@@ -141,28 +141,25 @@ const btns = computed(() => {
      condition: () => isAdmin.value && (instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false)
     },
     {
-    title: t("常用指令"),
-    icon: UsergroupDeleteOutlined,
-    click: async () => {
-    // 1. 如果尚未連線，則在背景執行 execute
-      if (!terminalHook.isConnect.value) {
-        try {
-        // 靜默連線，不彈出任何 loading 提示
-          await terminalHook.execute({
-            instanceId: instanceId!,
-            daemonId: daemonId!
-          });
-        } catch (err) {
-        // 僅在控制台打印錯誤，方便調試，不干擾用戶
-          console.error("PlayerManager Connection Failed:", err);
-          return; 
+      title: t("常用指令"),
+      // 建議換成閃電圖標，區分於玩家管理
+      icon: ControlOutlined, 
+      click: async () => {
+        if (!terminalHook.isConnect.value) {
+          try {
+            await terminalHook.execute({
+              instanceId: instanceId!,
+              daemonId: daemonId!
+            });
+          } catch (err) {
+            console.error("OftenCommand Connection Failed:", err);
+            return;
+          }
         }
-      }
-    
-    // 2. 直接打開對話框
-    // 提示：子組件 playermanagement.vue 內部已有 :disabled="!isConnect" 
-    // 所以即便連線中，按鈕也會是禁用狀態，直到連線完成。
-      oftencommandDialog.value?.openDialog();
+        oftencommandDialog.value?.openDialog();
+      },
+      // 只有 Java 版顯示
+      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
     },
     {
       title: t("備份管理"), // 或者使用對應的 i18n key
