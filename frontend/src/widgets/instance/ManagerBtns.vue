@@ -150,12 +150,27 @@ const btns = computed(() => {
     {
   title: t("玩家管理"),
   icon: UsergroupDeleteOutlined,
-  click: () => {
+  click: async () => {
+    // 1. 先判斷是否已經連線，如果沒連線才執行 execute
+    if (!terminalHook.isConnect.value) {
+      try {
+        message.loading({ content: t("正在建立加密連線..."), key: "terminal_conn" });
+        await terminalHook.execute({
+          instanceId: instanceId!,
+          daemonId: daemonId!
+        });
+        message.success({ content: t("連線就緒"), key: "terminal_conn", duration: 1 });
+      } catch (err) {
+        message.error({ content: t("連線失敗"), key: "terminal_conn" });
+        return; // 連線失敗就不打開對話框
+      }
+    }
+    
+    // 2. 連線成功後，再打開對話框
     playermanagementDialog.value?.openDialog();
   },
-  // 僅限 Minecraft Java 版顯示
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
-},
+}
     {
   title: t("切換 Java"),
   icon: CoffeeOutlined,
