@@ -43,6 +43,7 @@ import java from "./dialogs/java.vue";
 import srv from "./dialogs/srv.vue";
 import playermanagement from "./dialogs/playermanagement.vue";
 import { useTerminal } from "@/hooks/useTerminal";
+import oftencommand from "./dialogs/oftencommand.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -55,6 +56,7 @@ const backupDialog = ref<InstanceType<typeof backup>>();
 const javaDialog = ref<InstanceType<typeof java>>();
 const srvDialog = ref<InstanceType<typeof srv>>();
 const playermanagementDialog = ref<InstanceType<typeof playermanagement>>();
+const oftencommandDialog = ref<InstanceType<typeof oftencommand>>();
 
 const terminalHook = useTerminal();
   
@@ -138,6 +140,29 @@ const btns = computed(() => {
       // 修正後的寫法：加上括號
      condition: () => isAdmin.value && (instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false)
     },
+    title: t("常用指令"),
+  icon: UsergroupDeleteOutlined,
+  click: async () => {
+    // 1. 如果尚未連線，則在背景執行 execute
+    if (!terminalHook.isConnect.value) {
+      try {
+        // 靜默連線，不彈出任何 loading 提示
+        await terminalHook.execute({
+          instanceId: instanceId!,
+          daemonId: daemonId!
+        });
+      } catch (err) {
+        // 僅在控制台打印錯誤，方便調試，不干擾用戶
+        console.error("PlayerManager Connection Failed:", err);
+        return; 
+      }
+    }
+    
+    // 2. 直接打開對話框
+    // 提示：子組件 playermanagement.vue 內部已有 :disabled="!isConnect" 
+    // 所以即便連線中，按鈕也會是禁用狀態，直到連線完成。
+    oftencommandDialog.value?.openDialog();
+  },
     {
       title: t("備份管理"), // 或者使用對應的 i18n key
       icon: HistoryOutlined,
@@ -366,6 +391,15 @@ watch(instanceInfo, (cfg, oldCfg) => {
 
   <playermanagement
    ref="playermanagementDialog"
+   :instance-info="instanceInfo"
+   :instance-id="instanceId"
+   :daemon-id="daemonId"
+   :use-terminal-hook="terminalHook"
+   @update="refreshInstanceInfo"
+ /> 
+
+<oftencommand
+   ref="oftencommandDialog"
    :instance-info="instanceInfo"
    :instance-id="instanceId"
    :daemon-id="daemonId"
