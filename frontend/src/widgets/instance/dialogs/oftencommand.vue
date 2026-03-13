@@ -8,19 +8,15 @@ import {
   SendOutlined, 
   SettingOutlined, 
   RocketOutlined, 
-  UserOutlined,
   ReloadOutlined,
   HistoryOutlined
 } from "@ant-design/icons-vue";
 
-  // ... (之前的 script 邏輯保持不變，只需增加一個 activeKeys)
-const activeKeys = ref([COMMAND_GROUPS[0].group]); // 預設展開第一組
-// --- 類型定義修正 ---
+// --- 類型定義 ---
 interface CommandItem {
   label: string;
   cmd: string;
   options?: string[];
-  // 修改這裡：允許單個字串或字串數組
   placeholder?: string | string[]; 
 }
 
@@ -42,7 +38,11 @@ const { sendCommand, isConnect } = props.useTerminalHook;
 
 const formState = reactive<Record<string, string>>({});
 
-// --- 簡潔配置 ---
+// --- 這裡新增 activeKeys 用於摺疊面板 ---
+// 預設展開第一組，如果想全部預設關閉可以設為 ref([])
+const activeKeys = ref<string[]>([t("環境與時間")]); 
+
+// --- 指令配置 ---
 const COMMAND_GROUPS: CommandGroup[] = [
   {
     group: t("環境與時間"),
@@ -52,7 +52,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("天氣切換"), cmd: "weather {val}", options: ["clear", "rain", "thunder"] },
       { label: t("時間設置"), cmd: "time set {val}", options: ["day", "night", "noon", "midnight"] },
       { label: t("發送全服信息"), cmd: "say {text}", placeholder: t("輸入信息...") },
-      { label: t("發送標題文字"), cmd: "title {player} title {text}", placeholder: t("標題內容") },
+      { label: t("發送標題文字"), cmd: "title {text}", placeholder: t("標題內容") },
       { label: t("傳送玩家"), cmd: "tp {player} {player}" }, 
     ]
   },
@@ -136,18 +136,15 @@ const COMMAND_GROUPS: CommandGroup[] = [
   }
 ];
 
-// --- 邏輯處理 ---
+// --- 邏輯函數 ---
 const getParams = (cmd: string) => {
   const matches = cmd.match(/\{(player|val|text)\}/g) || [];
   return matches.map(m => m.replace(/[{}]/g, ''));
 };
 
-// 處理 Placeholder 的顯示邏輯 (兼容字串與數組)
 const getPlaceholder = (item: CommandItem, index: number) => {
   if (!item.placeholder) return t("輸入");
-  if (Array.isArray(item.placeholder)) {
-    return item.placeholder[index] || t("輸入");
-  }
+  if (Array.isArray(item.placeholder)) return item.placeholder[index] || t("輸入");
   return item.placeholder;
 };
 
@@ -163,11 +160,7 @@ const fetchPlayers = async () => {
     onlinePlayers.value = data.online && data.players?.list 
       ? data.players.list.map((p: any) => p.name_raw || p.name) 
       : [];
-  } catch (e) {
-    console.error(e);
-  } finally {
-    isFetchingPlayers.value = false;
-  }
+  } catch (e) { console.error(e); } finally { isFetchingPlayers.value = false; }
 };
 
 const runCommand = async (item: CommandItem) => {
@@ -182,9 +175,7 @@ const runCommand = async (item: CommandItem) => {
   try {
     await sendCommand(finalCmd);
     message.success(`${t("發送成功")}: /${finalCmd}`);
-  } catch (err: any) {
-    message.error(err.message || String(err));
-  }
+  } catch (err: any) { message.error(err.message || String(err)); }
 };
 
 const openDialog = () => { open.value = true; fetchPlayers(); };
