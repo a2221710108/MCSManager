@@ -11,7 +11,10 @@ import {
   StopOutlined,
   LogoutOutlined,
   ReloadOutlined,
-  SmileOutlined
+  SmileOutlined,
+  DisconnectOutlined,
+  SolutionOutlined,
+  CrownFilled
 } from "@ant-design/icons-vue";
 
 // 增加 useTerminalHook 作為 Prop 傳入，這樣才能共用父組件已連線的 Socket
@@ -108,7 +111,7 @@ defineExpose({
         </a-typography-text>
         <a-button type="link" size="small" :loading="isLoading" @click="fetchPlayers">
           <template #icon><ReloadOutlined /></template>
-          {{ t("刷新") }}
+          {{ t("重新整理") }}
         </a-button>
       </div>
 
@@ -135,6 +138,10 @@ defineExpose({
                       <a-button @click="runCommand('op {player}', item.name_raw || item.name)">
                         <template #icon><CrownOutlined /></template>
                       </a-button>
+                    <a-tooltip :title="t('撤銷管理員')">
+                      <a-button @click="runCommand('deop {player}', item.name_raw || item.name)">
+                        <template #icon><CrownFilled /></template>
+                      </a-button>
                     </a-tooltip>
                     <a-tooltip :title="t('生存模式')">
                       <a-button @click="runCommand('gamemode survival {player}', item.name_raw || item.name)">S</a-button>
@@ -142,8 +149,12 @@ defineExpose({
                     <a-tooltip :title="t('創造模式')">
                       <a-button @click="runCommand('gamemode creative {player}', item.name_raw || item.name)">C</a-button>
                     </a-tooltip>
+                    <a-tooltip :title="t('添加白名單')">
+                      <a-button @click="runCommand('whitelist add {player}', item.name_raw || item.name)">
+                      <template #icon><SolutionOutlined /></template>
+                    </a-tooltip>
                     <a-popconfirm :title="t('確定踢出玩家？')" @confirm="runCommand('kick {player}', item.name_raw || item.name)">
-                      <a-button danger><LogoutOutlined /></a-button>
+                      <a-button danger><DisconnectOutlined /></a-button>
                     </a-popconfirm>
                     <a-popconfirm :title="t('確定封禁玩家？')" @confirm="runCommand('ban {player}', item.name_raw || item.name)">
                       <a-button danger type="primary"><StopOutlined /></a-button>
