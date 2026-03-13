@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import { onMounted, ref, reactive, watch, nextTick, onBeforeUnmount } from "vue";
-// ... (保持原有的 import 不變)
 import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit"; // 建議確保有 fit 插件以保證佈局自適應
+import { FitAddon } from "@xterm/addon-fit";
+import { message } from "ant-design-vue";
+import { LoadingOutlined, DeleteOutlined, CodeOutlined } from "@ant-design/icons-vue";
+
+// 導入所需的工具和 Hook
+import { t } from "@/lang/i18n";
+import { getRandomId } from "../tools/randId";
+import { useLayoutContainerStore } from "@/stores/useLayoutContainerStore";
+import { useCommandHistory } from "@/hooks/useCommandHistory";
+import { getInstanceOutputLog } from "@/services/apis/instance";
+import { encodeConsoleColor, type UseTerminalHook } from "../hooks/useTerminal";
 
 const props = defineProps<{
   instanceId: string;
@@ -11,29 +20,45 @@ const props = defineProps<{
   useTerminalHook: UseTerminalHook;
 }>();
 
-// --- 新增：標籤頁狀態管理 ---
+const { containerState } = useLayoutContainerStore();
+const {
+  focusHistoryList,
+  selectLocation,
+  history,
+  commandInputValue,
+  handleHistorySelect,
+  clickHistoryItem
+} = useCommandHistory();
+
+const {
+  state,
+  events,
+  isConnect,
+  socketAddress,
+  execute: setUpTerminal,
+  initTerminalWindow,
+  sendCommand,
+  clearTerminal
+} = props.useTerminalHook;
+
+// --- 標籤頁與多終端管理 ---
 const activeTab = ref("ALL");
 const isMinecraft = ref(false);
+const terminalDomId = `terminal-window-${getRandomId()}`;
 
-// 存儲三個終端實例及其 DOM ID
 const terminals = reactive({
-  ALL: { term: null as Terminal | null, id: `term-all-${getRandomId()}`, fit: null as any },
-  WARN: { term: null as Terminal | null, id: `term-warn-${getRandomId()}`, fit: null as any },
-  ERROR: { term: null as Terminal | null, id: `term-error-${getRandomId()}` , fit: null as any }
+  ALL: { term: null as Terminal | null, id: `term-all-${getRandomId()}`, fit: null as FitAddon | null },
+  WARN: { term: null as Terminal | null, id: `term-warn-${getRandomId()}`, fit: null as FitAddon | null },
+  ERROR: { term: null as Terminal | null, id: `term-error-${getRandomId()}`, fit: null as FitAddon | null }
 });
 
-const { containerState } = useLayoutContainerStore();
-const { /* ...原有的解構 */ commandInputValue } = useCommandHistory();
-const { state, events, isConnect, socketAddress, execute: setUpTerminal, initTerminalWindow, sendCommand, clearTerminal } = props.useTerminalHook;
+const inputRef = ref<HTMLElement | null>(null);
 
-// --- 新增：日誌過濾邏輯 ---
+// 核心分流邏輯
 const writeToTabs = (data: string) => {
-  // 1. 寫入默認終端 (保持原功能不變)
   terminals.ALL.term?.write(data);
-
-  // 2. 如果是 Minecraft，則進行分流
   if (isMinecraft.value) {
-    // 簡單過濾正則 (匹配 [時刻] [線程/LEVEL]:)
+    // 匹配 Minecraft WARN/ERROR 格式
     if (data.includes("/WARN") || /WARN/i.test(data)) {
       terminals.WARN.term?.write(data);
     }
@@ -43,37 +68,6 @@ const writeToTabs = (data: string) => {
   }
 };
 
-// 重寫初始化邏輯以支持多實例
-const initAllTerminals = async () => {
-  if (containerState.isDesignMode) return;
-  
-  // 初始化 ALL (這是主終端)
-  const domAll = document.getElementById(terminals.ALL.id);
-  if (domAll) {
-    terminals.ALL.term = initTerminalWindow(domAll);
-    // 執行你原有的攔截邏輯
-    interceptDSR(terminals.ALL.term);
-  }
-
-  // 如果是 Minecraft，初始化另外兩個
-  if (isMinecraft.value) {
-    await nextTick();
-    ["WARN", "ERROR"].forEach(tab => {
-      const dom = document.getElementById((terminals as any)[tab].id);
-      if (dom) {
-        const t = new Terminal((terminals.ALL.term as any).options); // 繼承主終端配置
-        const fitAddon = new FitAddon();
-        t.loadAddon(fitAddon);
-        t.open(dom);
-        fitAddon.fit();
-        (terminals as any)[tab].term = t;
-        (terminals as any)[tab].fit = fitAddon;
-      }
-    });
-  }
-};
-
-// 封裝你原有的 DSR 攔截邏輯
 const interceptDSR = (term: any) => {
   if (!term) return;
   term.parser.registerOscHandler(11, () => true);
@@ -88,18 +82,72 @@ const interceptDSR = (term: any) => {
   }
 };
 
-// 監聽數據流
-events.on("data", (data: string) => {
-  writeToTabs(data);
-});
+const initAllTerminals = async () => {
+  if (containerState.isDesignMode) return;
+  
+  // 1. 初始化主終端 (ALL)
+  const domAll = document.getElementById(terminals.ALL.id);
+  if (domAll) {
+    terminals.ALL.term = initTerminalWindow(domAll);
+    interceptDSR(terminals.ALL.term);
+    // 獲取 fitAddon (假設 initTerminalWindow 已綁定，若無則手動添加)
+    const fit = new FitAddon();
+    terminals.ALL.term.loadAddon(fit);
+    terminals.ALL.fit = fit;
+  }
+
+  // 2. 初始化副終端 (WARN & ERROR)
+  if (isMinecraft.value) {
+    await nextTick();
+    const subTabs = ["WARN", "ERROR"] as const;
+    subTabs.forEach(tab => {
+      const dom = document.getElementById(terminals[tab].id);
+      if (dom) {
+        const tObj = new Terminal((terminals.ALL.term as any).options);
+        const fit = new FitAddon();
+        tObj.loadAddon(fit);
+        tObj.open(dom);
+        fit.fit();
+        terminals[tab].term = tObj;
+        terminals[tab].fit = fit;
+      }
+    });
+  }
+};
+
+// 事件監聽
+events.on("data", (data: string) => writeToTabs(data));
+events.on("opened", () => message.success(t("TXT_CODE_e13abbb1")));
+events.on("stopped", () => message.success(t("TXT_CODE_efb6d377")));
 
 // 監聽實例類型
-watch(() => state.value?.instanceInfo, (info) => {
-  if (info?.config?.type) {
-    // 判斷是否為 Minecraft (java 或 bedrock)
-    isMinecraft.value = info.config.type.includes("minecraft");
-  }
+watch(() => state.value?.config?.type, (type) => {
+  isMinecraft.value = !!(type && type.includes("minecraft"));
 }, { immediate: true });
+
+// 監聽標籤切換調整大小
+watch(activeTab, async () => {
+  await nextTick();
+  const current = (terminals as any)[activeTab.value];
+  current?.fit?.fit();
+});
+
+const handleSendCommand = () => {
+  if (focusHistoryList.value) return;
+  sendCommand(commandInputValue.value || "");
+  commandInputValue.value = "";
+};
+
+const handleClickHistoryItem = (item: string) => {
+  clickHistoryItem(item);
+  inputRef.value?.focus();
+};
+
+const handleClearAll = () => {
+  clearTerminal();
+  terminals.WARN.term?.clear();
+  terminals.ERROR.term?.clear();
+};
 
 onMounted(async () => {
   try {
@@ -111,13 +159,6 @@ onMounted(async () => {
     console.error(error);
   }
 });
-
-// 當切換標籤時重新調整大小
-watch(activeTab, () => {
-  nextTick(() => {
-    (terminals as any)[activeTab.value]?.fit?.fit();
-  });
-});
 </script>
 
 <template>
@@ -128,19 +169,18 @@ watch(activeTab, () => {
 
     <div v-if="isMinecraft" class="terminal-tabs">
       <div 
-        v-for="tab in ['ALL', 'WARN', 'ERROR']" 
+        v-for="tab in (['ALL', 'WARN', 'ERROR'] as const)" 
         :key="tab"
         :class="['tab-item', activeTab === tab ? 'active' : '']"
         @click="activeTab = tab"
       >
         {{ tab === 'ALL' ? t('TXT_CODE_555e2c1b').replace(':','') : tab }}
-        <span v-if="tab === 'ERROR'" class="dot-error"></span>
       </div>
     </div>
 
     <div class="terminal-button-group position-absolute-right position-absolute-top">
       <ul>
-        <li @click="clearTerminal()">
+        <li @click="handleClearAll">
           <a-tooltip placement="top">
             <template #title><span>{{ t("TXT_CODE_b1e2e1b4") }}</span></template>
             <delete-outlined />
@@ -151,33 +191,36 @@ watch(activeTab, () => {
 
     <div class="terminal-wrapper global-card-container-shadow position-relative">
       <div class="terminal-container">
-        <div 
-          v-show="activeTab === 'ALL'"
-          :id="terminals.ALL.id" 
-          :style="{ height: props.height }"
-        ></div>
-        
-        <div 
-          v-if="isMinecraft"
-          v-show="activeTab === 'WARN'"
-          :id="terminals.WARN.id" 
-          :style="{ height: props.height }"
-        ></div>
-
-        <div 
-          v-if="isMinecraft"
-          v-show="activeTab === 'ERROR'"
-          :id="terminals.ERROR.id" 
-          :style="{ height: props.height }"
-        ></div>
+        <div v-show="activeTab === 'ALL'" :id="terminals.ALL.id" :style="{ height: props.height }"></div>
+        <div v-if="isMinecraft" v-show="activeTab === 'WARN'" :id="terminals.WARN.id" :style="{ height: props.height }"></div>
+        <div v-if="isMinecraft" v-show="activeTab === 'ERROR'" :id="terminals.ERROR.id" :style="{ height: props.height }"></div>
 
         <div v-if="containerState.isDesignMode" :style="{ height: props.height }">
-          <p class="terminal-design-tip">{{ $t("TXT_CODE_7ac6f85c") }}</p>
+          <p class="terminal-design-tip">{{ t("TXT_CODE_7ac6f85c") }}</p>
         </div>
       </div>
     </div>
 
+    <div class="command-input">
+      <div v-show="focusHistoryList" class="history">
+        <li v-for="(item, key) in history" :key="item">
+          <a-tag :color="key !== selectLocation ? 'blue' : '#108ee9'" @click="handleClickHistoryItem(item)">
+            {{ item.length > 14 ? item.slice(0, 14) + "..." : item }}
+          </a-tag>
+        </li>
+      </div>
+      <a-input
+        ref="inputRef"
+        v-model:value="commandInputValue"
+        :placeholder="t('TXT_CODE_555e2c1b')"
+        :disabled="containerState.isDesignMode || !isConnect"
+        @press-enter="handleSendCommand"
+        @keydown="handleHistorySelect"
+      >
+        <template #prefix><CodeOutlined style="font-size: 18px" /></template>
+      </a-input>
     </div>
+  </div>
 </template>
 
 <style lang="scss" scoped>
