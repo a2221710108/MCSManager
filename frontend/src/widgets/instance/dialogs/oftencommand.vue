@@ -272,12 +272,10 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 容器基礎樣式 */
 .quick-cmd-container {
   padding: 0 4px;
   max-height: 70vh;
   overflow-y: auto;
-  overflow-x: hidden;
 }
 
 .header-toolbar {
@@ -299,10 +297,10 @@ defineExpose({ openDialog });
   border: none;
 }
 
-/* --- 摺疊面板自定義 --- */
+/* --- 摺疊面板樣式 (維持原樣) --- */
 .custom-collapse :deep(.ant-collapse-item) {
   border-bottom: 1px solid rgba(140, 140, 140, 0.1) !important;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .group-header {
@@ -310,119 +308,98 @@ defineExpose({ openDialog });
   align-items: center;
   gap: 10px;
   font-weight: 600;
-  color: #1677ff;
-}
-
-.group-icon {
-  font-size: 16px;
+  /* 恢復原始顏色引用 */
+  color: var(--ant-primary-color);
 }
 
 .cmd-count {
   font-size: 11px;
   background: rgba(22, 119, 255, 0.1);
-  padding: 1px 8px;
+  padding: 1px 6px;
   border-radius: 10px;
   font-weight: normal;
-  color: #1677ff;
 }
 
-/* --- 指令列表：核心雙列佈局 --- */
+/* --- 指令列表：核心雙列實現 --- */
 .cmd-list {
   display: grid;
-  /* 平分兩列，間距 12px */
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  /* 核心：雙列顯示 */
+  grid-template-columns: repeat(2, 1fr); 
+  gap: 6px;
   padding: 8px 0;
 }
 
 .cmd-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
+  padding: 6px 12px;
+  /* 恢復原本的淡淡背景 */
   background: rgba(22, 119, 255, 0.02);
-  border: 1px solid rgba(140, 140, 140, 0.1);
+  border: 1px solid rgba(140, 140, 140, 0.08);
   border-radius: 8px;
-  transition: all 0.2s ease;
-  gap: 8px;
+  transition: all 0.2s;
+  gap: 12px;
 }
 
 .cmd-row:hover {
-  background: #fff;
-  border-color: #1677ff;
-  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.1);
+  background: rgba(22, 119, 255, 0.05);
+  border-color: rgba(22, 119, 255, 0.3);
 }
 
-/* 標籤區：固定寬度防止抖動 */
 .cmd-label-section {
-  flex-shrink: 0;
-  width: 110px;
+  min-width: 140px;
+  max-width: 140px;
 }
 
 .cmd-label {
   font-size: 13px;
   font-weight: 500;
-  color: #434343;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
 }
 
-/* 控制區：自動填充剩餘空間並靠右 */
 .cmd-controls-section {
-  flex-grow: 1;
+  flex: 1;
   display: flex;
-  justify-content: flex-end;
-  overflow: hidden;
+  justify-content: flex-start;
 }
 
 .inputs-group {
   display: flex;
   align-items: center;
   gap: 6px;
-  /* 雙列模式下不換行以維持整齊 */
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
-/* 按鈕區 */
 .cmd-action-section {
-  flex-shrink: 0;
   display: flex;
   align-items: center;
 }
 
-/* --- 輸入組件細節微調 --- */
+/* --- 恢復原本輸入組件樣式 --- */
 .param-input {
-  background: #f5f5f5 !important;
-  border: 1px solid transparent !important;
+  background: rgba(140, 140, 140, 0.05) !important;
   border-radius: 4px !important;
-  transition: all 0.2s;
 }
 
-.param-input:hover, .param-input:focus {
-  background: #fff !important;
-  border-color: #1677ff !important;
-}
-
-/* 雙列模式下的組件寬度限制 */
-.player-select { width: 95px; }
-.val-select { width: 85px; }
-.text-input { width: 90px; }
+.player-select { width: 110px; }
+.val-select { width: 90px; }
+.text-input { width: 100px; }
 
 .exec-btn {
   border-radius: 6px;
   background: #1677ff;
   border: none;
-  box-shadow: 0 2px 4px rgba(22, 119, 255, 0.2);
+  opacity: 0.8;
 }
 
 .exec-btn:hover {
-  background: #4096ff;
-  transform: translateY(-1px);
+  opacity: 1;
+  transform: scale(1.05);
 }
 
-/* 玩家選擇框內的頭像 */
 .player-option {
   display: flex;
   align-items: center;
@@ -432,56 +409,37 @@ defineExpose({ openDialog });
 .mini-avatar {
   width: 16px;
   height: 16px;
-  border-radius: 2px;
-  flex-shrink: 0;
+  border-radius: 3px;
 }
 
-/* --- 響應式佈局 --- */
-
-/* 平板/窄螢幕：切換為單列 Grid */
-@media (max-width: 900px) {
+/* --- 響應式：手機端自動恢復單列 --- */
+@media (max-width: 800px) {
   .cmd-list {
     grid-template-columns: 1fr;
   }
 }
 
-/* 手機端：切換為垂直堆疊佈局 */
 @media (max-width: 600px) {
   .cmd-row {
     flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
+    align-items: flex-start;
+    gap: 8px;
   }
-
   .cmd-label-section {
+    max-width: 100%;
+  }
+  .cmd-controls-section {
     width: 100%;
   }
-
-  .cmd-controls-section {
-    justify-content: flex-start;
-  }
-
   .inputs-group {
     width: 100%;
-    flex-wrap: wrap; /* 手機端空間不足時允許換行 */
   }
-
-  .inputs-group > * {
-    flex-grow: 1; /* 讓輸入框自動填滿橫向空間 */
+  .param-input {
+    flex: 1;
   }
-
-  .player-select, .val-select, .text-input {
-    width: auto;
-    min-width: 100px;
-  }
-
   .cmd-action-section {
+    width: 100%;
     justify-content: flex-end;
-  }
-
-  .exec-btn {
-    width: 100%; /* 手機端按鈕撐滿 */
-    height: 32px;
   }
 }
 </style>
