@@ -68,7 +68,7 @@ const { getMetaOrRouteValue } = useLayoutCardTools(props.card);
 const instanceId = getMetaOrRouteValue("instanceId");
 const daemonId = getMetaOrRouteValue("daemonId");
 
-const { instanceInfo, execute, isGlobalTerminal } = useInstanceInfo({
+const { instanceInfo, execute, isGlobalTerminal, useTerminalHook } = useInstanceInfo({
   instanceId,
   daemonId,
   autoRefresh: true
