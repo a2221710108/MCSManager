@@ -4,7 +4,7 @@ import { t } from "@/lang/i18n";
 import type { InstanceDetail } from "@/types";
 import { message } from "ant-design-vue";
 // 引入類型定義，不重新建立 Hook
-import type { UseTerminalHook } from "/../../../hooks/useTerminal";
+import type { UseTerminalHook } from "../../../hooks/useTerminal";
 import {
   UserOutlined,
   CrownOutlined,
