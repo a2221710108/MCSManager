@@ -160,8 +160,9 @@ defineExpose({
                       <a-button @click="runCommand('gamemode creative {player}', item.name_raw || item.name)">C</a-button>
                     </a-tooltip>
                     <a-tooltip :title="t('添加白名單')">
-                      <a-button @click="runCommand('whitelist add {player}', item.name_raw || item.name)"></a-button>
+                      <a-button @click="runCommand('whitelist add {player}', item.name_raw || item.name)">
                       <template #icon><SolutionOutlined /></template>
+                      </a-button>
                     </a-tooltip>
                     <a-popconfirm :title="t('確定踢出玩家？')" @confirm="runCommand('kick {player}', item.name_raw || item.name)">
                       <a-button danger><DisconnectOutlined /></a-button>
