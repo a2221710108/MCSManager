@@ -41,6 +41,7 @@ import TermConfig from "./dialogs/TermConfig.vue";
 import backup from "./dialogs/backup.vue";
 import java from "./dialogs/java.vue";
 import srv from "./dialogs/srv.vue";
+import playermanament from "./dialogs/playermanament.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -52,7 +53,8 @@ const instanceFundamentalDetailDialog = ref<InstanceType<typeof InstanceFundamen
 const backupDialog = ref<InstanceType<typeof backup>>();
 const javaDialog = ref<InstanceType<typeof java>>();
 const srvDialog = ref<InstanceType<typeof srv>>();
-
+const playermanamentDialog = ref<InstanceType<typeof playermanament>>();
+  
 const { toPage: toOtherPager } = useAppRouters();
 
 const props = defineProps<{
@@ -142,6 +144,15 @@ const btns = computed(() => {
       // 權限控制：通常管理員或有文件管理權限的人可以看到
       condition: () => state.settings.canFileManager || isAdmin.value
     },
+    {
+  title: t("玩家 Java"),
+  icon: UsergroupDeleteOutlined,
+  click: () => {
+    playermanamentDialog.value?.openDialog();
+  },
+  // 僅限 Minecraft Java 版顯示
+  condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+},
     {
   title: t("切換 Java"),
   icon: CoffeeOutlined,
@@ -327,6 +338,14 @@ watch(instanceInfo, (cfg, oldCfg) => {
 
   <srv
   ref="srvDialog"
+  :instance-info="instanceInfo"
+  :instance-id="instanceId ?? ''"
+  :daemon-id="daemonId ?? ''"
+  @update="refreshInstanceInfo"
+/>
+
+  <playermanament
+  ref="playermanamentDialog"
   :instance-info="instanceInfo"
   :instance-id="instanceId ?? ''"
   :daemon-id="daemonId ?? ''"
