@@ -297,7 +297,7 @@ defineExpose({ openDialog });
   >
     <div v-if="COMMAND_GROUPS.length > 0" class="quick-cmd-container">
       <div class="header-toolbar">
-        <span class="desc-text">{{ t("玩家數據可能有 1-5 分鐘延遲，取決於 API 緩存") }}</span>
+        <span class="desc-text">{{ t("Minecraft 版本不同可能導致部分指令無法使用；玩家數據可能有 1-5 分鐘延遲，取決於 API 緩存") }}</span>
         <a-button class="refresh-btn" size="small" @click="fetchPlayers" :loading="isFetchingPlayers">
           <template #icon><ReloadOutlined /></template>
         </a-button>
