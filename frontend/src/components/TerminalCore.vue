@@ -230,7 +230,7 @@ onMounted(async () => {
   </div>
 </template>
 
-<style lang="ts" scoped>
+<style lang="scss" scoped>
 .console-wrapper {
   position: relative;
   display: flex;
@@ -248,7 +248,7 @@ onMounted(async () => {
   .terminal-tabs {
     display: flex;
     gap: 4px;
-    margin-bottom: 0px; // 關鍵：消除底部間距
+    margin-bottom: 0px; 
     padding-left: 2px;
     z-index: 2;
 
@@ -274,13 +274,12 @@ onMounted(async () => {
         color: #fff;
         font-weight: 600;
         border: 1px solid var(--card-border-color);
-        border-bottom: 1px solid #1e1e1e; // 覆蓋掉下方邊框，形成連通感
-        margin-bottom: -1px; // 關鍵：向下壓住終端框的邊框
+        border-bottom: 1px solid #1e1e1e; 
+        margin-bottom: -1px; 
       }
     }
   }
 
-  // 終端按鈕組 (清空按鈕)
   .terminal-button-group {
     z-index: 11;
     position: absolute;
@@ -315,12 +314,11 @@ onMounted(async () => {
     }
   }
 
-  // 終端主體容器
   .terminal-wrapper {
     border: 1px solid var(--card-border-color);
     background-color: #1e1e1e;
     padding: 10px;
-    border-radius: 0 8px 8px 8px; // 左上角設為直角，與標籤貼合
+    border-radius: 0 8px 8px 8px; 
     position: relative;
     overflow: hidden;
     z-index: 1;
@@ -332,7 +330,6 @@ onMounted(async () => {
     }
   }
 
-  // 指令輸入框部分
   .command-input {
     position: relative;
     margin-top: 12px;
@@ -348,7 +345,6 @@ onMounted(async () => {
       left: 0;
       padding: 2px 0;
 
-      // 隱藏滾動條
       &::-webkit-scrollbar {
         height: 0 !important;
         display: none;
@@ -387,7 +383,6 @@ onMounted(async () => {
   }
 }
 
-// 針對手機端的優化
 @media (max-width: 768px) {
   .console-wrapper {
     .terminal-tabs {
