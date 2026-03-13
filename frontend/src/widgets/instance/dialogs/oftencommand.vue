@@ -72,7 +72,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
     ]
   },
   {
-    group: t("生成（敵對生物）"),
+    group: t("召喚（敵對生物）"),
     icon: ThunderboltOutlined,
     commands: [
       { label: t("殭尸"), cmd: "execute at {player} run summon zombie ~ ~ ~" }, 
@@ -91,7 +91,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
     ]
   },
   {
-    group: t("生成（中立生物）"),
+    group: t("召喚（中立生物）"),
     icon: ThunderboltOutlined,
     commands: [
       { label: t("末影人"), cmd: "execute at {player} run summon enderman ~ ~ ~" }, 
@@ -104,7 +104,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
     ]
   },
   {
-    group: t("生成（友好生物）"),
+    group: t("召喚（友好生物）"),
     icon: ThunderboltOutlined,
     commands: [
       { label: t("村民"), cmd: "execute at {player} run summon villager ~ ~ ~" }, 
@@ -121,7 +121,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
     ]
   },
   {
-    group: t("生成（特殊實體）"),
+    group: t("召喚（特殊實體）"),
     icon: ThunderboltOutlined,
     commands: [
       { label: t("閃電"), cmd: "execute at {player} run summon lightning_bolt ~ ~ ~" }, 
