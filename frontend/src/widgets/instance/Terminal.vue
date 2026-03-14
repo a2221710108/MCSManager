@@ -73,7 +73,6 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 強化版日誌處理 ---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
@@ -90,7 +89,6 @@ const handleTabChange = async () => {
         data: { target: "logs/latest.log" }
       });
 
-      // 數據解構
       let rawText = "";
       if (typeof res === "string") {
         rawText = res;
@@ -133,7 +131,6 @@ const handleTabChange = async () => {
   }
 };
 
-// --- 操作功能 ---
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 const toOpenInstance = async () => {
   clearTerminal();
@@ -184,9 +181,14 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   const info = instanceInfo.value?.info;
   if (!info || isStopped.value) return [];
   const { cpuUsage, memoryUsage, memoryLimit, memoryUsagePercent, rxBytes, txBytes } = info;
+  
+  // 修正 TS18048: possibly 'undefined'
+  const safeCpu = cpuUsage ?? 0;
+  const safeMemPercent = memoryUsagePercent ?? 0;
+
   return arrayFilter<TagInfo>([
-    { label: t("CPU"), value: `${parseInt(String(cpuUsage))}%`, color: cpuUsage > 80 ? 'error' : 'default', icon: BlockOutlined, condition: () => cpuUsage != null },
-    { label: t("內存"), value: formatMemoryUsage(memoryUsage, memoryLimit), color: memoryUsagePercent > 90 ? 'error' : 'default', icon: DashboardOutlined, condition: () => memoryUsage != null },
+    { label: t("CPU"), value: `${parseInt(String(safeCpu))}%`, color: safeCpu > 80 ? 'error' : 'default', icon: BlockOutlined, condition: () => cpuUsage != null },
+    { label: t("內存"), value: formatMemoryUsage(memoryUsage, memoryLimit), color: safeMemPercent > 90 ? 'error' : 'default', icon: DashboardOutlined, condition: () => memoryUsage != null },
     { label: t("網絡"), value: `↓${formatNetworkSpeed(rxBytes)} · ↑${formatNetworkSpeed(txBytes)}`, icon: ApartmentOutlined, condition: () => rxBytes != null || txBytes != null, onClick: () => { useByteUnit.value = !useByteUnit.value; } }
   ]);
 });
@@ -248,7 +250,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         :use-terminal-hook="terminalHook"
         :instance-id="instanceId"
         :daemon-id="daemonId"
-        :height="500"
+        height="500px"
       />
     </div>
   </div>
@@ -294,19 +296,17 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 .console-container {
   position: relative;
   width: 100%;
-  height: 500px; /* 固定高度防止無限撐開 */
+  height: 500px;
   margin-top: -1px;
   background: #000;
   border: 1px solid var(--card-border-color);
   border-radius: 0 0 8px 8px;
   overflow: hidden;
 
-  /* 核心修正：讓 TerminalCore 內部的顯示視圖強制填滿並允許滾動 */
   :deep(.terminal-core-container) {
     height: 100% !important;
   }
 
-  /* 修復 WARN/ERROR 雙窗口重疊 */
   :deep(.terminal-log-view) {
     position: absolute;
     top: 0;
@@ -320,7 +320,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
     white-space: pre-wrap;
     z-index: 10;
     color: #d4d4d4;
-    overscroll-behavior: auto; /* 恢復網頁滾動 */
+    overscroll-behavior: auto;
   }
 }
 
