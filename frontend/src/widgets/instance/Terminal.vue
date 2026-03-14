@@ -443,7 +443,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   width: 100%;
   margin-top: -1px;
   z-index: 1;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 .align-center { display: flex; align-items: center; }
