@@ -426,56 +426,71 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 
   <!-- Other Page View -->
   <CardPanel v-else class="containerWrapper" style="height: 100%">
-    <template #title>
-      <CloudServerOutlined />
-      <span class="ml-8"> {{ getInstanceName }} </span>
-      <span class="ml-8">
-        <a-tag v-if="isRunning" color="green">
-          <CheckCircleOutlined />
-          {{ instanceStatusText }}
-        </a-tag>
-        <a-tag v-else-if="isBuys" color="red">
-          <LoadingOutlined />
-          {{ instanceStatusText }}
-        </a-tag>
-        <a-tag v-else>
-          <InfoCircleOutlined />
-          {{ instanceStatusText }}
-        </a-tag>
-        <a-tag color="purple"> {{ instanceTypeText }} </a-tag>
-      </span>
-    </template>
-    <template #operator>
-      <span
-        v-for="item in quickOperations"
-        :key="item.title"
-        size="default"
-        class="mr-2"
-        v-bind="item.props"
-      >
-        <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
-      </span>
-      <a-dropdown>
-        <template #overlay>
-          <a-menu>
-            <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
-              <component :is="item.icon"></component>
-              <span>&nbsp;{{ item.title }}</span>
-            </a-menu-item>
-          </a-menu>
+<template>
+  <div v-if="innerTerminalType">
+    <div class="mb-24">
+      <BetweenMenus>
+        <template #left>
+          <div class="align-center">
+            <a-typography-title class="mb-0 mr-12" :level="4">
+              <CloudServerOutlined />
+              <span class="ml-6"> {{ getInstanceName }} </span>
+            </a-typography-title>
+            </div>
         </template>
-        <span size="default" type="primary">
-          <IconBtn :icon="DownOutlined" :title="t('TXT_CODE_fe731dfc')"></IconBtn>
-        </span>
-      </a-dropdown>
-    </template>
+        </BetweenMenus>
+    </div>
+
+    <div class="mb-10 justify-end">
+      <TerminalTags :tags="terminalTopTags" />
+    </div>
+
+    <div class="terminal-tabs-container">
+      <a-tabs v-model:activeKey="activeTab" type="card" :animated="false">
+        
+        <a-tab-pane key="all" :tab="t('控制台')">
+          <TerminalCore
+            v-if="instanceId && daemonId"
+            :use-terminal-hook="terminalHook"
+            :instance-id="instanceId"
+            :daemon-id="daemonId"
+            :height="card.height"
+          />
+        </a-tab-pane>
+
+        <template v-if="isMinecraft">
+          <a-tab-pane key="warn" tab="WARN">
+            <TerminalCore
+              v-if="instanceId && daemonId && activeTab === 'warn'"
+              :use-terminal-hook="terminalHook"
+              :instance-id="instanceId"
+              :daemon-id="daemonId"
+              :height="card.height"
+              filter="WARN"
+            />
+          </a-tab-pane>
+
+          <a-tab-pane key="error" tab="ERROR">
+            <TerminalCore
+              v-if="instanceId && daemonId && activeTab === 'error'"
+              :use-terminal-hook="terminalHook"
+              :instance-id="instanceId"
+              :daemon-id="daemonId"
+              :height="card.height"
+              filter="ERROR"
+            />
+          </a-tab-pane>
+        </template>
+
+      </a-tabs>
+    </div>
+  </div>
+
+  <CardPanel v-else class="containerWrapper" style="height: 100%">
     <template #body>
       <div class="mb-6">
         <TerminalTags :tags="terminalTopTags" />
       </div>
-      <div class="terminal-tabs-wrapper">
-  <a-tabs v-model:activeKey="activeTab" type="card">
-    <a-tab-pane key="all" :tab="t('控制台')">
       <TerminalCore
         v-if="instanceId && daemonId"
         :use-terminal-hook="terminalHook"
@@ -483,31 +498,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         :daemon-id="daemonId"
         :height="card.height"
       />
-    </a-tab-pane>
-
-    <a-tab-pane v-if="isMinecraft" key="warn" tab="WARN">
-      <TerminalCore
-        v-if="instanceId && daemonId && activeTab === 'warn'"
-        :use-terminal-hook="terminalHook"
-        :instance-id="instanceId"
-        :daemon-id="daemonId"
-        :height="card.height"
-        filter="WARN" 
-      />
-    </a-tab-pane>
-
-    <a-tab-pane v-if="isMinecraft" key="error" tab="ERROR">
-      <TerminalCore
-        v-if="instanceId && daemonId && activeTab === 'error'"
-        :use-terminal-hook="terminalHook"
-        :instance-id="instanceId"
-        :daemon-id="daemonId"
-        :height="card.height"
-        filter="ERROR"
-      />
-    </a-tab-pane>
-  </a-tabs>
-</div>
     </template>
   </CardPanel>
 </template>
