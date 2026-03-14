@@ -160,31 +160,30 @@ onMounted(async () => {
       <div v-if="!isConnect" class="terminal-loading">
         <LoadingOutlined style="font-size: 72px; color: white" />
       </div>
-      
       <div class="terminal-button-group position-absolute-right position-absolute-top">
         <ul>
           <li @click="clearTerminal()">
             <a-tooltip placement="top">
-              <template #title><span>{{ t("TXT_CODE_b1e2e1b4") }}</span></template>
+              <template #title>
+                <span>{{ t("TXT_CODE_b1e2e1b4") }}</span>
+              </template>
               <delete-outlined />
             </a-tooltip>
           </li>
         </ul>
       </div>
-
-      <div class="terminal-wrapper global-card-container-shadow">
+      <div class="terminal-wrapper global-card-container-shadow position-relative">
         <div class="terminal-container">
           <div
             v-if="!containerState.isDesignMode"
             :id="terminalDomId"
-            class="xterm-dom-container"
+            :style="{ height: props.height, minHeight: props.height, maxHeight: '100%' }"
           ></div>
-          <div v-else class="xterm-dom-container flex-center">
+          <div v-else :style="{ height: props.height }">
             <p class="terminal-design-tip">{{ $t("TXT_CODE_7ac6f85c") }}</p>
           </div>
         </div>
       </div>
-
       <div class="command-input">
         <div v-show="focusHistoryList" class="history">
           <li v-for="(item, key) in history" :key="item">
@@ -214,10 +213,10 @@ onMounted(async () => {
 
     <div v-if="isStaticView" class="static-log-view-wrapper">
       <div class="terminal-wrapper global-card-container-shadow">
-        <a-spin :spinning="isLogLoading" :tip="t('正在加載日誌...')">
-          <div class="static-log-content">
+        <a-spin :spinning="isLogLoading">
+          <div class="static-log-content" :style="{ height: props.height, minHeight: props.height }">
             <pre v-if="staticLogContent">{{ staticLogContent }}</pre>
-            <div v-else-if="!isLogLoading" class="flex-center flex-column" style="height: 100%; opacity: 0.5;">
+            <div v-else-if="!isLogLoading" class="flex-center flex-column empty-box">
               <InfoCircleOutlined style="font-size: 32px;" />
               <p class="mt-10">{{ t("暫無相關日誌信息") }}</p>
             </div>
@@ -235,158 +234,183 @@ onMounted(async () => {
         <a-typography-paragraph>
           {{ $t("TXT_CODE_812a629e") + socketAddress }}
         </a-typography-paragraph>
-        <div class="mb-12">
-          <img :src="connectErrorImage" style="width: 100%; height: 110px; object-fit: contain" />
+        <div>
+          <img :src="connectErrorImage" style="width: 100%; height: 110px" />
         </div>
         <a-typography-title :level="5">{{ $t("TXT_CODE_9c95b60f") }}</a-typography-title>
         <a-typography-paragraph>
-          <pre class="error-msg-box"><code>{{ socketError?.message||"" }}</code></pre>
+          <pre style="font-size: 12px"><code>{{ socketError?.message||"" }}</code></pre>
+          <div v-if="isXhrPollError" style="font-size: 12px">
+            <span> {{ xhrPollErrorReason }}</span>
+          </div>
         </a-typography-paragraph>
-        <div class="flex flex-center mt-12">
-          <a-button type="primary" @click="refreshPage">{{ $t("TXT_CODE_f8b28901") }}</a-button>
-        </div>
+        <a-typography-paragraph v-if="isXhrPollError">
+          <div class="flex" style="gap: 8px; font-size: 12px">
+            <span><strong>{{ $t("TXT_CODE_d4c8fb3b") }}</strong></span>
+            <a href="https://discord.gg/auDk2Rj7aD" target="_blank">{{ $t("TXT_CODE_9b3ce825") }}</a>
+            <span>|</span>
+            <a href="https://news.lazycloud.one/" target="_blank">{{ $t("TXT_CODE_10cc2794") }}</a>
+          </div>
+        </a-typography-paragraph>
+        <a-typography-title :level="5">{{ $t("TXT_CODE_f1c96d8a") }}</a-typography-title>
+        <a-typography-paragraph>
+          <ul>
+            <li>{{ $t("TXT_CODE_ceba9262") }}</li>
+            <li>{{ $t("TXT_CODE_84099e5") }}</li>
+            <li>{{ $t("TXT_CODE_86ff658a") }}</li>
+          </ul>
+          <div class="flex flex-center">
+            <a-typography-link @click="refreshPage">
+              {{ $t("TXT_CODE_f8b28901") }}
+            </a-typography-link>
+          </div>
+        </a-typography-paragraph>
       </div>
     </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
+/* 完全沿用原版數值，僅針對多視圖進行結構優化 */
+
 .console-wrapper {
   position: relative;
-  display: flex;
-  flex-direction: column;
   height: 100%;
   width: 100%;
-  overflow: hidden;
 
-  .realtime-terminal-container,
-  .static-log-view-wrapper {
+  /* 確保切換視圖時佈局穩定 */
+  .realtime-terminal-container, .static-log-view-wrapper {
     display: flex;
     flex-direction: column;
-    height: 100%;
     width: 100%;
-    overflow: hidden;
   }
 
-  /* 終端主體：自動撐開並切割溢出 */
-  .terminal-wrapper {
-    flex: 1; 
-    position: relative;
-    background-color: #1e1e1e;
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid var(--card-border-color);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 12px;
+  .terminal-loading {
+    z-index: 12;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
 
-    .terminal-container {
-      flex: 1;
-      width: 100%;
-      height: 100%;
-      
-      .xterm-dom-container {
-        height: 100% !important;
-        width: 100%;
+  /* 原版按鈕組樣式 */
+  .terminal-button-group {
+    z-index: 11;
+    margin-right: 20px;
+    padding-bottom: 50px;
+    padding-left: 50px;
+    border-radius: 6px;
+    color: #fff;
+    &:hover ul { transition: all 1s; opacity: 0.8; }
+    ul {
+      display: flex;
+      opacity: 0;
+      li {
+        cursor: pointer;
+        list-style: none;
+        padding: 5px;
+        margin-left: 5px;
+        border-radius: 6px;
+        font-size: 20px;
+        &:hover { background-color: #3e3e3e; }
       }
     }
   }
 
-  /* 輸入框：固定在底部，不參與縮放 */
-  .command-input {
-    flex-shrink: 0;
+  /* 原版終端包裝樣式 */
+  .terminal-wrapper {
+    border: 1px solid var(--card-border-color);
     position: relative;
-    z-index: 10;
-    
-    .history {
-      display: flex;
-      position: absolute;
-      top: -38px;
-      left: 0;
-      width: 100%;
-      overflow-x: auto;
-      padding-bottom: 4px;
-      li { list-style: none; margin-right: 6px; }
-      &::-webkit-scrollbar { height: 0 !important; }
+    background-color: #1e1e1e;
+    padding: 8px; /* 原版 padding */
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 12px; /* 原版間距 */
+
+    .terminal-container {
+      height: 100%;
     }
   }
 
-  /* 靜態日誌文字樣式 */
+  /* 靜態日誌內容區：使用與終端一致的樣式 */
   .static-log-content {
-    flex: 1;
     overflow-y: auto;
+    padding: 4px 8px;
     color: #d4d4d4;
-    font-family: "JetBrains Mono", "Menlo", "Consolas", monospace;
+    font-family: "Menlo", "Monaco", "Consolas", "Courier New", monospace;
     font-size: 13px;
-    line-height: 1.6;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
     
     pre {
       margin: 0;
-      white-space: pre-wrap;
-      word-break: break-all;
+      color: inherit;
+      background: transparent;
+      border: none;
+    }
+
+    /* 滾動條美化 */
+    &::-webkit-scrollbar { width: 8px; }
+    &::-webkit-scrollbar-track { background: #1e1e1e; }
+    &::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 4px;
+      &:hover { background: #444; }
+    }
+  }
+
+  /* 原版指令輸入框樣式 */
+  .command-input {
+    position: relative;
+    .history {
+      display: flex;
+      max-width: 100%;
+      overflow: scroll;
+      z-index: 10;
+      position: absolute;
+      top: -35px;
+      left: 0;
+      li {
+        list-style: none;
+        span {
+          padding: 3px 20px;
+          max-width: 300px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          cursor: pointer;
+        }
+      }
+      &::-webkit-scrollbar { width: 0 !important; height: 0 !important; }
     }
   }
 }
 
-/* 懸浮按鈕組 */
-.terminal-button-group {
-  z-index: 20;
-  position: absolute;
-  top: 15px;
-  right: 25px;
-  ul {
-    margin: 0; padding: 0;
-    li {
-      color: #aaa;
-      cursor: pointer;
-      font-size: 18px;
-      transition: color 0.2s;
-      &:hover { color: #fff; }
-    }
-  }
-}
+/* 輔助樣式 */
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-column { flex-direction: column; }
+.empty-box { height: 100%; opacity: 0.4; }
+.mt-10 { margin-top: 10px; }
 
-/* 錯誤提示樣式優化 */
+/* 錯誤卡片完全保留原版 */
 .error-card {
   position: absolute;
   inset: 0;
-  z-index: 100;
+  z-index: 10;
+  border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-
   .error-card-container {
-    background: var(--color-gray-1);
-    padding: 24px;
-    border-radius: 8px;
-    max-width: 420px;
-    width: 90%;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    overflow: hidden;
+    max-width: 440px;
+    border: 1px solid var(--color-gray-6) !important;
+    background-color: var(--color-gray-1);
+    border-radius: 4px;
+    padding: 12px;
+    box-shadow: 0px 0px 2px var(--color-gray-7);
   }
 }
-
-.error-msg-box {
-  background: #f5f5f5;
-  padding: 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  max-height: 100px;
-  overflow-y: auto;
-}
-
-.terminal-loading {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 30;
-}
-
-.flex-center { display: flex; align-items: center; justify-content: center; }
-.flex-column { flex-direction: column; }
-.mt-10 { margin-top: 10px; }
-.mt-12 { margin-top: 12px; }
-.mb-12 { margin-bottom: 12px; }
 </style>
