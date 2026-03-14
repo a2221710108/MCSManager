@@ -158,7 +158,21 @@ const instanceOperations = computed(() =>
   arrayFilter([
     { title: t("重啟"), icon: RedoOutlined, noConfirm: false, type: "default", class: "", click: async () => { try { await restartInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } }); } catch (error: any) { reportErrorMsg(error); } }, props: {}, condition: () => isRunning.value },
     { title: t("強制停止"), icon: CloseOutlined, noConfirm: false, type: "danger", class: "force-kill-btn", click: async () => { try { await killInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } }); } catch (error: any) { reportErrorMsg(error); } }, props: { type: "primary", danger: true }, condition: () => !isStopped.value },
-    { title: t("更新"), type: "default", icon: CloudDownloadOutlined, noConfirm: true, class: "", click: async () => { try { clearTerminal(); await updateInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "", task_name: "update" }, data: { time: new Date().getTime() } }); } catch (error: any) { reportErrorMsg(error); } }, props: {}, condition: () => isStopped.value && updateCmd.value }
+    { title: t("更新"), type: "default", icon: CloudDownloadOutlined, noConfirm: true, class: "", click: async () => { try { clearTerminal(); await updateInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "", task_name: "update" }, data: { time: new Date().getTime() } }); } catch (error: any) { reportErrorMsg(error); } }, props: {}, condition: () => isStopped.value && updateCmd.value },
+    {
+      title: t("TXT_CODE_b19ed1dd"), // 安裝按鈕
+      icon: InteractionOutlined,
+      noConfirm: true,
+      class: "",
+      click: async () => {
+        try {
+          clearTerminal();
+          await openMarketDialog(daemonId ?? "", instanceId ?? "", { autoInstall: true, onlyDockerTemplate: isDockerMode.value });
+        } catch (error: any) {}
+      },
+      props: {},
+      condition: () => isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value
+    }
   ])
 );
 
@@ -181,8 +195,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   const info = instanceInfo.value?.info;
   if (!info || isStopped.value) return [];
   const { cpuUsage, memoryUsage, memoryLimit, memoryUsagePercent, rxBytes, txBytes } = info;
-  
-  // 修正 TS18048: possibly 'undefined'
   const safeCpu = cpuUsage ?? 0;
   const safeMemPercent = memoryUsagePercent ?? 0;
 
@@ -195,7 +207,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 </script>
 
 <template>
-  <div v-if="innerTerminalType" class="inner-terminal-wrapper">
+  <div v-if="innerTerminalType">
     <div class="mb-24">
       <BetweenMenus>
         <template #left>
@@ -233,7 +245,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       <TerminalTags :tags="terminalTopTags" />
     </div>
 
-    <div class="tab-header-flex">
+    <div class="flex-start">
       <div class="tab-controls">
         <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
           <a-radio-button value="default"><DashboardOutlined /> {{ t("控制台") }}</a-radio-button>
@@ -243,16 +255,15 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       </div>
     </div>
 
-    <div class="console-container">
-      <TerminalCore
-        ref="terminalCoreRef"
-        v-if="instanceId && daemonId"
-        :use-terminal-hook="terminalHook"
-        :instance-id="instanceId"
-        :daemon-id="daemonId"
-        height="500px"
-      />
-    </div>
+    <TerminalCore
+      ref="terminalCoreRef"
+      v-if="instanceId && daemonId"
+      :use-terminal-hook="terminalHook"
+      :instance-id="instanceId"
+      :daemon-id="daemonId"
+      :height="card.height"
+      class="custom-terminal-style"
+    />
   </div>
 
   <CardPanel v-else class="containerWrapper" style="height: 100%">
@@ -260,17 +271,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 </template>
 
 <style lang="scss" scoped>
-.inner-terminal-wrapper {
-  display: flex;
-  flex-direction: column;
-}
-
-.tab-header-flex {
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-end;
-}
-
+.flex-start { display: flex; justify-content: flex-start; align-items: flex-end; }
 .tab-controls {
   z-index: 2;
   :deep(.ant-radio-group) {
@@ -283,53 +284,31 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       border-color: var(--card-border-color);
       height: 32px;
       line-height: 30px;
-      &.ant-radio-button-wrapper-checked {
-        background: #262626;
-        color: #ffffff;
-      }
+      &.ant-radio-button-wrapper-checked { background: #262626; color: #ffffff; }
     }
     .warn-tab.ant-radio-button-wrapper-checked { border-top: 2px solid #faad14 !important; color: #faad14 !important; }
     .error-tab.ant-radio-button-wrapper-checked { border-top: 2px solid #ff4d4f !important; color: #ff4d4f !important; }
   }
 }
 
-.console-container {
-  position: relative;
-  width: 100%;
-  height: 500px;
+/* 修正重疊視圖，僅針對日誌視圖進行定位修正，不增加額外包裝層 */
+.custom-terminal-style {
   margin-top: -1px;
-  background: #000;
-  border: 1px solid var(--card-border-color);
-  border-radius: 0 0 8px 8px;
-  overflow: hidden;
-
-  :deep(.terminal-core-container) {
-    height: 100% !important;
-  }
-
   :deep(.terminal-log-view) {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: #1e1e1e;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #000;
     overflow-y: auto;
     padding: 12px;
-    font-family: "Cascadia Code", Consolas, monospace;
-    white-space: pre-wrap;
     z-index: 10;
-    color: #d4d4d4;
     overscroll-behavior: auto;
+    font-family: monospace;
   }
 }
 
 :deep(.force-kill-btn) {
   background-color: #ff4d4f !important;
-  border-color: #ff4d4f !important;
   color: white !important;
-  &:hover { background-color: #ff7875 !important; }
 }
-
 .align-center { display: flex; align-items: center; }
 </style>
