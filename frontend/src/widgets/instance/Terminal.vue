@@ -73,7 +73,7 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 分頁邏輯控制 ---
+// --- 智能分頁日誌過濾邏輯 ---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
@@ -82,42 +82,49 @@ const handleTabChange = async () => {
   if (activeTab.value === "default") {
     terminalCoreRef.value?.showDefaultView();
   } else {
-    // 進入日誌視圖，先顯示加載中
     terminalCoreRef.value?.showLogView("", true);
-    
     try {
       const res = await fetchFile({
         params: { daemonId: daemonId ?? "", uuid: instanceId ?? "" },
-        data: { 
-          // 修正：使用相對路徑，避免 /workspace 前綴導致的路徑存取錯誤
-          target: "logs/latest.log" 
-        }
+        data: { target: "logs/latest.log" }
       });
 
       const rawText = typeof res === "string" ? res : "";
       const lines = rawText.split("\n");
-      const last500Lines = lines.slice(-500);
+      const targetLevel = activeTab.value.toUpperCase(); // "WARN" 或 "ERROR"
+      
+      const resultLines: string[] = [];
+      let isCapturing = false;
 
-      let logs = "";
-      if (activeTab.value === "warn") {
-        logs = last500Lines
-          .filter(l => l.toUpperCase().includes("WARN") || l.toUpperCase().includes("WARNING"))
-          .join("\n");
-      } else if (activeTab.value === "error") {
-        logs = last500Lines
-          .filter(l => l.toUpperCase().includes("ERROR") || l.toUpperCase().includes("FATAL"))
-          .join("\n");
+      for (const line of lines) {
+        // 匹配標題行，例如 [09:11:28] [Server thread/WARN]:
+        const isNewLogEntry = line.startsWith("[") && line.includes("]");
+        
+        if (isNewLogEntry) {
+          if (line.includes(`/${targetLevel}]`)) {
+            isCapturing = true;
+            resultLines.push(line);
+          } else {
+            isCapturing = false;
+          }
+        } else if (isCapturing && line.trim() !== "") {
+          // 捕獲緊跟在標題行後的堆疊信息（直到下一個時間戳出現）
+          resultLines.push(line);
+        }
       }
       
-      terminalCoreRef.value?.showLogView(logs, false);
+      terminalCoreRef.value?.showLogView(
+        resultLines.length > 0 ? resultLines.join("\n") : t("未在最近日誌中發現相關信息"), 
+        false
+      );
     } catch (err: any) {
       reportErrorMsg(err.message);
-      terminalCoreRef.value?.showLogView(t("無法讀取日誌文件，請檢查路徑或權限。"), false);
+      terminalCoreRef.value?.showLogView(t("無法讀取日誌文件，請檢查文件是否存在。"), false);
     }
   }
 };
 
-// --- 原有操作邏輯 (保持不變) ---
+// --- 操作按鈕與權限邏輯 ---
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 
 const toOpenInstance = async () => {
@@ -144,7 +151,6 @@ const quickOperations = computed(() =>
     {
       title: t("TXT_CODE_57245e94"),
       icon: PlayCircleOutlined,
-      noConfirm: false,
       type: "default",
       class: "button-color-success",
       click: toOpenInstance,
@@ -175,7 +181,6 @@ const instanceOperations = computed(() =>
       title: t("TXT_CODE_47dcfa5"),
       icon: RedoOutlined,
       type: "default",
-      noConfirm: false,
       click: async () => {
         try {
           await restartInstance().execute({
@@ -202,6 +207,37 @@ const instanceOperations = computed(() =>
         }
       },
       condition: () => !isStopped.value
+    },
+    {
+      title: t("TXT_CODE_40ca4f2"),
+      type: "default",
+      icon: CloudDownloadOutlined,
+      click: async () => {
+        try {
+          clearTerminal();
+          await updateInstance().execute({
+            params: { uuid: instanceId || "", daemonId: daemonId || "", task_name: "update" },
+            data: { time: new Date().getTime() }
+          });
+        } catch (error: any) {
+          reportErrorMsg(error);
+        }
+      },
+      condition: () => isStopped.value && updateCmd.value
+    },
+    {
+      title: t("TXT_CODE_b19ed1dd"),
+      icon: InteractionOutlined,
+      click: async () => {
+        try {
+          clearTerminal();
+          await openMarketDialog(daemonId ?? "", instanceId ?? "", {
+            autoInstall: true,
+            onlyDockerTemplate: isDockerMode.value
+          });
+        } catch (error: any) {}
+      },
+      condition: () => isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value
     }
   ])
 );
@@ -212,6 +248,7 @@ const getInstanceName = computed(() => {
     : instanceInfo.value?.config.nickname;
 });
 
+// --- 資源占用顯示格式化 ---
 const useByteUnit = useLocalStorage("useByteUnit", true);
 const prettyBytesConfig: PrettyOptions = { minimumFractionDigits: 2, maximumFractionDigits: 2, binary: true };
 
@@ -269,7 +306,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         <template #right>
           <div v-if="!isPhone">
             <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
-              <a-button v-if="item.noConfirm" class="ml-8" :class="item.class" :danger="item.type === 'danger'" :disabled="isOpenInstanceLoading" @click="item.click">
+              <a-button v-if="item.noConfirm || item.type === 'default'" class="ml-8" :class="item.class" :danger="item.type === 'danger'" :disabled="isOpenInstanceLoading" @click="item.click">
                 <component :is="item.icon" /> {{ item.title }}
               </a-button>
               <a-popconfirm v-else :key="item.title" :title="t('TXT_CODE_276756b2')" @confirm="item.click">
@@ -283,7 +320,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       </BetweenMenus>
     </div>
 
-    <div class="mb-10 flex-between">
+    <div class="mb-0 flex-between">
       <div class="tab-controls">
         <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
           <a-radio-button value="default"><DashboardOutlined /> {{ t("控制台") }}</a-radio-button>
@@ -291,7 +328,9 @@ const terminalTopTags = computed<TagInfo[]>(() => {
           <a-radio-button value="error" class="error-tab">ERROR</a-radio-button>
         </a-radio-group>
       </div>
-      <TerminalTags :tags="terminalTopTags" />
+      <div class="mb-2">
+        <TerminalTags :tags="terminalTopTags" />
+      </div>
     </div>
 
     <div class="console-section">
@@ -307,53 +346,57 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   </div>
 
   <CardPanel v-else class="containerWrapper" style="height: 100%">
-    <template #title>
-      <CloudServerOutlined /> <span class="ml-8"> {{ getInstanceName }} </span>
-    </template>
-    <template #operator>
-      <span v-for="item in quickOperations" :key="item.title" class="mr-2">
-        <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
-      </span>
-      <a-dropdown>
-        <template #overlay>
-          <a-menu>
-            <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
-              <component :is="item.icon"></component><span>&nbsp;{{ item.title }}</span>
-            </a-menu-item>
-          </a-menu>
-        </template>
-        <span><IconBtn :icon="DownOutlined" :title="t('TXT_CODE_fe731dfc')"></IconBtn></span>
-      </a-dropdown>
-    </template>
-    <template #body>
-      <div class="mb-6"><TerminalTags :tags="terminalTopTags" /></div>
-      <TerminalCore v-if="instanceId && daemonId" :use-terminal-hook="terminalHook" :instance-id="instanceId" :daemon-id="daemonId" :height="card.height" />
-    </template>
-  </CardPanel>
+    </CardPanel>
 </template>
 
 <style lang="scss" scoped>
 .flex-between { 
   display: flex; 
   justify-content: space-between; 
-  align-items: center; 
+  align-items: flex-end; // 改為底端對齊，讓分頁按鈕貼地
   width: 100%;
+}
+
+.tab-controls {
+  z-index: 2;
+  :deep(.ant-radio-group) {
+    display: flex;
+    .ant-radio-button-wrapper {
+      border-bottom: none !important; // 移除底邊，與下方控制台融合
+      border-radius: 6px 6px 0 0 !important;
+      background: #1e1e1e;
+      color: #8c8c8c;
+      border-color: var(--card-border-color);
+      height: 32px;
+      line-height: 30px;
+      
+      &.ant-radio-button-wrapper-checked {
+        background: #262626;
+        color: #ffffff;
+        &::before { background-color: transparent !important; }
+      }
+
+      &:hover { color: #fff; }
+    }
+
+    .warn-tab.ant-radio-button-wrapper-checked {
+       border-top: 2px solid #faad14 !important;
+       color: #faad14 !important;
+    }
+    .error-tab.ant-radio-button-wrapper-checked {
+       border-top: 2px solid #ff4d4f !important;
+       color: #ff4d4f !important;
+    }
+  }
 }
 
 .console-section { 
   position: relative; 
   width: 100%;
-  // 確保下方輸入框有足夠空間，不被外部組件擋住
+  margin-top: -1px; // 核心：向上移動 1px 覆蓋邊框達成貼合
+  z-index: 1;
   margin-bottom: 20px;
 }
 
-.tab-controls {
-  .warn-tab:hover { color: #faad14 !important; }
-  .error-tab:hover { color: #ff4d4f !important; }
-}
-
-.align-center {
-  display: flex;
-  align-items: center;
-}
+.align-center { display: flex; align-items: center; }
 </style>
