@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from "vue";
 import CardPanel from "@/components/CardPanel.vue";
-import { openMarketDialog, openRenewalDialog } from "@/components/fc";
+import { openMarketDialog } from "@/components/fc";
 import IconBtn from "@/components/IconBtn.vue";
 import TerminalCore from "@/components/TerminalCore.vue";
 import TerminalTags from "@/components/TerminalTags.vue";
@@ -34,7 +34,6 @@ import {
   InfoCircleOutlined,
   InteractionOutlined,
   LoadingOutlined,
-  MoneyCollectOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
   RedoOutlined
@@ -90,9 +89,8 @@ const handleTabChange = async () => {
       });
 
       let rawText = "";
-      if (typeof res === "string") {
-        rawText = res;
-      } else if (res && typeof res === "object") {
+      if (typeof res === "string") rawText = res;
+      else if (res && typeof res === "object") {
         rawText = res._value || res.value || res.data || res.content || "";
       }
 
@@ -159,20 +157,7 @@ const instanceOperations = computed(() =>
     { title: t("重啟"), icon: RedoOutlined, noConfirm: false, type: "default", class: "", click: async () => { try { await restartInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } }); } catch (error: any) { reportErrorMsg(error); } }, props: {}, condition: () => isRunning.value },
     { title: t("強制停止"), icon: CloseOutlined, noConfirm: false, type: "danger", class: "force-kill-btn", click: async () => { try { await killInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } }); } catch (error: any) { reportErrorMsg(error); } }, props: { type: "primary", danger: true }, condition: () => !isStopped.value },
     { title: t("更新"), type: "default", icon: CloudDownloadOutlined, noConfirm: true, class: "", click: async () => { try { clearTerminal(); await updateInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "", task_name: "update" }, data: { time: new Date().getTime() } }); } catch (error: any) { reportErrorMsg(error); } }, props: {}, condition: () => isStopped.value && updateCmd.value },
-    {
-      title: t("TXT_CODE_b19ed1dd"), // 安裝按鈕
-      icon: InteractionOutlined,
-      noConfirm: true,
-      class: "",
-      click: async () => {
-        try {
-          clearTerminal();
-          await openMarketDialog(daemonId ?? "", instanceId ?? "", { autoInstall: true, onlyDockerTemplate: isDockerMode.value });
-        } catch (error: any) {}
-      },
-      props: {},
-      condition: () => isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value
-    }
+    { title: t("TXT_CODE_b19ed1dd"), icon: InteractionOutlined, noConfirm: true, class: "", click: async () => { try { clearTerminal(); await openMarketDialog(daemonId ?? "", instanceId ?? "", { autoInstall: true, onlyDockerTemplate: isDockerMode.value }); } catch (error: any) {} }, props: {}, condition: () => isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value }
   ])
 );
 
@@ -207,108 +192,102 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 </script>
 
 <template>
-  <div v-if="innerTerminalType">
-    <div class="mb-24">
-      <BetweenMenus>
-        <template #left>
-          <div class="align-center">
-            <a-typography-title class="mb-0 mr-12" :level="4">
-              <CloudServerOutlined />
-              <span class="ml-6"> {{ getInstanceName }} </span>
-            </a-typography-title>
-            <a-typography-paragraph v-if="!isPhone" class="mb-0 ml-4">
-              <a-tag v-if="isRunning" color="green"><CheckCircleOutlined /> {{ instanceStatusText }}</a-tag>
-              <a-tag v-else-if="isBuys" color="red"><LoadingOutlined /> {{ instanceStatusText }}</a-tag>
-              <a-tag v-else-if="instanceStatusText"><InfoCircleOutlined /> {{ instanceStatusText }}</a-tag>
-              <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
-            </a-typography-paragraph>
-          </div>
-        </template>
-        <template #right>
-          <div v-if="!isPhone">
-            <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
-              <a-button v-if="item.noConfirm" class="ml-8" :class="item.class" v-bind="item.props" :disabled="isOpenInstanceLoading" @click="item.click">
-                <component :is="item.icon" /> {{ item.title }}
-              </a-button>
-              <a-popconfirm v-else :key="item.title" :title="t('確定執行此操作嗎？')" @confirm="item.click">
-                <a-button class="ml-8" :class="item.class" v-bind="item.props">
-                  <component :is="item.icon" /> {{ item.title }}
-                </a-button>
-              </a-popconfirm>
-            </template>
-          </div>
-        </template>
-      </BetweenMenus>
-    </div>
+  <CardPanel class="containerWrapper console-wrapper" style="height: 100%">
+    <template #title>
+      <CloudServerOutlined />
+      <span class="ml-8"> {{ getInstanceName }} </span>
+      <span v-if="!isPhone" class="ml-8">
+        <a-tag v-if="isRunning" color="green"><CheckCircleOutlined /> {{ instanceStatusText }}</a-tag>
+        <a-tag v-else-if="isBuys" color="red"><LoadingOutlined /> {{ instanceStatusText }}</a-tag>
+        <a-tag v-else><InfoCircleOutlined /> {{ instanceStatusText }}</a-tag>
+        <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
+      </span>
+    </template>
 
-    <div class="mb-12">
-      <TerminalTags :tags="terminalTopTags" />
-    </div>
+    <template #operator>
+      <a-radio-group v-model:value="activeTab" size="small" class="mr-12" @change="handleTabChange">
+        <a-radio-button value="default">{{ t("控制台") }}</a-radio-button>
+        <a-radio-button value="warn" class="warn-tab">WARN</a-radio-button>
+        <a-radio-button value="error" class="error-tab">ERROR</a-radio-button>
+      </a-radio-group>
 
-    <div class="flex-start">
-      <div class="tab-controls">
-        <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
-          <a-radio-button value="default"><DashboardOutlined /> {{ t("控制台") }}</a-radio-button>
-          <a-radio-button value="warn" class="warn-tab">WARN</a-radio-button>
-          <a-radio-button value="error" class="error-tab">ERROR</a-radio-button>
-        </a-radio-group>
+      <span v-for="item in quickOperations" :key="item.title" class="mr-2">
+        <IconBtn :icon="item.icon" :title="item.title" @click="item.click" />
+      </span>
+      <a-dropdown>
+        <template #overlay>
+          <a-menu>
+            <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
+              <component :is="item.icon" /><span>&nbsp;{{ item.title }}</span>
+            </a-menu-item>
+          </a-menu>
+        </template>
+        <IconBtn :icon="DownOutlined" :title="t('更多操作')" />
+      </a-dropdown>
+    </template>
+
+    <template #body>
+      <div class="terminal-wrapper">
+        <div class="terminal-container">
+          <TerminalCore
+            ref="terminalCoreRef"
+            v-if="instanceId && daemonId"
+            :use-terminal-hook="terminalHook"
+            :instance-id="instanceId"
+            :daemon-id="daemonId"
+            :height="card.height"
+          />
+        </div>
+        <div class="terminal-tags-overlay">
+          <TerminalTags :tags="terminalTopTags" />
+        </div>
       </div>
-    </div>
-
-    <TerminalCore
-      ref="terminalCoreRef"
-      v-if="instanceId && daemonId"
-      :use-terminal-hook="terminalHook"
-      :instance-id="instanceId"
-      :daemon-id="daemonId"
-      :height="card.height"
-      class="custom-terminal-style"
-    />
-  </div>
-
-  <CardPanel v-else class="containerWrapper" style="height: 100%">
-    </CardPanel>
+    </template>
+  </CardPanel>
 </template>
 
 <style lang="scss" scoped>
-.flex-start { display: flex; justify-content: flex-start; align-items: flex-end; }
-.tab-controls {
-  z-index: 2;
-  :deep(.ant-radio-group) {
+.console-wrapper {
+  position: relative;
+  
+  .terminal-wrapper {
+    border: 1px solid var(--card-border-color);
+    position: relative;
+    background-color: #1e1e1e;
+    border-radius: 6px;
+    overflow: hidden;
     display: flex;
-    .ant-radio-button-wrapper {
-      border-bottom: none !important;
-      border-radius: 6px 6px 0 0 !important;
-      background: #1e1e1e;
-      color: #8c8c8c;
-      border-color: var(--card-border-color);
-      height: 32px;
-      line-height: 30px;
-      &.ant-radio-button-wrapper-checked { background: #262626; color: #ffffff; }
+    flex-direction: column;
+    height: 100%;
+
+    .terminal-container {
+      height: 100%;
+      flex: 1;
     }
-    .warn-tab.ant-radio-button-wrapper-checked { border-top: 2px solid #faad14 !important; color: #faad14 !important; }
-    .error-tab.ant-radio-button-wrapper-checked { border-top: 2px solid #ff4d4f !important; color: #ff4d4f !important; }
+
+    /* 資源監控貼底，保留 3px 空間 */
+    .terminal-tags-overlay {
+      padding: 0 8px 3px 8px; 
+      background: #1e1e1e;
+    }
   }
 }
 
-/* 修正重疊視圖，僅針對日誌視圖進行定位修正，不增加額外包裝層 */
-.custom-terminal-style {
-  margin-top: -1px;
-  :deep(.terminal-log-view) {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: #000;
-    overflow-y: auto;
-    padding: 12px;
-    z-index: 10;
-    overscroll-behavior: auto;
-    font-family: monospace;
-  }
+/* 修正 WARN/ERROR 顯示視圖，確保其在終端容器內撐滿 */
+:deep(.terminal-log-view) {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #1e1e1e;
+  overflow-y: auto;
+  padding: 12px;
+  z-index: 10;
+  font-family: monospace;
+  overscroll-behavior: auto;
 }
 
-:deep(.force-kill-btn) {
-  background-color: #ff4d4f !important;
-  color: white !important;
-}
+.warn-tab.ant-radio-button-wrapper-checked { border-top: 2px solid #faad14 !important; color: #faad14 !important; }
+.error-tab.ant-radio-button-wrapper-checked { border-top: 2px solid #ff4d4f !important; color: #ff4d4f !important; }
+
+.force-kill-btn { color: #ff4d4f !important; }
 .align-center { display: flex; align-items: center; }
 </style>
