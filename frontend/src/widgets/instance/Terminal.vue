@@ -126,11 +126,11 @@ const handleTabChange = async () => {
       }
 
       terminalCoreRef.value?.showLogView(
-        resultLines.length > 0 ? resultLines.join("\n") : `--- 未發現 ${targetLevel} 日誌 ---`,
+        resultLines.length > 0 ? resultLines.join("\n") : `--- 未發現 ${targetLevel} ---`,
         false
       );
     } catch (err: any) {
-      terminalCoreRef.value?.showLogView("讀取失敗：" + err.message, false);
+      terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版：" + err.message, false);
     }
   }
 };
