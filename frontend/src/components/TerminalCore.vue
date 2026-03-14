@@ -8,7 +8,7 @@ import { useLayoutContainerStore } from "@/stores/useLayoutContainerStore";
 import { CodeOutlined, DeleteOutlined, LoadingOutlined, FileSearchOutlined } from "@ant-design/icons-vue";
 import { Terminal } from "@xterm/xterm";
 import { message } from "ant-design-vue";
-import { onMounted, ref, watch } from "vue";
+import { onMounted, ref } from "vue";
 import { encodeConsoleColor, type UseTerminalHook } from "../hooks/useTerminal";
 import { getRandomId } from "../tools/randId";
 
@@ -67,22 +67,21 @@ const initTerminal = async () => {
   if (containerState.isDesignMode) return;
   const dom = document.getElementById(terminalDomId);
   if (dom) {
-    // 如果是過濾模式，開啟自動換行轉換
-    const term = initTerminalWindow(dom, props.filter ? { convertEol: true } : {});
+    // 修正 TS2554：恢復為單個參數，避開類型檢查
+    const term = initTerminalWindow(dom);
     return term;
   }
   throw new Error(t("TXT_CODE_42bcfe0c"));
 };
 
-// --- 新增：日誌過濾分析邏輯 ---
+// --- 日誌過濾分析邏輯 ---
 const performLogAnalysis = (rawLog: string) => {
   if (!props.filter || !term) return;
   
   const lines = rawLog.split(/\r?\n/);
-  // 取最後 500 行進行分析
+  // 分析最後 500 行
   const last500 = lines.slice(-500);
   
-  // 匹配 [WARN] 或 WARN: 格式 (不分大小寫)
   const filterKey = props.filter.toUpperCase();
   const filteredLines = last500.filter(line => 
     line.toUpperCase().includes(`[${filterKey}]`) || 
@@ -95,7 +94,6 @@ const performLogAnalysis = (rawLog: string) => {
   if (filteredLines.length === 0) {
     term.write(`\x1b[33m目前沒有發現任何 ${filterKey} 級別的信息。\x1b[0m\r\n`);
   } else {
-    // 重新合併並處理顏色
     const output = filteredLines.join('\r\n');
     term.write(state.value?.config?.terminalOption?.haveColor ? encodeConsoleColor(output) : output);
   }
@@ -113,7 +111,6 @@ events.on("error", (error: Error) => {
   socketError.value = error;
 });
 
-// 修改 detail 事件：區分普通模式與過濾模式
 events.once("detail", async () => {
   try {
     const { value } = await getInstanceOutputLog().execute({
@@ -146,6 +143,11 @@ onMounted(async () => {
     term = await initTerminal();
 
     if (term) {
+      // 修正：手動開啟自動換行，解決過濾模式下的排版問題
+      if (props.filter) {
+        term.options.convertEol = true;
+      }
+
       term.parser.registerOscHandler(11, () => true);
       term.parser.registerOscHandler(10, () => true);
 
@@ -227,7 +229,7 @@ onMounted(async () => {
         <a-alert type="info" banner>
           <template #message>
             <span style="font-size: 12px; color: #666;">
-              <FileSearchOutlined /> 正在查看 {{ props.filter }} 日誌過濾視圖。此模式下無法輸入指令。
+              <FileSearchOutlined /> 正在查看 {{ props.filter }} 日誌過濾視圖 (最後 500 行)。
             </span>
           </template>
         </a-alert>
@@ -250,11 +252,29 @@ onMounted(async () => {
             <span> {{ xhrPollErrorReason }}</span>
           </div>
         </a-typography-paragraph>
-        <div class="flex flex-center">
+        
+        <a-typography-paragraph v-if="isXhrPollError">
+          <div class="flex" style="gap: 8px; font-size: 12px">
+            <span><strong>{{ $t("TXT_CODE_d4c8fb3b") }}</strong></span>
+            <a href="https://discord.gg/auDk2Rj7aD" target="_blank" rel="noopener noreferrer">Discord</a>
+            <span>|</span>
+            <a href="https://news.lazycloud.one/" target="_blank" rel="noopener noreferrer">News</a>
+          </div>
+        </a-typography-paragraph>
+
+        <a-typography-title :level="5">{{ $t("TXT_CODE_f1c96d8a") }}</a-typography-title>
+        <a-typography-paragraph>
+          <ul>
+            <li>{{ $t("TXT_CODE_ceba9262") }}</li>
+            <li>{{ $t("TXT_CODE_84099e5") }}</li>
+            <li>{{ $t("TXT_CODE_86ff658a") }}</li>
+          </ul>
+          <div class="flex flex-center">
             <a-typography-link @click="refreshPage">
               {{ $t("TXT_CODE_f8b28901") }}
             </a-typography-link>
-        </div>
+          </div>
+        </a-typography-paragraph>
       </div>
     </div>
   </div>
