@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import BetweenMenus from "@/components/BetweenMenus.vue";
 import CardPanel from "@/components/CardPanel.vue";
-import { useDownloadFileDialog } from "@/components/fc";
 import { useLayoutCardTools } from "@/hooks/useCardTools";
 import { useFileManager } from "@/hooks/useFileManager";
 import { useRightClickMenu } from "@/hooks/useRightClickMenu";
@@ -58,14 +57,9 @@ const {
   operationForm,
   dataSource,
   breadcrumbs,
-  currentPath,
   clipboard,
   currentDisk,
   isMultiple,
-  activeTab,
-  currentTabs,
-  onEditTabs,
-  handleChangeTab,
   selectChanged,
   getFileList,
   touchFile,
@@ -77,7 +71,6 @@ const {
   zipFile,
   unzipFile,
   downloadFile,
-  downloadFromUrl,
   handleChangeDir,
   handleSearchChange,
   selectedFiles,
@@ -92,6 +85,61 @@ const {
 } = useFileManager(instanceId, daemonId);
 
 const { openRightClickMenu } = useRightClickMenu();
+
+// --- 多標籤頁邏輯實作 ---
+interface FileTab {
+  key: string;
+  name: string;
+  path: string;
+}
+
+const activeTabKey = ref("default");
+const tabs = ref<FileTab[]>([
+  { key: "default", name: t("TXT_CODE_28124988"), path: "/" }
+]);
+
+// 監聽目錄切換：當用戶點擊標籤時，觸發底層目錄跳轉
+const handleTabChange = async (key: string) => {
+  const tab = tabs.value.find(t => t.key === key);
+  if (tab) {
+    await handleChangeDir(tab.path);
+  }
+};
+
+// 監聽麵包屑變化：自動同步當前標籤的名稱與路徑
+watch(() => breadcrumbs.value, (newBreads) => {
+  if (newBreads && newBreads.length > 0) {
+    const lastItem = newBreads[newBreads.length - 1];
+    const currentTab = tabs.value.find(t => t.key === activeTabKey.value);
+    if (currentTab) {
+      currentTab.path = lastItem.path;
+      currentTab.name = lastItem.name || t("TXT_CODE_28124988");
+    }
+  }
+}, { deep: true });
+
+// 標籤編輯邏輯（新增/刪除）
+const onEditTabs = (targetKey: any, action: string) => {
+  if (action === 'add') {
+    const newKey = `tab_${Date.now()}`;
+    tabs.value.push({
+      key: newKey,
+      name: t("TXT_CODE_28124988"),
+      path: "/"
+    });
+    activeTabKey.value = newKey;
+    handleChangeDir("/");
+  } else if (action === 'remove') {
+    if (tabs.value.length <= 1) return;
+    const index = tabs.value.findIndex(t => t.key === targetKey);
+    tabs.value = tabs.value.filter(t => t.key !== targetKey);
+    if (activeTabKey.value === targetKey) {
+      activeTabKey.value = tabs.value[Math.max(0, index - 1)].key;
+      handleTabChange(activeTabKey.value);
+    }
+  }
+};
+// --- 多標籤頁邏輯結束 ---
 
 const isShowDiskList = computed(
   () =>
@@ -222,10 +270,10 @@ const handleDrop = (e: DragEvent) => {
     for (const file of files) {
       name += file.name + ", ";
     }
-    name = name.slice(0, -2); // trailing comma
+    name = name.slice(0, -2);
   }
   if (name.length > 30) {
-    name = name.slice(0, 27) + "..."; // cut if too long
+    name = name.slice(0, 27) + "...";
   }
   if (files.length > 1) {
     name += ` (${files.length})`;
@@ -235,7 +283,7 @@ const handleDrop = (e: DragEvent) => {
     icon: h(ExclamationCircleOutlined),
     content: t("TXT_CODE_52bc24ec") + ` ${name} ?`,
     onOk() {
-      selectedFiles([...files]); // files:FileList not instanceof Array
+      selectedFiles([...files]);
     }
   });
 };
@@ -250,7 +298,7 @@ const onFileSelect = (info: UploadChangeParam) => {
 };
 
 const editFile = (fileName: string) => {
-  const path = currentPath.value + fileName;
+  const path = breadcrumbs.value[breadcrumbs.value.length - 1].path + fileName;
   FileEditorDialog.value?.openDialog(path, fileName);
 };
 
@@ -355,24 +403,10 @@ const handleRightClickRow = (e: MouseEvent, record: DataType) => {
   return false;
 };
 
-const downloadFromURLFile = async () => {
-  const data = await useDownloadFileDialog();
-  if (!data) return;
-  await downloadFromUrl(data);
-};
-
 onMounted(async () => {
   await getFileStatus();
   dialog.value.loading = true;
-
-  if (currentTabs.value.length) {
-    const thisTab = currentTabs.value[0];
-    activeTab.value = thisTab.key;
-    await getFileList(false, thisTab.path);
-  } else {
-    await getFileList(false);
-  }
-
+  await getFileList();
   dialog.value.loading = false;
 });
 
@@ -401,10 +435,6 @@ onUnmounted(() => {
               }}
             </a-typography-text>
 
-            <a-button type="dashed" @click="() => downloadFromURLFile()">
-              <download-outlined />
-              {{ t("TXT_CODE_5b364aef") }}
-            </a-button>
             <a-upload
               v-model:file-list="fileList"
               :before-upload="() => false"
@@ -494,6 +524,18 @@ onUnmounted(() => {
           @drop="handleDrop"
         >
           <template #body>
+            <div class="file-tabs-container">
+              <a-tabs
+                v-model:activeKey="activeTabKey"
+                type="editable-card"
+                size="small"
+                @change="handleTabChange"
+                @edit="onEditTabs"
+              >
+                <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.name" />
+              </a-tabs>
+            </div>
+
             <div v-if="uploadData.current" class="flex-nowrap w-100">
               <a-typography-text :ellipsis="true">
                 {{ uploadData.currentFile }}
@@ -543,16 +585,6 @@ onUnmounted(() => {
                 {{ convertFileSize(uploadData.current![1].toString()) }}
               </a-typography-text>
             </div>
-            <a-tabs
-              v-model:activeKey="activeTab"
-              type="editable-card"
-              @edit="onEditTabs"
-              @change="(key) => handleChangeTab(key as string)"
-            >
-              <a-tab-pane v-for="b in currentTabs" :key="b.key" :tab="b.name" :closable="true">
-              </a-tab-pane>
-            </a-tabs>
-
             <div class="flex-wrap items-flex-start">
               <a-select
                 v-if="isShowDiskList"
@@ -577,13 +609,6 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <p
-              v-if="fileStatus?.downloadFileFromURLTask && fileStatus.downloadFileFromURLTask > 0"
-              style="color: #1677ff"
-            >
-              <a-spin />
-              {{ t("TXT_CODE_8b7fe641", { count: fileStatus?.downloadFileFromURLTask }) }}
-            </p>
             <p
               v-if="fileStatus?.instanceFileTask && fileStatus.instanceFileTask > 0"
               style="color: #1677ff"
@@ -785,6 +810,29 @@ onUnmounted(() => {
 </template>
 
 <style lang="scss" scoped>
+/* 多標籤頁專用樣式 */
+.file-tabs-container {
+  margin-bottom: 8px;
+  :deep(.ant-tabs-nav) {
+    margin-bottom: 0 !important;
+    &::before {
+      border-bottom: none !important;
+    }
+  }
+  :deep(.ant-tabs-tab) {
+    background: transparent !important;
+    border: 1px solid var(--color-gray-4) !important;
+    border-bottom: none !important;
+    border-radius: 6px 6px 0 0 !important;
+    margin-right: 2px !important;
+    transition: all 0.3s;
+  }
+  :deep(.ant-tabs-tab-active) {
+    background: var(--color-gray-2) !important;
+    border-color: var(--color-gray-5) !important;
+  }
+}
+
 .search-input {
   transition: all 0.4s;
   text-align: center;
@@ -793,24 +841,13 @@ onUnmounted(() => {
 
 .file-name {
   color: inherit;
-
   &:hover {
     color: #1677ff;
   }
 }
 
-.upload-tip {
-  position: absolute;
-  right: 0;
-  left: 0;
-  top: 0;
-  bottom: 0;
-}
-
 @media (max-width: 992px) {
   .search-input {
-    transition: all 0.4s;
-    text-align: center;
     width: 100% !important;
   }
 }
@@ -823,7 +860,6 @@ onUnmounted(() => {
   border: 1px solid var(--color-gray-5);
   border-radius: 6px;
   flex: 1;
-
   .file-breadcrumbs-item {
     padding: 8px;
     cursor: pointer;
@@ -832,7 +868,6 @@ onUnmounted(() => {
     min-width: 32px;
     text-align: center;
   }
-
   .file-breadcrumbs-item:hover {
     background-color: var(--color-gray-4);
   }
@@ -841,7 +876,6 @@ onUnmounted(() => {
 @media (max-width: 350px) {
   .permission {
     flex-direction: column;
-
     .son {
       width: 100%;
     }
