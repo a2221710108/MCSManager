@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, computed } from "vue";
 import CardPanel from "@/components/CardPanel.vue";
 import { openMarketDialog, openRenewalDialog } from "@/components/fc";
 import IconBtn from "@/components/IconBtn.vue";
@@ -15,6 +16,8 @@ import {
   stopInstance,
   updateInstance
 } from "@/services/apis/instance";
+// 引入你提供的檔案讀取 API
+import { fileContent } from "@/services/apis/fileManager";
 import { useAppStateStore } from "@/stores/useAppStateStore";
 import { sleep } from "@/tools/common";
 import { reportErrorMsg } from "@/tools/validator";
@@ -36,11 +39,11 @@ import {
   MoneyCollectOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
-  RedoOutlined
+  RedoOutlined,
+  FileTextOutlined
 } from "@ant-design/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
 import prettyBytes, { type Options as PrettyOptions } from "pretty-bytes";
-import { computed, ref } from "vue";
 import type { TagInfo } from "../../components/interface";
 import { GLOBAL_INSTANCE_NAME } from "../../config/const";
 import { useTerminal, type UseTerminalHook } from "../../hooks/useTerminal";
@@ -54,7 +57,6 @@ const { isPhone } = useScreen();
 const { state, isAdmin } = useAppStateStore();
 const { getMetaOrRouteValue } = useLayoutCardTools(props.card);
 
-// 初始化終端 Hook
 const terminalHook: UseTerminalHook = useTerminal();
 const {
   state: instanceInfo,
@@ -66,17 +68,61 @@ const {
   clearTerminal
 } = terminalHook;
 
-// 分頁控制
-const activeTab = ref("all");
-
 const instanceId = getMetaOrRouteValue("instanceId");
 const daemonId = getMetaOrRouteValue("daemonId");
 const viewType = getMetaOrRouteValue("viewType", false);
 const innerTerminalType = computed(() => props.card.width === 12 && viewType === "inner");
-
 const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
+
+// --- 新增分頁邏輯開始 ---
+const activeTab = ref("default");
+const filteredLogs = ref("");
+const isLogLoading = ref(false);
+const { execute: fetchFile } = fileContent();
+
+const loadAndFilterLogs = async (type: string) => {
+  if (type === "default") return;
+  isLogLoading.value = true;
+  try {
+    const res = await fetchFile({
+      params: {
+        daemonId: daemonId ?? "",
+        uuid: instanceId ?? ""
+      },
+      data: {
+        target: "/workspace/logs/latest.log"
+      }
+    });
+
+    const rawText = typeof res === "string" ? res : "";
+    const lines = rawText.split("\n");
+    // 取最後 500 行
+    const last500Lines = lines.slice(-500);
+
+    if (type === "warn") {
+      filteredLogs.value = last500Lines
+        .filter((l) => l.toUpperCase().includes("WARN") || l.toUpperCase().includes("WARNING"))
+        .join("\n");
+    } else if (type === "error") {
+      filteredLogs.value = last500Lines
+        .filter((l) => l.toUpperCase().includes("ERROR") || l.toUpperCase().includes("FATAL"))
+        .join("\n");
+    }
+  } catch (err: any) {
+    reportErrorMsg(err.message);
+  } finally {
+    isLogLoading.value = false;
+  }
+};
+
+const handleTabChange = () => {
+  if (activeTab.value !== "default") {
+    loadAndFilterLogs(activeTab.value);
+  }
+};
+// --- 新增分頁邏輯結束 ---
 
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 
@@ -88,8 +134,12 @@ const toOpenInstance = async () => {
       if (!flag) return;
       await sleep(1000);
     }
+
     await requestOpenInstance({
-      params: { uuid: instanceId ?? "", daemonId: daemonId ?? "" }
+      params: {
+        uuid: instanceId ?? "",
+        daemonId: daemonId ?? ""
+      }
     });
   } catch (error: any) {
     reportErrorMsg(error);
@@ -118,13 +168,18 @@ const quickOperations = computed(() =>
       click: async () => {
         try {
           await stopInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "" }
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || ""
+            }
           });
         } catch (error: any) {
           reportErrorMsg(error);
         }
       },
-      props: { danger: true },
+      props: {
+        danger: true
+      },
       condition: () => isRunning.value
     }
   ])
@@ -140,7 +195,10 @@ const instanceOperations = computed(() =>
       click: async () => {
         try {
           await restartInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "" }
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || ""
+            }
           });
         } catch (error: any) {
           reportErrorMsg(error);
@@ -156,7 +214,10 @@ const instanceOperations = computed(() =>
       click: async () => {
         try {
           await killInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "" }
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || ""
+            }
           });
         } catch (error: any) {
           reportErrorMsg(error);
@@ -172,8 +233,14 @@ const instanceOperations = computed(() =>
         try {
           clearTerminal();
           await updateInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "", task_name: "update" },
-            data: { time: new Date().getTime() }
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || "",
+              task_name: "update"
+            },
+            data: {
+              time: new Date().getTime()
+            }
           });
         } catch (error: any) {
           reportErrorMsg(error);
@@ -192,11 +259,15 @@ const instanceOperations = computed(() =>
             autoInstall: true,
             onlyDockerTemplate: isDockerMode.value
           });
-        } catch (error: any) {}
+        } catch (error: any) {
+          // ignore
+        }
       },
       props: {},
       condition: () =>
-        isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value
+        isStopped.value &&
+        (state.settings.allowUsePreset || isAdmin.value) &&
+        !isGlobalTerminal.value
     },
     {
       title: t("TXT_CODE_f77093c8"),
@@ -216,12 +287,11 @@ const instanceOperations = computed(() =>
 );
 
 const getInstanceName = computed(() => {
-  // 優先從 config 取 nickname，如果沒有則顯示 ID 或預設名稱
-  const name = instanceInfo.value?.config?.nickname;
-  if (name === GLOBAL_INSTANCE_NAME) {
+  if (instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME) {
     return t("TXT_CODE_5bdaf23d");
+  } else {
+    return instanceInfo.value?.config.nickname;
   }
-  return name || instanceId || "Unknown Instance";
 });
 
 const useByteUnit = useLocalStorage("useByteUnit", true);
@@ -256,6 +326,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   const info = instanceInfo.value?.info;
   if (!info || isStopped.value) return [];
   const { cpuUsage, memoryUsage, memoryLimit, memoryUsagePercent, rxBytes, txBytes } = info;
+
   return arrayFilter<TagInfo>([
     {
       label: t("TXT_CODE_b862a158"),
@@ -276,7 +347,9 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       value: `↓${formatNetworkSpeed(rxBytes)} · ↑${formatNetworkSpeed(txBytes)}`,
       icon: ApartmentOutlined,
       condition: () => rxBytes != null || txBytes != null,
-      onClick: () => (useByteUnit.value = !useByteUnit.value)
+      onClick: () => {
+        useByteUnit.value = !useByteUnit.value;
+      }
     }
   ]);
 });
@@ -295,13 +368,16 @@ const terminalTopTags = computed<TagInfo[]>(() => {
             <a-typography-paragraph v-if="!isPhone" class="mb-0 ml-4">
               <span class="ml-6">
                 <a-tag v-if="isRunning" color="green">
-                  <CheckCircleOutlined /> {{ instanceStatusText }}
+                  <CheckCircleOutlined />
+                  {{ instanceStatusText }}
                 </a-tag>
                 <a-tag v-else-if="isBuys" color="red">
-                  <LoadingOutlined /> {{ instanceStatusText }}
+                  <LoadingOutlined />
+                  {{ instanceStatusText }}
                 </a-tag>
                 <a-tag v-else-if="instanceStatusText">
-                  <InfoCircleOutlined /> {{ instanceStatusText }}
+                  <InfoCircleOutlined />
+                  {{ instanceStatusText }}
                 </a-tag>
               </span>
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
@@ -314,16 +390,27 @@ const terminalTopTags = computed<TagInfo[]>(() => {
               <a-button
                 v-if="item.noConfirm"
                 class="ml-8"
-                :class="item.class"
+                :class="item.class ? item.class : ''"
                 :danger="item.type === 'danger'"
                 :disabled="isOpenInstanceLoading"
                 @click="item.click"
               >
-                <component :is="item.icon" /> {{ item.title }}
+                <component :is="item.icon" />
+                {{ item.title }}
               </a-button>
-              <a-popconfirm v-else :title="t('TXT_CODE_276756b2')" @confirm="item.click">
-                <a-button class="ml-8" :danger="item.type === 'danger'" :class="item.class">
-                  <component :is="item.icon" /> {{ item.title }}
+              <a-popconfirm
+                v-else
+                :key="item.title"
+                :title="t('TXT_CODE_276756b2')"
+                @confirm="item.click"
+              >
+                <a-button
+                  class="ml-8"
+                  :danger="item.type === 'danger'"
+                  :class="item.class ? item.class : ''"
+                >
+                  <component :is="item.icon" />
+                  {{ item.title }}
                 </a-button>
               </a-popconfirm>
             </template>
@@ -332,43 +419,39 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       </BetweenMenus>
     </div>
 
-    <div class="mb-10 justify-end">
+    <div class="mb-10 flex-between">
       <TerminalTags :tags="terminalTopTags" />
+      <div class="tab-controls">
+        <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
+          <a-radio-button value="default">
+            <template #icon><DashboardOutlined /></template>
+            {{ t("控制台") }}
+          </a-radio-button>
+          <a-radio-button value="warn" class="warn-tab">WARN</a-radio-button>
+          <a-radio-button value="error" class="error-tab">ERROR</a-radio-button>
+        </a-radio-group>
+      </div>
     </div>
 
-    <a-tabs v-model:activeKey="activeTab" class="console-tabs">
-      <a-tab-pane key="all" tab="控制台">
-        <TerminalCore
-          v-if="instanceId && daemonId"
-          :use-terminal-hook="terminalHook"
-          :instance-id="instanceId"
-          :daemon-id="daemonId"
-          :height="card.height"
-        />
-      </a-tab-pane>
+    <div class="console-section" :style="{ height: card.height }">
+      <TerminalCore
+        v-show="activeTab === 'default'"
+        v-if="instanceId && daemonId"
+        :use-terminal-hook="terminalHook"
+        :instance-id="instanceId"
+        :daemon-id="daemonId"
+        :height="card.height"
+      />
 
-      <a-tab-pane key="warn" tab="WARN 分析">
-        <TerminalCore
-          v-if="instanceId && daemonId && activeTab === 'warn'"
-          :use-terminal-hook="terminalHook"
-          :instance-id="instanceId"
-          :daemon-id="daemonId"
-          filter="WARN"
-          :height="card.height"
-        />
-      </a-tab-pane>
-
-      <a-tab-pane key="error" tab="ERROR 分析">
-        <TerminalCore
-          v-if="instanceId && daemonId && activeTab === 'error'"
-          :use-terminal-hook="terminalHook"
-          :instance-id="instanceId"
-          :daemon-id="daemonId"
-          filter="ERROR"
-          :height="card.height"
-        />
-      </a-tab-pane>
-    </a-tabs>
+      <div v-if="activeTab !== 'default'" class="static-log-view">
+        <a-spin :spinning="isLogLoading">
+          <div v-if="filteredLogs" class="log-container">
+            <pre>{{ filteredLogs }}</pre>
+          </div>
+          <a-empty v-else :description="t('無相關日誌信息')" class="mt-20" />
+        </a-spin>
+      </div>
+    </div>
   </div>
 
   <CardPanel v-else class="containerWrapper" style="height: 100%">
@@ -376,8 +459,26 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       <CloudServerOutlined />
       <span class="ml-8"> {{ getInstanceName }} </span>
     </template>
+    <template #operator>
+      <span v-for="item in quickOperations" :key="item.title" class="mr-2">
+        <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
+      </span>
+      <a-dropdown>
+        <template #overlay>
+          <a-menu>
+            <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
+              <component :is="item.icon"></component>
+              <span>&nbsp;{{ item.title }}</span>
+            </a-menu-item>
+          </a-menu>
+        </template>
+        <span><IconBtn :icon="DownOutlined" :title="t('TXT_CODE_fe731dfc')"></IconBtn></span>
+      </a-dropdown>
+    </template>
     <template #body>
-      <div class="mb-6"><TerminalTags :tags="terminalTopTags" /></div>
+      <div class="mb-6">
+        <TerminalTags :tags="terminalTopTags" />
+      </div>
       <TerminalCore
         v-if="instanceId && daemonId"
         :use-terminal-hook="terminalHook"
@@ -390,22 +491,63 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 </template>
 
 <style lang="scss" scoped>
-.console-tabs {
-  background: transparent;
-  :deep(.ant-tabs-nav) {
-    margin-bottom: 0 !important;
-    background: var(--color-gray-2);
-    padding: 0 16px;
-    border-radius: 8px 8px 0 0;
-    &::before {
-      border-bottom: none;
-    }
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.console-section {
+  position: relative;
+  width: 100%;
+}
+
+.static-log-view {
+  background-color: #1e1e1e;
+  border: 1px solid var(--card-border-color);
+  border-radius: 6px;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  .log-container {
+    padding: 12px;
+    height: 100%;
+    overflow-y: auto;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #d4d4d4;
+    white-space: pre-wrap;
+    word-break: break-all;
   }
-  :deep(.ant-tabs-content-holder) {
+
+  pre {
+    margin: 0;
+    background: transparent;
+    color: inherit;
+  }
+}
+
+.warn-tab:hover {
+  color: #faad14 !important;
+}
+.error-tab:hover {
+  color: #ff4d4f !important;
+}
+
+// 保持原有的樣式適配
+.console-wrapper {
+  position: relative;
+  .terminal-wrapper {
     border: 1px solid var(--card-border-color);
-    border-top: none;
-    border-radius: 0 0 8px 8px;
     background-color: #1e1e1e;
+    padding: 8px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
 }
 </style>
