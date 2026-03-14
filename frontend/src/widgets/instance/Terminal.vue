@@ -362,7 +362,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 </script>
 
 <template>
-  <div v-if="innerTerminalType">
+  <div v-if="innerTerminalType" class="full-terminal-layout">
     <div class="mb-24">
       <BetweenMenus>
         <template #left>
@@ -386,9 +386,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
                   {{ instanceStatusText }}
                 </a-tag>
               </span>
-
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
-
               <span v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 0" class="ml-16">
                 <a-tooltip>
                   <template #title> {{ t("正在監看人數") }} </template>
@@ -410,8 +408,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
                 :disabled="isOpenInstanceLoading"
                 @click="item.click"
               >
-                <component :is="item.icon" />
-                {{ item.title }}
+                <component :is="item.icon" /> {{ item.title }}
               </a-button>
               <a-popconfirm
                 v-else
@@ -419,35 +416,21 @@ const terminalTopTags = computed<TagInfo[]>(() => {
                 :title="t('確認執行此操作？')"
                 @confirm="item.click"
               >
-                <a-button
-                  class="ml-8"
-                  :danger="item.type === 'danger'"
-                  :class="item.class ? item.class : ''"
-                >
-                  <component :is="item.icon" />
-                  {{ item.title }}
+                <a-button class="ml-8" :danger="item.type === 'danger'" :class="item.class">
+                  <component :is="item.icon" /> {{ item.title }}
                 </a-button>
               </a-popconfirm>
             </template>
           </div>
-
           <a-dropdown v-else>
             <template #overlay>
               <a-menu>
-                <a-menu-item
-                  v-for="item in [...quickOperations, ...instanceOperations]"
-                  :key="item.title"
-                  @click="item.click"
-                >
-                  <component :is="item.icon" />
-                  {{ item.title }}
+                <a-menu-item v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title" @click="item.click">
+                  <component :is="item.icon" /> {{ item.title }}
                 </a-menu-item>
               </a-menu>
             </template>
-            <a-button type="primary">
-              {{ t("操作") }}
-              <DownOutlined />
-            </a-button>
+            <a-button type="primary"> {{ t("操作") }} <DownOutlined /> </a-button>
           </a-dropdown>
         </template>
       </BetweenMenus>
@@ -466,86 +449,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       </div>
     </div>
 
-    <TerminalCore
-      ref="terminalCoreRef"
-      v-if="instanceId && daemonId"
-      :use-terminal-hook="terminalHook"
-      :instance-id="instanceId"
-      :daemon-id="daemonId"
-      :height="card.height"
-    />
-  </div>
-
-  <CardPanel v-else class="containerWrapper" style="height: 100%">
-    <template #title>
-      <CloudServerOutlined />
-      <span class="ml-8"> {{ getInstanceName }} </span>
-      <span class="ml-8">
-        <a-tag v-if="isRunning" color="green">
-          <CheckCircleOutlined />
-          {{ instanceStatusText }}
-        </a-tag>
-        <a-tag v-else-if="isBuys" color="red">
-          <LoadingOutlined />
-          {{ instanceStatusText }}
-        </a-tag>
-        <a-tag v-else>
-          <InfoCircleOutlined />
-          {{ instanceStatusText }}
-        </a-tag>
-        <a-tag color="purple"> {{ instanceTypeText }} </a-tag>
-      </span>
-    </template>
-    <template #operator>
-      <span
-        v-for="item in quickOperations"
-        :key="item.title"
-        class="mr-2"
-        v-bind="item.props"
-      >
-        <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
-      </span>
-      <a-dropdown>
-        <template #overlay>
-          <a-menu>
-            <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
-              <component :is="item.icon"></component>
-              <span>&nbsp;{{ item.title }}</span>
-            </a-menu-item>
-          </a-menu>
-        </template>
-        <span size="default">
-          <IconBtn :icon="DownOutlined" :title="t('操作')"></IconBtn>
-        </span>
-      </a-dropdown>
-    </template>
-    <template #body>
-      <div class="mb-6 status-bar-row">
-        <div class="status-bar-left">
-          <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
-            <a-radio-button value="default">LOG</a-radio-button>
-            <a-radio-button value="warn">W</a-radio-button>
-            <a-radio-button value="error">E</a-radio-button>
-          </a-radio-group>
-        </div>
-        <div class="status-bar-right">
-          <TerminalTags :tags="terminalTopTags" />
-        </div>
-      </div>
-
-      <div class="terminal-main-container">
-    <TerminalCore
-      ref="terminalCoreRef"
-      v-if="instanceId && daemonId"
-      :use-terminal-hook="terminalHook"
-      :instance-id="instanceId"
-      :daemon-id="daemonId"
-      :height="card.height"
-    />
-  </div>
-
-
-      
+    <div class="terminal-container-wrapper">
       <TerminalCore
         ref="terminalCoreRef"
         v-if="instanceId && daemonId"
@@ -554,56 +458,120 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         :daemon-id="daemonId"
         :height="card.height"
       />
+    </div>
+  </div>
+
+  <CardPanel v-else class="containerWrapper console-card-layout" style="height: 100%">
+    <template #title>
+      <CloudServerOutlined />
+      <span class="ml-8"> {{ getInstanceName }} </span>
+      <span class="ml-8">
+        <a-tag v-if="isRunning" color="green"><CheckCircleOutlined /> {{ instanceStatusText }}</a-tag>
+        <a-tag v-else-if="isBuys" color="red"><LoadingOutlined /> {{ instanceStatusText }}</a-tag>
+        <a-tag v-else><InfoCircleOutlined /> {{ instanceStatusText }}</a-tag>
+        <a-tag color="purple"> {{ instanceTypeText }} </a-tag>
+      </span>
+    </template>
+    <template #operator>
+      <span v-for="item in quickOperations" :key="item.title" class="mr-2" v-bind="item.props">
+        <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
+      </span>
+      <a-dropdown>
+        <template #overlay>
+          <a-menu>
+            <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
+              <component :is="item.icon"></component><span>&nbsp;{{ item.title }}</span>
+            </a-menu-item>
+          </a-menu>
+        </template>
+        <IconBtn :icon="DownOutlined" :title="t('操作')" />
+      </a-dropdown>
+    </template>
+
+    <template #body>
+      <div class="terminal-body-flex">
+        <div class="mb-10 status-bar-row">
+          <div class="status-bar-left">
+            <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
+              <a-radio-button value="default">LOG</a-radio-button>
+              <a-radio-button value="warn">W</a-radio-button>
+              <a-radio-button value="error">E</a-radio-button>
+            </a-radio-group>
+          </div>
+          <div class="status-bar-right">
+            <TerminalTags :tags="terminalTopTags" />
+          </div>
+        </div>
+
+        <div class="terminal-container-wrapper">
+          <TerminalCore
+            ref="terminalCoreRef"
+            v-if="instanceId && daemonId"
+            :use-terminal-hook="terminalHook"
+            :instance-id="instanceId"
+            :daemon-id="daemonId"
+            :height="card.height"
+          />
+        </div>
+      </div>
     </template>
   </CardPanel>
 </template>
 
 <style lang="scss" scoped>
-
-
-  .terminal-main-container {
-  position: relative;
-  // 核心修復：確保終端能撐開並與下方組件保持 16px-24px 的標準間距
-  margin-bottom: 15px; 
-  border-radius: 8px;
-  overflow: hidden;
-  background-color: #1e1e1e;
-  
-  // 解決截圖中看到的黑色區域與下方卡片邊界不明顯的問題
-  border: 1px solid var(--color-gray-4); 
+/* 全局佈局修正：防止溢出擠壓下方組件 */
+.console-card-layout {
+  display: flex;
+  flex-direction: column;
+  :deep(.ant-card-body) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 16px !important;
+  }
 }
-  
-// --- 新增佈局樣式 ---
+
+.terminal-body-flex {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* 狀態行佈局：左按鈕，右監控 */
 .status-bar-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
+  flex-shrink: 0; // 禁止被壓縮
 }
 
-.status-bar-left {
+.status-bar-left, .status-bar-right {
   display: flex;
   align-items: center;
 }
 
-.status-bar-right {
-  display: flex;
-  justify-content: flex-end;
+/* 終端包裝層：強制填滿剩餘高度並切斷溢出 */
+.terminal-container-wrapper {
+  flex: 1;
+  position: relative;
+  background-color: #1e1e1e;
+  border-radius: 6px;
+  overflow: hidden; // 解決你看到的黑色塊溢出問題
+  border: 1px solid var(--card-border-color);
 }
 
-// --- 視圖切換按鈕極簡風格化 (Stripe 風) ---
+/* 視圖切換按鈕極簡風格化 (Stripe 風) */
 :deep(.ant-radio-button-wrapper) {
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
   font-weight: 500;
   color: var(--color-gray-8);
-  &::before {
-    display: none !important;
-  }
-  &:hover {
-    color: var(--primary-color);
-  }
+  &::before { display: none !important; }
+  &:hover { color: var(--primary-color); }
 }
 
 :deep(.ant-radio-button-wrapper-checked) {
@@ -612,13 +580,10 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   color: var(--primary-color) !important;
 }
 
-// --- 日誌視圖容器 ---
+/* 日誌視圖覆蓋層 */
 :deep(.terminal-log-view) {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: #1e1e1e;
   padding: 12px;
   z-index: 10;
@@ -626,54 +591,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   overflow-y: auto;
 }
 
-// --- 保留原版樣式 ---
-.align-center {
-  display: flex;
-  align-items: center;
-}
-
-.justify-end {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.error-card {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: 0;
-  z-index: 10;
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  .error-card-container {
-    overflow: hidden;
-    max-width: 440px;
-    border: 1px solid var(--color-gray-6) !important;
-    background-color: var(--color-gray-1);
-    border-radius: 4px;
-    padding: 12px;
-    box-shadow: 0px 0px 2px var(--color-gray-7);
-  }
-
-  @media (max-width: 992px) {
-    .error-card-container {
-      max-width: 90vw !important;
-    }
-  }
-}
-
-.console-wrapper {
-  position: relative;
-  .terminal-loading {
-    z-index: 12;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
-}
+/* 基礎樣式保持 */
+.align-center { display: flex; align-items: center; }
+.full-terminal-layout { height: 100%; display: flex; flex-direction: column; }
 </style>
