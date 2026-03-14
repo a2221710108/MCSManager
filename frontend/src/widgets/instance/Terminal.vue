@@ -130,11 +130,11 @@ const handleTabChange = async () => {
         false
       );
     } catch (err: any) {
-      terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版：" + err.message, false);
+      terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版");
     }
   }
 };
-// ------------------------------
+// ------------------------------terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版：" + err.message, false);
 
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 
