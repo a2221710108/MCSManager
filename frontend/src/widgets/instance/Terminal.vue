@@ -48,12 +48,6 @@ import { ref, computed, onMounted } from "vue"; // 把需要用的都放這裡
 
 // 標籤頁狀態：all (控制台), warn (警告), error (錯誤)
 const activeTab = ref("all");
-
-// 判斷是否為 Minecraft 伺服器 (包含 Java 和 Bedrock)
-const isMinecraft = computed(() => {
-  const type = instanceInfo.value?.config?.type;
-  return type && type.toLowerCase().includes("minecraft");
-});
   
 const props = defineProps<{
   card: LayoutCard;
