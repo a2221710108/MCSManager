@@ -160,30 +160,31 @@ onMounted(async () => {
       <div v-if="!isConnect" class="terminal-loading">
         <LoadingOutlined style="font-size: 72px; color: white" />
       </div>
+      
       <div class="terminal-button-group position-absolute-right position-absolute-top">
         <ul>
           <li @click="clearTerminal()">
             <a-tooltip placement="top">
-              <template #title>
-                <span>{{ t("TXT_CODE_b1e2e1b4") }}</span>
-              </template>
+              <template #title><span>{{ t("TXT_CODE_b1e2e1b4") }}</span></template>
               <delete-outlined />
             </a-tooltip>
           </li>
         </ul>
       </div>
-      <div class="terminal-wrapper global-card-container-shadow position-relative">
+
+      <div class="terminal-wrapper global-card-container-shadow">
         <div class="terminal-container">
           <div
             v-if="!containerState.isDesignMode"
             :id="terminalDomId"
-            :style="{ height: props.height }"
+            class="xterm-dom-container"
           ></div>
-          <div v-else :style="{ height: props.height }">
+          <div v-else class="xterm-dom-container flex-center">
             <p class="terminal-design-tip">{{ $t("TXT_CODE_7ac6f85c") }}</p>
           </div>
         </div>
       </div>
+
       <div class="command-input">
         <div v-show="focusHistoryList" class="history">
           <li v-for="(item, key) in history" :key="item">
@@ -214,7 +215,7 @@ onMounted(async () => {
     <div v-if="isStaticView" class="static-log-view-wrapper">
       <div class="terminal-wrapper global-card-container-shadow">
         <a-spin :spinning="isLogLoading" :tip="t('正在加載日誌...')">
-          <div class="static-log-content" :style="{ height: props.height }">
+          <div class="static-log-content">
             <pre v-if="staticLogContent">{{ staticLogContent }}</pre>
             <div v-else-if="!isLogLoading" class="flex-center flex-column" style="height: 100%; opacity: 0.5;">
               <InfoCircleOutlined style="font-size: 32px;" />
@@ -234,229 +235,158 @@ onMounted(async () => {
         <a-typography-paragraph>
           {{ $t("TXT_CODE_812a629e") + socketAddress }}
         </a-typography-paragraph>
-        <div>
-          <img :src="connectErrorImage" style="width: 100%; height: 110px" />
+        <div class="mb-12">
+          <img :src="connectErrorImage" style="width: 100%; height: 110px; object-fit: contain" />
         </div>
         <a-typography-title :level="5">{{ $t("TXT_CODE_9c95b60f") }}</a-typography-title>
         <a-typography-paragraph>
-          <pre style="font-size: 12px"><code>{{ socketError?.message||"" }}</code></pre>
-          <div v-if="isXhrPollError" style="font-size: 12px">
-            <span> {{ xhrPollErrorReason }}</span>
-          </div>
+          <pre class="error-msg-box"><code>{{ socketError?.message||"" }}</code></pre>
         </a-typography-paragraph>
-        <a-typography-paragraph v-if="isXhrPollError">
-          <div class="flex" style="gap: 8px; font-size: 12px">
-            <span><strong>{{ $t("TXT_CODE_d4c8fb3b") }}</strong></span>
-            <a href="https://discord.gg/auDk2Rj7aD" target="_blank">{{ $t("TXT_CODE_9b3ce825") }}</a>
-            <span>|</span>
-            <a href="https://news.lazycloud.one/" target="_blank">{{ $t("TXT_CODE_10cc2794") }}</a>
-          </div>
-        </a-typography-paragraph>
-        <a-typography-title :level="5">{{ $t("TXT_CODE_f1c96d8a") }}</a-typography-title>
-        <a-typography-paragraph>
-          <ul>
-            <li>{{ $t("TXT_CODE_ceba9262") }}</li>
-            <li>{{ $t("TXT_CODE_84099e5") }}</li>
-            <li>{{ $t("TXT_CODE_86ff658a") }}</li>
-          </ul>
-          <div class="flex flex-center">
-            <a-typography-link @click="refreshPage">
-              {{ $t("TXT_CODE_f8b28901") }}
-            </a-typography-link>
-          </div>
-        </a-typography-paragraph>
+        <div class="flex flex-center mt-12">
+          <a-button type="primary" @click="refreshPage">{{ $t("TXT_CODE_f8b28901") }}</a-button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
-/* 錯誤提示卡片 - 保持原樣 */
-.error-card {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: 0;
-  z-index: 20;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(0, 0, 0, 0.4);
-
-  .error-card-container {
-    overflow: hidden;
-    max-width: 440px;
-    border: 1px solid var(--color-gray-6) !important;
-    background-color: var(--color-gray-1);
-    border-radius: 4px;
-    padding: 16px;
-    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
-  }
-}
-
 .console-wrapper {
   position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   width: 100%;
+  overflow: hidden;
 
-  /* 實時終端容器 */
-  .realtime-terminal-container {
+  .realtime-terminal-container,
+  .static-log-view-wrapper {
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 100%;
+    overflow: hidden;
   }
 
-  /* 終端視窗主體 - 與 Xterm 顏色統一 */
+  /* 終端主體：自動撐開並切割溢出 */
   .terminal-wrapper {
-    flex: 1;
-    border: 1px solid var(--card-border-color);
+    flex: 1; 
     position: relative;
-    background-color: #1e1e1e; // Xterm 背景色
-    padding: 8px;
+    background-color: #1e1e1e;
+    padding: 10px;
     border-radius: 6px;
-    border-top-left-radius: 0; // 核心：貼合上方分頁按鈕
+    border: 1px solid var(--card-border-color);
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 
     .terminal-container {
       flex: 1;
-      height: 100%;
       width: 100%;
+      height: 100%;
+      
+      .xterm-dom-container {
+        height: 100% !important;
+        width: 100%;
+      }
     }
   }
 
-  /* 指令輸入框 - 確保不與終端重疊 */
+  /* 輸入框：固定在底部，不參與縮放 */
   .command-input {
-    position: relative;
     flex-shrink: 0;
-    width: 100%;
+    position: relative;
     z-index: 10;
-
+    
     .history {
       display: flex;
-      max-width: 100%;
-      overflow-x: auto;
-      z-index: 15;
       position: absolute;
-      top: -35px;
+      top: -38px;
       left: 0;
-      li {
-        list-style: none;
-        margin-right: 4px;
-        span {
-          padding: 3px 12px;
-          max-width: 200px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          cursor: pointer;
-        }
-      }
+      width: 100%;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      li { list-style: none; margin-right: 6px; }
       &::-webkit-scrollbar { height: 0 !important; }
     }
   }
 
-  /* 頂部操作組 (清屏等) */
-  .terminal-button-group {
-    z-index: 11;
-    position: absolute;
-    top: 12px;
-    right: 20px;
-    color: #fff;
-
-    ul {
-      display: flex;
-      opacity: 0;
-      transition: opacity 0.3s;
-      margin: 0;
-      padding: 0;
-      li {
-        cursor: pointer;
-        list-style: none;
-        padding: 5px;
-        margin-left: 5px;
-        border-radius: 4px;
-        font-size: 18px;
-        &:hover { background-color: rgba(255, 255, 255, 0.1); }
-      }
-    }
-
-    &:hover ul { opacity: 0.8; }
-  }
-}
-
-/* 靜態日誌視圖 (WARN/ERROR 分頁) */
-.static-log-view-wrapper {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  background-color: #1e1e1e;
-  border: 1px solid var(--card-border-color);
-  border-radius: 6px;
-  border-top-left-radius: 0; // 核心：貼合上方分頁按鈕
-  overflow: hidden;
-  margin-bottom: 8px;
-
+  /* 靜態日誌文字樣式 */
   .static-log-content {
     flex: 1;
     overflow-y: auto;
-    padding: 12px;
     color: #d4d4d4;
-    /* 強制使用與終端一致的等寬字體 */
-    font-family: "Menlo", "Monaco", "Consolas", "Courier New", monospace;
+    font-family: "JetBrains Mono", "Menlo", "Consolas", monospace;
     font-size: 13px;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    word-break: break-all;
-    background-color: #1e1e1e;
+    line-height: 1.6;
     
     pre {
       margin: 0;
-      color: inherit;
-      background: transparent;
-      border: none;
-      padding: 0;
-    }
-
-    /* 滾動條美化 - 讓它看起來更像終端內部滾動 */
-    &::-webkit-scrollbar {
-      width: 8px;
-    }
-    &::-webkit-scrollbar-track {
-      background: #1e1e1e;
-    }
-    &::-webkit-scrollbar-thumb {
-      background: #333;
-      border-radius: 4px;
-      &:hover { background: #444; }
+      white-space: pre-wrap;
+      word-break: break-all;
     }
   }
+}
 
-  /* 確保 Spin 加載動畫覆蓋整個區域 */
-  :deep(.ant-spin-nested-loading),
-  :deep(.ant-spin-container) {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+/* 懸浮按鈕組 */
+.terminal-button-group {
+  z-index: 20;
+  position: absolute;
+  top: 15px;
+  right: 25px;
+  ul {
+    margin: 0; padding: 0;
+    li {
+      color: #aaa;
+      cursor: pointer;
+      font-size: 18px;
+      transition: color 0.2s;
+      &:hover { color: #fff; }
+    }
   }
+}
+
+/* 錯誤提示樣式優化 */
+.error-card {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+
+  .error-card-container {
+    background: var(--color-gray-1);
+    padding: 24px;
+    border-radius: 8px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+}
+
+.error-msg-box {
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  max-height: 100px;
+  overflow-y: auto;
 }
 
 .terminal-loading {
-  z-index: 12;
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: 50%; left: 50%;
   transform: translate(-50%, -50%);
+  z-index: 30;
 }
 
-/* 全域輔助類 */
 .flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-column { flex-direction: column; }
 .mt-10 { margin-top: 10px; }
+.mt-12 { margin-top: 12px; }
+.mb-12 { margin-bottom: 12px; }
 </style>
