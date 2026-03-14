@@ -532,6 +532,20 @@ const terminalTopTags = computed<TagInfo[]>(() => {
           <TerminalTags :tags="terminalTopTags" />
         </div>
       </div>
+
+      <div class="terminal-main-container">
+    <TerminalCore
+      ref="terminalCoreRef"
+      v-if="instanceId && daemonId"
+      :use-terminal-hook="terminalHook"
+      :instance-id="instanceId"
+      :daemon-id="daemonId"
+      :height="card.height"
+    />
+  </div>
+
+
+      
       <TerminalCore
         ref="terminalCoreRef"
         v-if="instanceId && daemonId"
@@ -545,6 +559,20 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 </template>
 
 <style lang="scss" scoped>
+
+
+  .terminal-main-container {
+  position: relative;
+  // 核心修復：確保終端能撐開並與下方組件保持 16px-24px 的標準間距
+  margin-bottom: 15px; 
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #1e1e1e;
+  
+  // 解決截圖中看到的黑色區域與下方卡片邊界不明顯的問題
+  border: 1px solid var(--color-gray-4); 
+}
+  
 // --- 新增佈局樣式 ---
 .status-bar-row {
   display: flex;
