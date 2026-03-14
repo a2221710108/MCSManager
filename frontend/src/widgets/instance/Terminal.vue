@@ -1,414 +1,458 @@
-<script setup lang="ts">
-import CardPanel from "@/components/CardPanel.vue";
-import { openMarketDialog, openRenewalDialog } from "@/components/fc";
-import IconBtn from "@/components/IconBtn.vue";
-import TerminalCore from "@/components/TerminalCore.vue";
-import TerminalTags from "@/components/TerminalTags.vue";
-import { useLayoutCardTools } from "@/hooks/useCardTools";
-import { INSTANCE_TYPE_TRANSLATION, verifyEULA } from "@/hooks/useInstance";
-import { useScreen } from "@/hooks/useScreen";
+import { GLOBAL_INSTANCE_NAME } from "@/config/const";
+import { useCommandHistory } from "@/hooks/useCommandHistory";
 import { t } from "@/lang/i18n";
-import {
-  killInstance,
-  openInstance,
-  restartInstance,
-  stopInstance,
-  updateInstance
-} from "@/services/apis/instance";
-import { useAppStateStore } from "@/stores/useAppStateStore";
-import { sleep } from "@/tools/common";
-import { reportErrorMsg } from "@/tools/validator";
-import type { LayoutCard } from "@/types";
-import { INSTANCE_STATUS } from "@/types/const";
-import {
-  ApartmentOutlined,
-  BlockOutlined,
-  CheckCircleOutlined,
-  CloseOutlined,
-  CloudDownloadOutlined,
-  CloudServerOutlined,
-  DashboardOutlined,
-  DownOutlined,
-  InfoCircleOutlined,
-  InteractionOutlined,
-  LaptopOutlined,
-  LoadingOutlined,
-  MoneyCollectOutlined,
-  PauseCircleOutlined,
-  PlayCircleOutlined,
-  RedoOutlined
-} from "@ant-design/icons-vue";
-import { useLocalStorage } from "@vueuse/core";
-import prettyBytes, { type Options as PrettyOptions } from "pretty-bytes";
-import type { TagInfo } from "../../components/interface";
-import { GLOBAL_INSTANCE_NAME } from "../../config/const";
-import { useTerminal, type UseTerminalHook } from "../../hooks/useTerminal";
-import { arrayFilter } from "../../tools/array";
-import { ref, computed } from "vue"; 
+import { setUpTerminalStreamChannel } from "@/services/apis/instance";
+import { useLayoutConfigStore } from "@/stores/useLayoutConfig";
+import { parseForwardAddress } from "@/tools/protocol";
+import { removeTrail } from "@/tools/string";
+import type { InstanceDetail } from "@/types";
+import { INSTANCE_STATUS_CODE } from "@/types/const";
+import type { DefaultEventsMap } from "@socket.io/component-emitter";
+import { CanvasAddon } from "@xterm/addon-canvas";
+import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
+import { Terminal } from "@xterm/xterm";
+import EventEmitter from "eventemitter3";
+import type { Socket } from "socket.io-client";
+import { io } from "socket.io-client";
+import { computed, onMounted, onUnmounted, ref, unref } from "vue";
 
-const activeTab = ref("all");
-  
-const props = defineProps<{
-  card: LayoutCard;
-}>();
+export const TERM_COLOR = {
+  TERM_RESET: "\x1B[0m",
+  TERM_TEXT_BLACK: "\x1B[0;30m", // Black §0
+  TERM_TEXT_DARK_BLUE: "\x1B[0;34m", // Dark Blue §1
+  TERM_TEXT_DARK_GREEN: "\x1B[0;32m", // Dark Green §2
+  TERM_TEXT_DARK_AQUA: "\x1B[0;36m", // Dark Aqua §3
+  TERM_TEXT_DARK_RED: "\x1B[0;31m", // Dark Red §4
+  TERM_TEXT_DARK_PURPLE: "\x1B[0;35m", // Dark Purple §5
+  TERM_TEXT_GOLD: "\x1B[0;33m", // Gold §6
+  TERM_TEXT_GRAY: "\x1B[0;37m", // Gray §7
+  TERM_TEXT_DARK_GRAY: "\x1B[0;30;1m", // Dark Gray §8
+  TERM_TEXT_BLUE: "\x1B[0;34;1m", // Blue §9
+  TERM_TEXT_GREEN: "\x1B[0;32;1m", // Green §a
+  TERM_TEXT_AQUA: "\x1B[0;36;1m", // Aqua §b
+  TERM_TEXT_RED: "\x1B[0;31;1m", // Red §c
+  TERM_TEXT_LIGHT_PURPLE: "\x1B[0;35;1m", // Light Purple §d
+  TERM_TEXT_YELLOW: "\x1B[0;33;1m", // Yellow §e
+  TERM_TEXT_WHITE: "\x1B[0;37;1m", // White §f
+  TERM_TEXT_OBFUSCATED: "\x1B[5m", // Obfuscated §k
+  TERM_TEXT_BOLD: "\x1B[21m", // Bold §l
+  TERM_TEXT_STRIKETHROUGH: "\x1B[9m", // Strikethrough §m
+  TERM_TEXT_UNDERLINE: "\x1B[4m", // Underline §n
+  TERM_TEXT_ITALIC: "\x1B[3m", // Italic §o
+  TERM_TEXT_B: "\x1B[1m"
+};
 
-const { isPhone } = useScreen();
-const { state, isAdmin } = useAppStateStore();
-const { getMetaOrRouteValue } = useLayoutCardTools(props.card);
+export interface UseTerminalParams {
+  instanceId: string;
+  daemonId: string;
+}
 
-const terminalHook: UseTerminalHook = useTerminal();
-const {
-  state: instanceInfo,
-  isStopped,
-  isRunning,
-  isBuys,
-  isGlobalTerminal,
-  isDockerMode,
-  clearTerminal
-} = terminalHook;
+export interface StdoutData {
+  instanceUuid: string;
+  text: string;
+}
 
-const instanceId = getMetaOrRouteValue("instanceId");
-const daemonId = getMetaOrRouteValue("daemonId");
-const viewType = getMetaOrRouteValue("viewType", false);
-const innerTerminalType = computed(() => props.card.width === 12 && viewType === "inner");
-const instanceTypeText = computed(
-  () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
-);
+const { setHistory } = useCommandHistory();
 
-const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
+export type UseTerminalHook = ReturnType<typeof useTerminal>;
 
-const toOpenInstance = async () => {
-  clearTerminal();
-  try {
-    if (instanceInfo.value?.config?.type?.startsWith("minecraft/java")) {
-      const flag = await verifyEULA(instanceId ?? "", daemonId ?? "");
-      if (!flag) return;
-      await sleep(1000);
+export function useTerminal() {
+  const { hasBgImage } = useLayoutConfigStore();
+
+  const events = new EventEmitter();
+  let socket: Socket<DefaultEventsMap, DefaultEventsMap> | undefined;
+  const state = ref<InstanceDetail>();
+  const isReady = ref<boolean>(false);
+  const terminal = ref<Terminal>();
+  const isConnect = ref<boolean>(false);
+  const socketAddress = ref("");
+
+  const isGlobalTerminal = computed(() => {
+    return state.value?.config.nickname === GLOBAL_INSTANCE_NAME;
+  });
+
+  const isDockerMode = computed(() => {
+    return state.value?.config.processType === "docker";
+  });
+
+  let fitAddonTask: NodeJS.Timer;
+  let cachedSize = {
+    w: 160,
+    h: 40
+  };
+
+  const execute = async (config: UseTerminalParams) => {
+    isReady.value = false;
+
+    if (socket) {
+      return socket;
     }
 
-    await requestOpenInstance({
+    const res = await setUpTerminalStreamChannel().execute({
       params: {
-        uuid: instanceId ?? "",
-        daemonId: daemonId ?? ""
+        daemonId: config.daemonId,
+        uuid: config.instanceId
       }
     });
-  } catch (error: any) {
-    reportErrorMsg(error);
-  }
-};
+    const remoteInfo = unref(res.value);
+    if (!remoteInfo) throw new Error(t("TXT_CODE_181f2f08"));
 
-const updateCmd = computed(() => (instanceInfo.value?.config.updateCommand ? true : false));
-const instanceStatusText = computed(() => INSTANCE_STATUS[instanceInfo.value?.status ?? -1]);
+    const addr = parseForwardAddress(remoteInfo?.addr, "ws");
+    socketAddress.value = addr;
+    const password = remoteInfo.password;
 
-const quickOperations = computed(() =>
-  arrayFilter([
-    {
-      title: t("TXT_CODE_57245e94"),
-      icon: PlayCircleOutlined,
-      noConfirm: false,
-      type: "default",
-      class: "button-color-success",
-      click: toOpenInstance,
-      props: {},
-      condition: () => isStopped.value
-    },
-    {
-      title: t("TXT_CODE_b1dedda3"),
-      icon: PauseCircleOutlined,
-      type: "default",
-      click: async () => {
-        try {
-          await stopInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "" }
-          });
-        } catch (error: any) {
-          reportErrorMsg(error);
-        }
+    socket = io(addr, {
+      path: (!!remoteInfo.prefix ? removeTrail(remoteInfo.prefix, "/") : "") + "/socket.io",
+      multiplex: false,
+      reconnectionDelayMax: 1000 * 10,
+      timeout: 1000 * 30,
+      reconnection: true,
+      reconnectionAttempts: 3,
+      rejectUnauthorized: false
+    });
+
+    socket.on("connect", () => {
+      console.log("[Socket.io] connect:", addr);
+      socket?.emit("stream/auth", {
+        data: { password }
+      });
+      isConnect.value = true;
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("[Socket.io] Connect error: ", addr, error);
+      isConnect.value = false;
+      events.emit("error", error);
+    });
+
+    socket.on("instance/stopped", () => {
+      events.emit("stopped");
+    });
+
+    socket.on("instance/opened", () => {
+      events.emit("opened");
+    });
+
+    socket.on("stream/auth", (packet) => {
+      const data = packet.data;
+      if (data === true) {
+        socket?.emit("stream/detail", {});
+        events.emit("connect");
+        isReady.value = true;
+      } else {
+        events.emit("error", new Error("Stream/auth error!"));
+      }
+    });
+
+    socket.on("reconnect", () => {
+      console.warn("[Socket.io] reconnect:", addr);
+      isConnect.value = true;
+      socket?.emit("stream/auth", {
+        data: { password }
+      });
+    });
+
+    socket.on("disconnect", () => {
+      console.error("[Socket.io] disconnect:", addr);
+      isConnect.value = false;
+      events.emit("disconnect");
+    });
+
+    socket.on("instance/stdout", (packet) => events.emit("stdout", packet?.data));
+    socket.on("stream/detail", (packet) => {
+      const v = packet?.data as InstanceDetail | undefined;
+      state.value = v;
+      events.emit("detail", v);
+    });
+
+    socket.connect();
+    return socket;
+  };
+
+  const refreshWindowSize = (w: number, h: number) => {
+    cachedSize = {
+      w,
+      h
+    };
+    socket?.emit("stream/resize", {
+      data: cachedSize
+    });
+  };
+
+  const touchHandler = (event: TouchEvent) => {
+    const touches = event.changedTouches;
+    const first = touches[0];
+
+    let type = "";
+    switch (event.type) {
+      case "touchstart":
+        type = "mousedown";
+        break;
+      case "touchmove":
+        type = "mousemove";
+        break;
+      case "touchend":
+        type = "mouseup";
+        break;
+      default:
+        return;
+    }
+
+    const mouseEvent = new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      detail: 1,
+      screenX: first.screenX,
+      screenY: first.screenY,
+      clientX: first.clientX,
+      clientY: first.clientY,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      button: 0,
+      relatedTarget: null
+    });
+
+    first.target.dispatchEvent(mouseEvent);
+    if (type === "mousedown") {
+      event.preventDefault();
+    }
+  };
+
+  const initTerminalWindow = (element: HTMLElement) => {
+    if (terminal.value) {
+      throw new Error("Terminal already initialized, Please refresh the page!");
+    }
+
+    // init touch handler
+    element.addEventListener("touchstart", touchHandler, true);
+    element.addEventListener("touchmove", touchHandler, true);
+    element.addEventListener("touchend", touchHandler, true);
+    element.addEventListener("touchcancel", touchHandler, true);
+
+    const background = hasBgImage.value ? "#00000000" : "#1e1e1e";
+    const term = new Terminal({
+      convertEol: true,
+      disableStdin: false,
+      cursorStyle: "underline",
+      cursorBlink: true,
+      fontSize: 14,
+      theme: {
+        background
       },
-      props: { danger: true },
-      condition: () => isRunning.value
-    }
-  ])
-);
+      allowProposedApi: true,
+      allowTransparency: true
+    });
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
 
-const instanceOperations = computed(() =>
-  arrayFilter([
-    {
-      title: t("TXT_CODE_47dcfa5"),
-      icon: RedoOutlined,
-      type: "default",
-      noConfirm: false,
-      click: async () => {
-        try {
-          await restartInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "" }
-          });
-        } catch (error: any) {
-          reportErrorMsg(error);
-        }
-      },
-      condition: () => isRunning.value
-    },
-    {
-      title: t("TXT_CODE_7b67813a"),
-      icon: CloseOutlined,
-      type: "danger",
-      class: "color-warning",
-      click: async () => {
-        try {
-          await killInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "" }
-          });
-        } catch (error: any) {
-          reportErrorMsg(error);
-        }
-      },
-      condition: () => !isStopped.value
-    }
-  ])
-);
+    terminal.value = term;
 
-const getInstanceName = computed(() => {
-  if (instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME) {
-    return t("TXT_CODE_5bdaf23d");
-  } else {
-    return instanceInfo.value?.config.nickname;
-  }
-});
-
-const useByteUnit = useLocalStorage("useByteUnit", true); 
-const prettyBytesConfig: PrettyOptions = {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-  binary: true
-};
-
-const getUsageColor = (percentage?: number) => {
-  percentage = Number(percentage);
-  if (percentage > 600) return "error";
-  if (percentage > 200) return "warning";
-  return "default";
-};
-
-const formatMemoryUsage = (usage?: number, limit?: number) => {
-  const fUsage = prettyBytes(usage ?? 0, prettyBytesConfig);
-  const fLimit = prettyBytes(limit ?? 0, prettyBytesConfig);
-  return limit ? `${fUsage} / ${fLimit}` : fUsage;
-};
-
-const formatNetworkSpeed = (bytes?: number) =>
-  useByteUnit.value
-    ? prettyBytes(bytes ?? 0, { ...prettyBytesConfig, binary: false }) + "/s"
-    : prettyBytes((bytes ?? 0) * 8, { ...prettyBytesConfig, bits: true, binary: false }).replace(/bit$/, "b") + "ps";
-
-const terminalTopTags = computed<TagInfo[]>(() => {
-  const info = instanceInfo.value?.info;
-  if (!info || isStopped.value) return [];
-  const { cpuUsage, memoryUsage, memoryLimit, memoryUsagePercent, rxBytes, txBytes } = info;
-
-  return arrayFilter<TagInfo>([
-    {
-      label: t("TXT_CODE_b862a158"),
-      value: `${parseInt(String(cpuUsage))}%`,
-      color: getUsageColor(cpuUsage),
-      icon: BlockOutlined,
-      condition: () => cpuUsage != null
-    },
-    {
-      label: t("TXT_CODE_593ee330"),
-      value: formatMemoryUsage(memoryUsage, memoryLimit),
-      color: getUsageColor(memoryUsagePercent),
-      icon: DashboardOutlined,
-      condition: () => memoryUsage != null
-    },
-    {
-      label: t("TXT_CODE_50daec4"),
-      value: `↓${formatNetworkSpeed(rxBytes)} · ↑${formatNetworkSpeed(txBytes)}`,
-      icon: ApartmentOutlined,
-      condition: () => rxBytes != null || txBytes != null,
-      onClick: () => { useByteUnit.value = !useByteUnit.value; }
-    }
-  ]);
-});
-</script>
-
-<template>
-  <div v-if="innerTerminalType" class="console-wrapper">
-    <div class="mb-24">
-      <BetweenMenus>
-        <template #left>
-          <div class="align-center">
-            <a-typography-title class="mb-0 mr-12" :level="4">
-              <CloudServerOutlined />
-              <span class="ml-6"> {{ getInstanceName }} </span>
-            </a-typography-title>
-            <a-typography-paragraph v-if="!isPhone" class="mb-0 ml-4">
-              <a-tag v-if="isRunning" color="green"><CheckCircleOutlined /> {{ instanceStatusText }}</a-tag>
-              <a-tag v-else-if="isBuys" color="red"><LoadingOutlined /> {{ instanceStatusText }}</a-tag>
-              <a-tag v-else-if="instanceStatusText"><InfoCircleOutlined /> {{ instanceStatusText }}</a-tag>
-              <a-tag v-if="instanceTypeText" color="purple" class="ml-4"> {{ instanceTypeText }} </a-tag>
-            </a-typography-paragraph>
-          </div>
-        </template>
-        <template #right>
-          <div v-if="!isPhone">
-            <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
-              <a-button class="ml-8" :class="item.class" :danger="item.type === 'danger'" @click="item.click">
-                <component :is="item.icon" /> {{ item.title }}
-              </a-button>
-            </template>
-          </div>
-        </template>
-      </BetweenMenus>
-    </div>
-
-    <div class="mb-10 justify-end">
-      <TerminalTags :tags="terminalTopTags" />
-    </div>
-
-    <div class="terminal-tabs-wrapper">
-      <a-tabs v-model:activeKey="activeTab" type="card" :animated="false">
-        <a-tab-pane key="all" :tab="t('控制台')">
-          <TerminalCore
-            v-if="instanceId && daemonId"
-            :use-terminal-hook="terminalHook"
-            :instance-id="instanceId"
-            :daemon-id="daemonId"
-            :height="card.height"
-          />
-        </a-tab-pane>
-
-        <a-tab-pane key="warn" tab="WARN">
-          <TerminalCore
-            v-if="instanceId && daemonId && activeTab === 'warn'"
-            :use-terminal-hook="terminalHook"
-            :instance-id="instanceId"
-            :daemon-id="daemonId"
-            :height="card.height"
-            filter="WARN"
-          />
-        </a-tab-pane>
-
-        <a-tab-pane key="error" tab="ERROR">
-          <TerminalCore
-            v-if="instanceId && daemonId && activeTab === 'error'"
-            :use-terminal-hook="terminalHook"
-            :instance-id="instanceId"
-            :daemon-id="daemonId"
-            :height="card.height"
-            filter="ERROR"
-          />
-        </a-tab-pane>
-      </a-tabs>
-    </div>
-  </div>
-
-  <CardPanel v-else class="containerWrapper" style="height: 100%">
-    <template #body>
-      <div class="mb-6">
-        <TerminalTags :tags="terminalTopTags" />
-      </div>
-      <TerminalCore
-        v-if="instanceId && daemonId"
-        :use-terminal-hook="terminalHook"
-        :instance-id="instanceId"
-        :daemon-id="daemonId"
-        :height="card.height"
-      />
-    </template>
-  </CardPanel>
-</template>
-
-
-
-<style lang="scss" scoped>
-.error-card {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: 0;
-  z-index: 10;
-  border-radius: 20px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  .error-card-container {
-    overflow: hidden;
-    max-width: 440px;
-    border: 1px solid var(--color-gray-6) !important;
-    background-color: var(--color-gray-1);
-    border-radius: 4px;
-    padding: 12px;
-    box-shadow: 0px 0px 2px var(--color-gray-7);
-  }
-
-  @media (max-width: 992px) {
-    .error-card-container {
-      max-width: 90vw !important;
-    }
-  }
-}
-.console-wrapper {
-  position: relative;
-
-  .terminal-loading {
-    z-index: 12;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-  .terminal-wrapper {
-    border: 1px solid var(--card-border-color);
-    position: relative;
-    overflow: hidden;
-    height: 100%;
-    background-color: #1e1e1e;
-    padding: 8px;
-    border-radius: 6px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    .terminal-container {
-      // min-width: 1200px;
-      height: 100%;
+    const gl = document.createElement("canvas").getContext("webgl2");
+    if (gl) {
+      // If WebGL2 is supported, use the WebGlAddon
+      const webglAddon = new WebglAddon();
+      webglAddon.onContextLoss((_) => {
+        webglAddon.dispose();
+      });
+      term.loadAddon(webglAddon);
+    } else {
+      // If WebGL2 is not supported, use the CanvasAddon
+      const canvasAddon = new CanvasAddon();
+      term.loadAddon(canvasAddon);
     }
 
-    margin-bottom: 12px;
-  }
+    term.open(element);
 
-  .command-input {
-    position: relative;
+    // Auto resize pty win size
+    fitAddon.fit();
+    refreshWindowSize(term.cols - 1, term.rows - 1);
+    fitAddonTask = setInterval(() => {
+      fitAddon.fit();
+      refreshWindowSize(term.cols - 1, term.rows - 1);
+    }, 2000);
 
-    .history {
-      display: flex;
-      max-width: 100%;
-      overflow: scroll;
-      z-index: 10;
-      position: absolute;
-      top: -35px;
-      left: 0;
+    let lastCtrlCTime = 0;
+    const ctrlCTimeThreshold = 500;
 
-      li {
-        list-style: none;
-        span {
-          padding: 3px 20px;
-          max-width: 300px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          cursor: pointer;
-        }
+    function sendInput(data: string) {
+      socket?.emit("stream/write", {
+        data: { input: data }
+      });
+    }
+
+    term.onData((data) => {
+      // If the PTY terminal is disabled, no input is sent.
+      if (
+        state.value?.config.terminalOption?.pty === false ||
+        state.value?.status === INSTANCE_STATUS_CODE.STOPPED
+      ) {
+        return;
       }
 
-      &::-webkit-scrollbar {
-        width: 0 !important;
-        height: 0 !important;
+      if (data !== "\x03") {
+        lastCtrlCTime = 0;
+        return sendInput(data);
       }
+      const now = Date.now();
+      if (now - lastCtrlCTime < ctrlCTimeThreshold) {
+        term.write("\r\n" + t("TXT_CODE_3725b37b") + "\r\n");
+        sendInput(data);
+        lastCtrlCTime = 0;
+      } else {
+        lastCtrlCTime = now;
+        term.write("\r\n" + t("TXT_CODE_3fd222b0"));
+      }
+    });
+
+    return term;
+  };
+
+  const clearTerminal = () => {
+    terminal.value?.clear();
+  };
+
+  events.on("stdout", (v: StdoutData) => {
+    if (state.value?.config?.terminalOption?.haveColor) {
+      terminal.value?.write(encodeConsoleColor(v.text));
+    } else {
+      terminal.value?.write(v.text);
+    }
+  });
+
+  const sendCommand = (command: string) => {
+    setHistory(command);
+    if (!socket?.connected) throw new Error(t("TXT_CODE_74443c8f"));
+    socket.emit("stream/input", {
+      data: {
+        command
+      }
+    });
+  };
+
+  let statusQueryTask: NodeJS.Timeout;
+  onMounted(() => {
+    statusQueryTask = setInterval(() => {
+      if (socket?.connected) socket?.emit("stream/detail", {});
+    }, 1000);
+  });
+
+  onUnmounted(() => {
+    clearInterval(fitAddonTask);
+    clearInterval(statusQueryTask);
+    events.removeAllListeners();
+    socket?.disconnect();
+    socket?.removeAllListeners();
+  });
+
+  const isStopped = computed(() => state?.value?.status === INSTANCE_STATUS_CODE.STOPPED);
+  const isRunning = computed(() => state?.value?.status === INSTANCE_STATUS_CODE.RUNNING);
+  const isBuys = computed(() => state?.value?.status === INSTANCE_STATUS_CODE.BUSY);
+
+  return {
+    events,
+    state,
+    isRunning,
+    isBuys,
+    isStopped,
+    terminal,
+    socketAddress,
+    isConnect,
+    isGlobalTerminal,
+    isDockerMode,
+    execute,
+    initTerminalWindow,
+    sendCommand,
+    clearTerminal
+  };
+}
+
+export function encodeConsoleColor(text: string) {
+  text = text.replace(/(\x1B[^m]*m)/gm, "$1;");
+  text = text.replace(/ \[([A-Za-z0-9 _\-\\.]+)]/gim, " [§3$1§r]");
+  text = text.replace(/^\[([A-Za-z0-9 _\-\\.]+)]/gim, "[§3$1§r]");
+  text = text.replace(/((["'])(.*?)\1)/gm, "§e$1§r");
+  text = text.replace(/([0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2})/gim, "§6$1§r");
+  text = text.replace(/([0-9]{2,4}[\/\-][0-9]{2,4}[\/\-][0-9]{2,4})/gim, "§6$1§r");
+  text = text.replace(/(\x1B[^m]*m);/gm, "$1");
+  // ["](.*?)["];
+  text = text.replace(/§0/gim, TERM_COLOR.TERM_TEXT_BLACK);
+  text = text.replace(/§1/gim, TERM_COLOR.TERM_TEXT_DARK_BLUE);
+  text = text.replace(/§2/gim, TERM_COLOR.TERM_TEXT_DARK_GREEN);
+  text = text.replace(/§3/gim, TERM_COLOR.TERM_TEXT_DARK_AQUA);
+  text = text.replace(/§4/gim, TERM_COLOR.TERM_TEXT_DARK_RED);
+  text = text.replace(/§5/gim, TERM_COLOR.TERM_TEXT_DARK_PURPLE);
+  text = text.replace(/§6/gim, TERM_COLOR.TERM_TEXT_GOLD);
+  text = text.replace(/§7/gim, TERM_COLOR.TERM_TEXT_GRAY);
+  text = text.replace(/§8/gim, TERM_COLOR.TERM_TEXT_DARK_GRAY);
+  text = text.replace(/§9/gim, TERM_COLOR.TERM_TEXT_BLUE);
+  text = text.replace(/§a/gim, TERM_COLOR.TERM_TEXT_GREEN);
+  text = text.replace(/§b/gim, TERM_COLOR.TERM_TEXT_AQUA);
+  text = text.replace(/§c/gim, TERM_COLOR.TERM_TEXT_RED);
+  text = text.replace(/§d/gim, TERM_COLOR.TERM_TEXT_LIGHT_PURPLE);
+  text = text.replace(/§e/gim, TERM_COLOR.TERM_TEXT_YELLOW);
+  text = text.replace(/§f/gim, TERM_COLOR.TERM_TEXT_WHITE);
+  text = text.replace(/§k/gim, TERM_COLOR.TERM_TEXT_OBFUSCATED);
+  text = text.replace(/§l/gim, TERM_COLOR.TERM_TEXT_BOLD);
+  text = text.replace(/§m/gim, TERM_COLOR.TERM_TEXT_STRIKETHROUGH);
+  text = text.replace(/§n/gim, TERM_COLOR.TERM_TEXT_UNDERLINE);
+  text = text.replace(/§o/gim, TERM_COLOR.TERM_TEXT_ITALIC);
+  text = text.replace(/§r/gim, TERM_COLOR.TERM_RESET);
+
+  text = text.replace(/&0/gim, TERM_COLOR.TERM_TEXT_BLACK);
+  text = text.replace(/&1/gim, TERM_COLOR.TERM_TEXT_DARK_BLUE);
+  text = text.replace(/&2/gim, TERM_COLOR.TERM_TEXT_DARK_GREEN);
+  text = text.replace(/&3/gim, TERM_COLOR.TERM_TEXT_DARK_AQUA);
+  text = text.replace(/&4/gim, TERM_COLOR.TERM_TEXT_DARK_RED);
+  text = text.replace(/&5/gim, TERM_COLOR.TERM_TEXT_DARK_PURPLE);
+  text = text.replace(/&6/gim, TERM_COLOR.TERM_TEXT_GOLD);
+  text = text.replace(/&7/gim, TERM_COLOR.TERM_TEXT_GRAY);
+  text = text.replace(/&8/gim, TERM_COLOR.TERM_TEXT_DARK_GRAY);
+  text = text.replace(/&9/gim, TERM_COLOR.TERM_TEXT_BLUE);
+  text = text.replace(/&a/gim, TERM_COLOR.TERM_TEXT_GREEN);
+  text = text.replace(/&b/gim, TERM_COLOR.TERM_TEXT_AQUA);
+  text = text.replace(/&c/gim, TERM_COLOR.TERM_TEXT_RED);
+  text = text.replace(/&d/gim, TERM_COLOR.TERM_TEXT_LIGHT_PURPLE);
+  text = text.replace(/&e/gim, TERM_COLOR.TERM_TEXT_YELLOW);
+  text = text.replace(/&f/gim, TERM_COLOR.TERM_TEXT_WHITE);
+  text = text.replace(/&k/gim, TERM_COLOR.TERM_TEXT_OBFUSCATED);
+  text = text.replace(/&l/gim, TERM_COLOR.TERM_TEXT_BOLD);
+  text = text.replace(/&m/gim, TERM_COLOR.TERM_TEXT_STRIKETHROUGH);
+  text = text.replace(/&n/gim, TERM_COLOR.TERM_TEXT_UNDERLINE);
+  text = text.replace(/&o/gim, TERM_COLOR.TERM_TEXT_ITALIC);
+  text = text.replace(/&r/gim, TERM_COLOR.TERM_RESET);
+
+  const RegExpStringArr = [
+    //blue
+    ["\\d{1,3}%", "true", "false"],
+    //green
+    ["information", "info", "\\(", "\\)", "\\{", "\\}", '\\"', "&lt;", "&gt;", "-->", "->", ">>>"],
+    //red
+    ["Error", "Caused by", "panic"],
+    //yellow
+    ["WARNING", "Warn"]
+  ];
+  for (const k in RegExpStringArr) {
+    for (const y in RegExpStringArr[k]) {
+      const reg = new RegExp("(" + RegExpStringArr[k][y].replace(/ /gim, "&nbsp;") + ")", "igm");
+      if (k === "0")
+        //blue
+        text = text.replace(reg, TERM_COLOR.TERM_TEXT_BLUE + "$1" + TERM_COLOR.TERM_RESET);
+      if (k === "1")
+        //green
+        text = text.replace(reg, TERM_COLOR.TERM_TEXT_DARK_GREEN + "$1" + TERM_COLOR.TERM_RESET);
+      if (k === "2")
+        //red
+        text = text.replace(reg, TERM_COLOR.TERM_TEXT_RED + "$1" + TERM_COLOR.TERM_RESET);
+      if (k === "3")
+        //yellow
+        text = text.replace(reg, TERM_COLOR.TERM_TEXT_GOLD + "$1" + TERM_COLOR.TERM_RESET);
     }
   }
+  // line ending symbol substitution
+  text = text.replace(/\r\n/gm, TERM_COLOR.TERM_RESET + "\r\n");
+  return text;
 }
-</style>
