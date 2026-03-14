@@ -1,16 +1,13 @@
 import { openLoadingDialog, useImageViewerDialog } from "@/components/fc";
 import OverwriteFilesPopUpContent from "@/components/OverwriteFilesPopUpContent.vue";
-
 import { t } from "@/lang/i18n";
 import {
   addFolder as addFolderApi,
   changePermission as changePermissionApi,
-  changePermissionBatch as changePermissionBatchApi,
   compressFile as compressFileApi,
   copyFile as copyFileApi,
   deleteFile as deleteFileApi,
   downloadAddress,
-  downloadFromUrl as downloadFromUrlAPI,
   fileList as getFileListApi,
   getFileStatus as getFileStatusApi,
   moveFile as moveFileApi,
@@ -19,13 +16,12 @@ import {
 } from "@/services/apis/fileManager";
 import uploadService from "@/services/uploadService";
 import { number2permission, permission2number } from "@/tools/permission";
-import { mapDaemonAddress, parseForwardAddress, type RemoteMappingEntry } from "@/tools/protocol";
+import { parseForwardAddress } from "@/tools/protocol";
 import { removeTrail } from "@/tools/string";
 import { reportErrorMsg } from "@/tools/validator";
 import type {
   Breadcrumb,
   DataType,
-  DownloadFileConfigItem,
   FileStatus,
   OperationForm,
   Permission
@@ -37,17 +33,7 @@ import type { Key } from "ant-design-vue/es/table/interface";
 import { v4 } from "uuid";
 import { computed, createVNode, onMounted, reactive, ref, type VNodeRef } from "vue";
 
-export function getFileConfigAddr(config: { addr: string; remoteMappings?: RemoteMappingEntry[] }) {
-  let addr = config.addr;
-  if (config.remoteMappings) {
-    const mapped = mapDaemonAddress(config.remoteMappings);
-    if (mapped) {
-      addr = mapped.addr + mapped.prefix;
-    }
-  }
-  return addr;
-}
-
+// --- 多標籤相關類型定義 ---
 interface TabItem {
   name: string;
   path: string;
@@ -55,11 +41,9 @@ interface TabItem {
   key: string;
   pushedTime: number;
 }
-
 interface TabsMap {
   [key: string]: TabItem[];
 }
-
 const TAB_LIST_KEY = "FileManagerTabMap";
 
 export const useFileManager = (instanceId: string = "", daemonId: string = "") => {
@@ -77,18 +61,62 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
   });
 
   const breadcrumbs = reactive<Breadcrumb[]>([]);
-  breadcrumbs.push({
-    path: "/",
-    name: "/",
-    disabled: false
-  });
+  // 初始麵包屑佔位，後續由 initDefaultTab 或 handleChangeTab 驅動
   const currentPath = computed(
-    () => removeTrail(breadcrumbs[breadcrumbs.length - 1].path, "/") + "/"
+    () => removeTrail(breadcrumbs[breadcrumbs.length - 1]?.path || "/", "/") + "/"
   );
 
   const currentTabKey = instanceId + daemonId;
   const currentTabs = computed(() => tabList.value[currentTabKey] ?? []);
   const activeTab = ref<string>("");
+
+  // --- 新增：路徑解析邏輯 (保持多標籤與麵包屑同步) ---
+  const parsePath = (path: string) => {
+    if (!path) return [];
+    const normalizedPath = path.replace(/\\/g, "/");
+    const driveMatch = normalizedPath.match(/^([a-zA-Z]):/);
+    const driveLetter = driveMatch ? driveMatch[1] : "";
+    const pathPart = driveLetter ? normalizedPath.slice(2) : normalizedPath;
+    const parts = pathPart.split("/").filter(Boolean);
+    const result = driveLetter ? [driveLetter] : ["/"];
+    parts.forEach((_, index) => {
+      const _currentPath = "/" + parts.slice(0, index + 1).join("/");
+      result.push(index < parts.length - 1 ? _currentPath + "/" : _currentPath);
+    });
+    return result;
+  };
+
+  const getLastNameFromPath = (path: string) => {
+    if (path === "/") return "/";
+    const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
+    const parts = cleanPath.split("/").filter((part) => part !== "");
+    return parts.length > 0 ? parts[parts.length - 1] : "/";
+  };
+
+  const updateBreadcrumbs = (path: string) => {
+    const breadcrumbPaths = parsePath(path);
+    breadcrumbs.length = 0;
+    if (breadcrumbPaths[0] !== "/") {
+      currentDisk.value = breadcrumbPaths[0];
+      breadcrumbPaths[0] = "/";
+      breadcrumbPaths.forEach((p) => {
+        breadcrumbs.push({
+          path: `${currentDisk.value}:${p}`,
+          name: getLastNameFromPath(p),
+          disabled: false
+        });
+      });
+    } else {
+      currentDisk.value = t("TXT_CODE_28124988");
+      breadcrumbPaths.forEach((p) => {
+        breadcrumbs.push({
+          path: p,
+          name: getLastNameFromPath(p),
+          disabled: false
+        });
+      });
+    }
+  };
 
   const initDefaultTab = (path = "/") => {
     const key = v4();
@@ -105,11 +133,9 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     handleChangeTab(key);
   };
 
-  // clear old tabs
   onMounted(() => {
     const oneDayInMs = 1000 * 60 * 60 * 24;
     const now = Date.now();
-
     Object.keys(tabList.value).forEach((key) => {
       const tabs = tabList.value[key];
       if (tabs && tabs.length > 0) {
@@ -117,10 +143,7 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
           if (!tab.pushedTime) return true;
           return now - tab.pushedTime < oneDayInMs;
         });
-
-        if (tabList.value[key].length === 0) {
-          delete tabList.value[key];
-        }
+        if (tabList.value[key].length === 0) delete tabList.value[key];
       }
     });
   });
@@ -133,9 +156,7 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
         initDefaultTab();
         return;
       }
-
       if (activeTab.value === key) {
-        // Prefer to switch to the previous tab; if none exists, take the last one
         const prevIndex = index > 0 ? index - 1 : currentTabs.value.length - 1;
         const nextKey = currentTabs.value[prevIndex]?.key || "";
         activeTab.value = nextKey;
@@ -167,70 +188,17 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     }
   };
 
-  const updateBreadcrumbs = (path: string) => {
-    const breadcrumbPaths = parsePath(path);
-    breadcrumbs.length = 0;
-
-    if (breadcrumbPaths[0] !== "/") {
-      // win
-      currentDisk.value = breadcrumbPaths[0];
-      breadcrumbPaths[0] = "/";
-      breadcrumbPaths.forEach((p) => {
-        breadcrumbs.push({
-          path: `${currentDisk.value}:${p}`,
-          name: getLastNameFromPath(p),
-          disabled: false
-        });
-      });
-    } else {
-      currentDisk.value = t("TXT_CODE_28124988");
-      breadcrumbPaths.forEach((p) => {
-        breadcrumbs.push({
-          path: p,
-          name: getLastNameFromPath(p),
-          disabled: false
-        });
-      });
-    }
-  };
-
   const handleChangeTab = async (key: string) => {
     const path = currentTabs.value.find((tab) => tab.key === key)?.path || "";
     activeTab.value = key;
     updateBreadcrumbs(path);
-
     spinning.value = true;
     operationForm.value.name = "";
     operationForm.value.current = 1;
     await getFileList();
     spinning.value = false;
   };
-
-  const parsePath = (path: string) => {
-    if (!path) return [];
-
-    const normalizedPath = path.replace(/\\/g, "/");
-    const driveMatch = normalizedPath.match(/^([a-zA-Z]):/);
-    const driveLetter = driveMatch ? driveMatch[1] : "";
-    const pathPart = driveLetter ? normalizedPath.slice(2) : normalizedPath;
-
-    const parts = pathPart.split("/").filter(Boolean);
-    const result = driveLetter ? [driveLetter] : ["/"];
-
-    parts.forEach((_, index) => {
-      const _currentPath = "/" + parts.slice(0, index + 1).join("/");
-      result.push(index < parts.length - 1 ? _currentPath + "/" : _currentPath);
-    });
-
-    return result;
-  };
-
-  const getLastNameFromPath = (path: string) => {
-    if (path === "/") return "/";
-    const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
-    const parts = cleanPath.split("/").filter((part) => part !== "");
-    return parts.length > 0 ? parts[parts.length - 1] : "/";
-  };
+  // ------------------------
 
   const clipboard = ref<{
     type: "copy" | "move";
@@ -264,11 +232,9 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     dialog.value.style = style || {};
     dialog.value.value = defaultValue || "";
     dialog.value.mode = mode || "";
-
     dialog.value.title = title;
     dialog.value.info = info;
     dialog.value.show = true;
-
     (dialog.value?.ref as any)?.focus();
 
     return new Promise((resolve) => {
@@ -291,19 +257,11 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     });
   };
 
-  const getFileList = async (throwErr = false, initPath?: string) => {
+  const getFileList = async (throwErr = false) => {
     const { execute } = getFileListApi();
     const thisTab = currentTabs.value.find((e) => e.key === activeTab.value);
-
     try {
       clearSelected();
-      let path;
-      if (initPath) {
-        path = initPath;
-        updateBreadcrumbs(initPath);
-      } else {
-        path = currentPath.value;
-      }
       const res = await execute({
         params: {
           daemonId: daemonId || "",
@@ -311,21 +269,13 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
           page: operationForm.value.current - 1,
           page_size: operationForm.value.pageSize,
           file_name: operationForm.value.name,
-          target: path
+          target: currentPath.value
         }
       });
       dataSource.value = res.value?.items || [];
       operationForm.value.total = res.value?.total || 0;
-      if (!thisTab) {
-        initDefaultTab(path);
-      }
+      if (!thisTab) initDefaultTab(currentPath.value);
     } catch (error: any) {
-      // if (thisTab) {
-      //   handleRemoveTab(thisTab.key);
-      // } else {
-      //   initDefaultTab();
-      // }
-
       if (throwErr) throw error;
       return reportErrorMsg(error.message);
     }
@@ -454,19 +404,15 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
       content: createVNode("div", { style: "color:red;" }, t("TXT_CODE_6a10302d")),
       async onOk() {
         if (!isMultiple.value) {
-          // one file
           await useDeleteFileApi([currentPath.value + file]);
         } else {
-          // more file
           if (!selectionData.value) return reportErrorMsg(t("TXT_CODE_f41ad30a"));
           await useDeleteFileApi(selectionData.value.map((e) => currentPath.value + e.name));
         }
       },
       okType: "danger",
-      okText: t("TXT_CODE_d507abff"),
-      class: "test"
+      okText: t("TXT_CODE_d507abff")
     });
-    return;
   };
 
   const zipFile = async () => {
@@ -535,7 +481,7 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
 
   const spinning = ref(false);
 
-  const selectedFiles = async (files: File[], overridePath?: string) => {
+  const selectedFiles = async (files: File[]) => {
     const { state: missionCfg, execute: getUploadMissionCfg } = uploadAddress();
     const fileSet = new Set(files.map((f) => ({ file: f, overwrite: false })));
     const existingFiles: typeof fileSet = new Set();
@@ -567,29 +513,20 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
           ),
           okText: t("TXT_CODE_ae09d79d"),
           cancelText: t("TXT_CODE_518528d0"),
-          onOk() {
-            onComplete(true);
-          },
-          onCancel() {
-            onComplete(false);
-          }
+          onOk() { onComplete(true); },
+          onCancel() { onComplete(false); }
         });
       });
       if (await confirmPromise) {
         if (all.value) {
-          for (const f of existingFiles) {
-            f.overwrite = overwrite.value;
-          }
+          for (const f of existingFiles) f.overwrite = overwrite.value;
           break;
         }
         f.overwrite = overwrite.value;
         existingFiles.delete(f);
       } else {
-        // skip
         if (all.value) {
-          for (const f of existingFiles) {
-            fileSet.delete(f);
-          }
+          for (const f of existingFiles) fileSet.delete(f);
           break;
         }
         existingFiles.delete(f);
@@ -601,31 +538,23 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
       try {
         await getUploadMissionCfg({
           params: {
-            upload_dir: overridePath || currentPath.value,
+            upload_dir: currentPath.value,
             daemonId: daemonId!,
             uuid: instanceId!,
             file_name: f.file.name
           }
         });
         if (!missionCfg.value) throw new Error(t("TXT_CODE_e8ce38c2"));
-
-        const addr = parseForwardAddress(getFileConfigAddr(missionCfg.value), "http");
         uploadService.append(
           f.file,
-          addr,
+          parseForwardAddress(missionCfg.value.addr, "http"),
           missionCfg.value.password,
-          {
-            overwrite: f.overwrite
-          },
+          { overwrite: f.overwrite },
           (task) => {
-            task.instanceInfo = {
-              instanceId: instanceId || "",
-              daemonId: daemonId || ""
-            };
+            task.instanceInfo = { instanceId: instanceId || "", daemonId: daemonId || "" };
           }
         );
       } catch (err: any) {
-        console.error(err);
         return reportErrorMsg(err.response?.data || err.message);
       }
     }
@@ -637,15 +566,13 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
   };
 
   const pushSelected = (key: Key, row: DataType) => {
-    const index = selectedRowKeys.value.indexOf(key);
-    if (index > -1) return;
+    if (selectedRowKeys.value.includes(key)) return;
     selectionData.value?.push(row);
     selectedRowKeys.value.push(key);
   };
 
   const oneSelected = (key: Key, row: DataType) => {
-    const index = selectedRowKeys.value.indexOf(key);
-    if (index > -1) return;
+    if (selectedRowKeys.value.includes(key)) return;
     selectionData.value = [row];
     selectedRowKeys.value = [key];
   };
@@ -660,12 +587,7 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     try {
       spinning.value = true;
       const target = currentPath.value + item;
-
-      breadcrumbs.push({
-        path: target,
-        name: item,
-        disabled: false
-      });
+      breadcrumbs.push({ path: target, name: item, disabled: false });
       operationForm.value.name = "";
       operationForm.value.current = 1;
       await getFileList(true);
@@ -674,7 +596,6 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
       if (thisTab) {
         thisTab.path = target;
         thisTab.name = item;
-        return;
       }
     } catch (error: any) {
       breadcrumbs.splice(breadcrumbs.length - 1, 1);
@@ -687,7 +608,6 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
   const getFileLink = async (fileName: string, frontDir?: string) => {
     frontDir = frontDir || currentPath.value;
     const { state: downloadCfg, execute: getDownloadCfg } = downloadAddress();
-
     try {
       await getDownloadCfg({
         params: {
@@ -697,43 +617,9 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
         }
       });
       if (!downloadCfg.value) return null;
-      const addr = parseForwardAddress(getFileConfigAddr(downloadCfg.value), "http");
-      const path = `/download/${downloadCfg.value.password}/${fileName}`;
-      return addr + path;
+      return `${parseForwardAddress(downloadCfg.value.addr, "http")}/download/${downloadCfg.value.password}/${fileName}`;
     } catch (err: any) {
-      console.error(err);
       return reportErrorMsg(err.message);
-    }
-  };
-
-  const downloadFromUrl = async (downloadConfig: DownloadFileConfigItem) => {
-    if (!downloadConfig.url) throw new Error(t("TXT_CODE_f3031262"));
-    if (!downloadConfig.fileName) throw new Error(t("TXT_CODE_7b605ad8"));
-
-    const { execute } = downloadFromUrlAPI();
-    const loadingDialog = await openLoadingDialog(
-      t("TXT_CODE_b3825da"),
-      t("TXT_CODE_2b5b8a3d"),
-      t("TXT_CODE_6f038f25")
-    );
-    try {
-      await execute({
-        params: {
-          uuid: instanceId || "",
-          daemonId: daemonId || ""
-        },
-        data: {
-          url: downloadConfig.url,
-          file_name: currentPath.value + downloadConfig.fileName
-        }
-      });
-      message.success(t("TXT_CODE_c3a933d3"));
-      await getFileList();
-    } catch (error: any) {
-      message.error(t("TXT_CODE_9ea5696b"));
-      reportErrorMsg(error.message);
-    } finally {
-      loadingDialog.cancel();
     }
   };
 
@@ -744,10 +630,10 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
   };
 
   const handleChangeDir = async (dir: string) => {
-    if (breadcrumbs.findIndex((e) => e.path === dir) === -1)
-      return reportErrorMsg(t("TXT_CODE_96281410"));
+    const idx = breadcrumbs.findIndex((e) => e.path === dir);
+    if (idx === -1) return reportErrorMsg(t("TXT_CODE_96281410"));
     spinning.value = true;
-    breadcrumbs.splice(breadcrumbs.findIndex((e) => e.path === dir) + 1);
+    breadcrumbs.splice(idx + 1);
     operationForm.value.name = "";
     operationForm.value.current = 1;
     await getFileList();
@@ -757,14 +643,12 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     if (thisTab) {
       thisTab.path = dir;
       thisTab.name = getLastNameFromPath(dir);
-      return;
     }
   };
 
   const handleTableChange = (e: { current: number; pageSize: number }) => {
     selectedRowKeys.value = [];
     selectionData.value = [];
-    // operationForm.value.name = "";
     operationForm.value.current = e.current;
     operationForm.value.pageSize = e.pageSize;
     getFileList();
@@ -778,42 +662,21 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
   const getFileStatus = async () => {
     const { state, execute } = getFileStatusApi();
     try {
-      await execute({
-        params: {
-          daemonId: daemonId || "",
-          uuid: instanceId || ""
-        }
-      });
-      if (state.value) {
-        fileStatus.value = state.value;
-      }
+      await execute({ params: { daemonId: daemonId || "", uuid: instanceId || "" } });
+      if (state.value) fileStatus.value = state.value;
     } catch (err: any) {
-      console.error(err);
       return reportErrorMsg(err.message);
     }
   };
 
   const permission = reactive<Permission>({
-    data: {
-      owner: [],
-      usergroup: [],
-      everyone: []
-    },
+    data: { owner: [], usergroup: [], everyone: [] },
     deep: false,
     loading: false,
     item: [
-      {
-        key: t("TXT_CODE_2e5d3d0f"),
-        role: "owner"
-      },
-      {
-        key: t("TXT_CODE_e7b75c0e"),
-        role: "usergroup"
-      },
-      {
-        key: t("TXT_CODE_5c54f599"),
-        role: "everyone"
-      }
+      { key: t("TXT_CODE_2e5d3d0f"), role: "owner" },
+      { key: t("TXT_CODE_e7b75c0e"), role: "usergroup" },
+      { key: t("TXT_CODE_5c54f599"), role: "everyone" }
     ]
   });
 
@@ -821,58 +684,18 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     permission.loading = true;
     permission.data = number2permission(mode);
     permission.loading = false;
-    await openDialog(t("TXT_CODE_16853efe"), "", "", "permission", {
-      maxWidth: "400px"
-    });
+    await openDialog(t("TXT_CODE_16853efe"), "", "", "permission", { maxWidth: "400px" });
+    const { execute } = changePermissionApi();
     try {
-      const chmod = permission2number(
-        permission.data.owner,
-        permission.data.usergroup,
-        permission.data.everyone
-      );
-      if (isMultiple.value) {
-        if (!selectionData.value || selectionData.value.length === 0)
-          return reportErrorMsg(t("TXT_CODE_b152cd75"));
-        const { state, execute } = changePermissionBatchApi();
-        await execute({
-          params: {
-            daemonId: daemonId || "",
-            uuid: instanceId || ""
-          },
-          data: {
-            chmod,
-            deep: permission.deep,
-            targets: selectionData.value.map((item) => currentPath.value + item.name)
-          }
-        });
-        const summary = state.value;
-        if (!summary || summary.failed === 0) {
-          message.success(t("TXT_CODE_b05948d1"));
-        } else if (summary.success === 0) {
-          message.error(t("TXT_CODE_6f8ce7f1", { total: summary.total }));
-        } else {
-          message.warning(
-            t("TXT_CODE_31b8fbd5", {
-              success: summary.success,
-              failed: summary.failed
-            })
-          );
+      await execute({
+        params: { daemonId: daemonId || "", uuid: instanceId || "" },
+        data: {
+          chmod: permission2number(permission.data.owner, permission.data.usergroup, permission.data.everyone),
+          deep: permission.deep,
+          target: currentPath.value + name
         }
-      } else {
-        const { execute } = changePermissionApi();
-        await execute({
-          params: {
-            daemonId: daemonId || "",
-            uuid: instanceId || ""
-          },
-          data: {
-            chmod,
-            deep: permission.deep,
-            target: currentPath.value + name
-          }
-        });
-        message.success(t("TXT_CODE_b05948d1"));
-      }
+      });
+      message.success(t("TXT_CODE_b05948d1"));
       await getFileList();
     } catch (err: any) {
       return reportErrorMsg(err.message);
@@ -885,18 +708,12 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
   const toDisk = async (disk: string) => {
     const diskName = disk === "/" ? disk : disk + ":\\";
     breadcrumbs.splice(0, breadcrumbs.length);
-    breadcrumbs.push({
-      path: diskName,
-      name: "/",
-      disabled: false
-    });
+    breadcrumbs.push({ path: diskName, name: "/", disabled: false });
     spinning.value = true;
     operationForm.value.name = "";
     operationForm.value.current = 1;
     const thisTab = currentTabs.value.find((e) => e.key === activeTab.value);
-    if (thisTab) {
-      thisTab.name = thisTab.path = diskName;
-    }
+    if (thisTab) thisTab.name = thisTab.path = diskName;
     await getFileList();
     spinning.value = false;
   };
@@ -945,7 +762,6 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     rowClickTable,
     downloadFile,
     getFileLink,
-    downloadFromUrl,
     handleChangeDir,
     handleTableChange,
     handleSearchChange,
