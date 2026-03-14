@@ -73,7 +73,7 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 智能日誌過濾邏輯 ---
+// --- 改進後的日誌過濾邏輯 ---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
@@ -89,42 +89,43 @@ const handleTabChange = async () => {
         data: { target: "logs/latest.log" }
       });
 
-      const rawText = typeof res === "string" ? res : "";
-      const lines = rawText.split("\n");
+      // 增加編碼相容性處理
+      const rawText = typeof res === "string" ? res : JSON.stringify(res);
+      const lines = rawText.split(/\r?\n/);
       const targetLevel = activeTab.value.toUpperCase();
       
       const resultLines: string[] = [];
       let isCapturing = false;
 
       for (const line of lines) {
-        // 匹配帶有時間戳的標題行
-        const isNewLogEntry = line.startsWith("[") && line.includes("]");
+        // 同時支持 [WARN] 和 /WARN] 兩種常見格式
+        const hasLevel = line.includes(`/${targetLevel}]`) || line.includes(`[${targetLevel}]`);
+        const isNewLogEntry = (line.startsWith("[") && line.includes("]")) || /^\d{2}:\d{2}:\d{2}/.test(line);
         
         if (isNewLogEntry) {
-          if (line.includes(`/${targetLevel}]`)) {
+          if (hasLevel) {
             isCapturing = true;
             resultLines.push(line);
           } else {
             isCapturing = false;
           }
         } else if (isCapturing && line.trim() !== "") {
-          // 捕獲緊隨標題行後的多行內容（報錯堆疊）
           resultLines.push(line);
         }
       }
       
       terminalCoreRef.value?.showLogView(
-        resultLines.length > 0 ? resultLines.join("\n") : t("最近日誌中未發現相關資訊"), 
+        resultLines.length > 0 ? resultLines.join("\n") : `--- 沒有發現 ${targetLevel} 級別的日誌 ---`, 
         false
       );
     } catch (err: any) {
       reportErrorMsg(err.message);
-      terminalCoreRef.value?.showLogView(t("無法讀取日誌文件"), false);
+      terminalCoreRef.value?.showLogView("讀取失敗：" + err.message, false);
     }
   }
 };
 
-// --- 操作按鈕 ---
+// --- 操作按鈕與強制關閉紅色底 ---
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 
 const toOpenInstance = async () => {
@@ -166,12 +167,8 @@ const quickOperations = computed(() =>
       class: "",
       click: async () => {
         try {
-          await stopInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "" }
-          });
-        } catch (error: any) {
-          reportErrorMsg(error);
-        }
+          await stopInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } });
+        } catch (error: any) { reportErrorMsg(error); }
       },
       props: { danger: true },
       condition: () => isRunning.value
@@ -189,32 +186,24 @@ const instanceOperations = computed(() =>
       class: "",
       click: async () => {
         try {
-          await restartInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "" }
-          });
-        } catch (error: any) {
-          reportErrorMsg(error);
-        }
+          await restartInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } });
+        } catch (error: any) { reportErrorMsg(error); }
       },
       props: {},
       condition: () => isRunning.value
     },
     {
-      title: t("TXT_CODE_7b67813a"),
+      title: t("TXT_CODE_7b67813a"), // 強制停止
       icon: CloseOutlined,
       noConfirm: false,
       type: "danger",
-      class: "color-warning",
+      class: "force-kill-btn", // 使用自定義類實現紅底
       click: async () => {
         try {
-          await killInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "" }
-          });
-        } catch (error: any) {
-          reportErrorMsg(error);
-        }
+          await killInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } });
+        } catch (error: any) { reportErrorMsg(error); }
       },
-      props: {},
+      props: { type: "primary", danger: true }, // 強制紅底
       condition: () => !isStopped.value
     },
     {
@@ -230,9 +219,7 @@ const instanceOperations = computed(() =>
             params: { uuid: instanceId || "", daemonId: daemonId || "", task_name: "update" },
             data: { time: new Date().getTime() }
           });
-        } catch (error: any) {
-          reportErrorMsg(error);
-        }
+        } catch (error: any) { reportErrorMsg(error); }
       },
       props: {},
       condition: () => isStopped.value && updateCmd.value
@@ -245,10 +232,7 @@ const instanceOperations = computed(() =>
       click: async () => {
         try {
           clearTerminal();
-          await openMarketDialog(daemonId ?? "", instanceId ?? "", {
-            autoInstall: true,
-            onlyDockerTemplate: isDockerMode.value
-          });
+          await openMarketDialog(daemonId ?? "", instanceId ?? "", { autoInstall: true, onlyDockerTemplate: isDockerMode.value });
         } catch (error: any) {}
       },
       props: {},
@@ -260,11 +244,7 @@ const instanceOperations = computed(() =>
       noConfirm: true,
       class: "",
       click: async () => {
-        await openRenewalDialog(
-          instanceInfo.value?.instanceUuid ?? "",
-          daemonId ?? "",
-          instanceInfo.value?.config.category ?? 0
-        );
+        await openRenewalDialog(instanceInfo.value?.instanceUuid ?? "", daemonId ?? "", instanceInfo.value?.config.category ?? 0);
       },
       props: {},
       condition: () => !!instanceInfo.value?.config?.category
@@ -273,9 +253,7 @@ const instanceOperations = computed(() =>
 );
 
 const getInstanceName = computed(() => {
-  return instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME 
-    ? t("TXT_CODE_5bdaf23d") 
-    : instanceInfo.value?.config.nickname;
+  return instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME ? t("TXT_CODE_5bdaf23d") : instanceInfo.value?.config.nickname;
 });
 
 const useByteUnit = useLocalStorage("useByteUnit", true);
@@ -348,16 +326,17 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       </BetweenMenus>
     </div>
 
-    <div class="mb-0 flex-between">
+    <div class="mb-12">
+      <TerminalTags :tags="terminalTopTags" />
+    </div>
+
+    <div class="flex-start">
       <div class="tab-controls">
         <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
           <a-radio-button value="default"><DashboardOutlined /> {{ t("控制台") }}</a-radio-button>
           <a-radio-button value="warn" class="warn-tab">WARN</a-radio-button>
           <a-radio-button value="error" class="error-tab">ERROR</a-radio-button>
         </a-radio-group>
-      </div>
-      <div class="mb-2">
-        <TerminalTags :tags="terminalTopTags" />
       </div>
     </div>
 
@@ -374,35 +353,13 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   </div>
 
   <CardPanel v-else class="containerWrapper" style="height: 100%">
-    <template #title>
-      <CloudServerOutlined /> <span class="ml-8"> {{ getInstanceName }} </span>
-    </template>
-    <template #operator>
-      <span v-for="item in quickOperations" :key="item.title" class="mr-2">
-        <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
-      </span>
-      <a-dropdown>
-        <template #overlay>
-          <a-menu>
-            <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
-              <component :is="item.icon"></component><span>&nbsp;{{ item.title }}</span>
-            </a-menu-item>
-          </a-menu>
-        </template>
-        <span><IconBtn :icon="DownOutlined" :title="t('TXT_CODE_fe731dfc')"></IconBtn></span>
-      </a-dropdown>
-    </template>
-    <template #body>
-      <div class="mb-6"><TerminalTags :tags="terminalTopTags" /></div>
-      <TerminalCore v-if="instanceId && daemonId" :use-terminal-hook="terminalHook" :instance-id="instanceId" :daemon-id="daemonId" :height="card.height" />
-    </template>
-  </CardPanel>
+    </CardPanel>
 </template>
 
 <style lang="scss" scoped>
-.flex-between { 
+.flex-start { 
   display: flex; 
-  justify-content: space-between; 
+  justify-content: flex-start; // 貼左
   align-items: flex-end; 
   width: 100%;
 }
@@ -425,16 +382,9 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         color: #ffffff;
         &::before { background-color: transparent !important; }
       }
-      &:hover { color: #fff; }
     }
-    .warn-tab.ant-radio-button-wrapper-checked {
-       border-top: 2px solid #faad14 !important;
-       color: #faad14 !important;
-    }
-    .error-tab.ant-radio-button-wrapper-checked {
-       border-top: 2px solid #ff4d4f !important;
-       color: #ff4d4f !important;
-    }
+    .warn-tab.ant-radio-button-wrapper-checked { border-top: 2px solid #faad14 !important; color: #faad14 !important; }
+    .error-tab.ant-radio-button-wrapper-checked { border-top: 2px solid #ff4d4f !important; color: #ff4d4f !important; }
   }
 }
 
@@ -443,7 +393,18 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   width: 100%;
   margin-top: -1px;
   z-index: 1;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+}
+
+// 強制關閉實例按鈕改為紅色底
+:deep(.force-kill-btn) {
+  background-color: #ff4d4f !important;
+  border-color: #ff4d4f !important;
+  color: white !important;
+  &:hover {
+    background-color: #ff7875 !important;
+    border-color: #ff7875 !important;
+  }
 }
 
 .align-center { display: flex; align-items: center; }
