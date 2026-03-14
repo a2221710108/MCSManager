@@ -62,13 +62,64 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("全伺服器副標題"), cmd: 'title @a subtitle {"text":"{text}","color":"{val}"}', placeholder: t("標題內容"), options: ["red", "yellow", "green", "blue"] },
       { label: t("發送物品欄文字"), cmd: 'title {player} actionbar {"text":"{text}","color":"{val}"}', placeholder: t("標題內容"), options: ["red", "yellow", "green", "blue"] },
       { label: t("全伺服器物品欄文字"), cmd: 'title @a actionbar {"text":"{text}","color":"{val}"}', placeholder: t("標題內容"), options: ["red", "yellow", "green", "blue"] },
-      { label: t("傳送玩家"), cmd: "tp {player} {player}" }, 
+      { label: t("傳送玩家（A傳B）"), cmd: "tp {player} {player}" }, 
       { label: t("清除玩家以外的實體"), cmd: "kill @e[type=!player]" }, 
       { label: t("清除掉落物品"), cmd: "kill @e[type=item]" }, 
       { label: t("清除所有實體"), cmd: "kill @e" }, 
       { label: t("清除玩家附近實體"), cmd: "kill @e[type=!player,distance=..{text}]", placeholder: t("半徑") }, 
       { label: t("增加經驗值"), cmd: "experience add {player} {text} points" ,placeholder: t("經驗值")},
       { label: t("設定等級"), cmd: "experience set {player} {text} levels" ,placeholder: t("等級")},
+    ]
+  },
+  {
+    group: t("遊戲規則 (傷害)"),
+    icon: SettingOutlined,
+    commands: [
+      { label: t("自然回血"), cmd: "gamerule natural_health_regeneration {val}", options: ["true", "false"] },
+      { label: t("溺水傷害"), cmd: "gamerule drowning_damage {val}", options: ["true", "false"] },
+      { label: t("摔落傷害"), cmd: "gamerule fall_damage {val}", options: ["true", "false"] },
+      { label: t("火焰傷害"), cmd: "gamerule fire_damage {val}", options: ["true", "false"] },
+      { label: t("冰凍傷害"), cmd: "gamerule freeze_damage {val}", options: ["true", "false"] },
+      { label: t("原諒死者"), cmd: "gamerule forgive_dead_players {val}", options: ["true", "false"] },
+      { label: t("怪物無差別仇恨"), cmd: "gamerule universal_anger {val}", options: ["true", "false"] },
+    ]
+  },
+  {
+    group: t("遊戲規則 (上帝)"),
+    icon: SettingOutlined,
+    commands: [
+      { label: t("死亡不掉落"), cmd: "gamerule keep_inventory {val}", options: ["true", "false"] },
+      { label: t("生物破壞地形"), cmd: "gamerule mob_griefing {val}", options: ["true", "false"] },
+      { label: t("日夜循環"), cmd: "gamerule advance_time {val}", options: ["true", "false"] },
+      { label: t("指令方塊"), cmd: "gamerule command_blocks_work {val}", options: ["true", "false"] },
+      { label: t("鞘翅移動檢測"), cmd: "gamerule elytra_movement_check {val}", options: ["true", "false"] },
+      { label: t("玩家移動檢測"), cmd: "gamerule player_movement_check {val}", options: ["true", "false"] },
+      { label: t("玩家定位條"), cmd: "gamerule locator_bar {val}", options: ["true", "false"] },
+      { label: t("積雪厚度"), cmd: "gamerule max_snow_accumulation_height {text}", placeholder: t("1 表示一格") },
+      { label: t("創造傳送門等待時間"), cmd: "gamerule players_nether_portal_creative_delay {text}", placeholder: t("20 代表一秒") },
+      { label: t("生存傳送門等待時間"), cmd: "gamerule players_nether_portal_default_delay {text}", placeholder: "80" },
+      { label: t("允許進入地獄"), cmd: "gamerule allow_entering_nether_using_portals {val}", options: ["true", "false"] },
+      { label: t("跳過夜晚睡眠比例"), cmd: "gamerule players_sleeping_percentage {text}", placeholder: t("大於100將無法跳過") },
+      { label: t("PVP"), cmd: "gamerule pvp {val}", options: ["true", "false"] },
+      { label: t("藤蔓蔓延"), cmd: "gamerule spread_vines {val}", options: ["true", "false"] },
+      { label: t("TNT爆炸"), cmd: "gamerule tnt_explodes {val}", options: ["true", "false"] },
+      { label: t("設定世界中心"), cmd: "worldborder center {text}", placeholder: "x z" },
+      { label: t("設定世界邊界"), cmd: "worldborder set {text}", placeholder: "" },
+      { label: t("重置世界邊界"), cmd: "worldborder set 59999968" },
+    ]
+  },
+  {
+    group: t("遊戲規則 (生成)"),
+    icon: SettingOutlined,
+    commands: [
+      { label: t("生物自然生成"), cmd: "gamerule spawn_mobs {val}", options: ["true", "false"] },
+      { label: t("怪物自然生成"), cmd: "gamerule spawn_monsters {val}", options: ["true", "false"] },
+      { label: t("掠奪者巡邏隊"), cmd: "gamerule spawn_patrols {val}", options: ["true", "false"] },
+      { label: t("夜魅"), cmd: "gamerule spawn_phantoms {val}", options: ["true", "false"] },
+      { label: t("流浪商人"), cmd: "gamerule spawn_wandering_traders {val}", options: ["true", "false"] },
+      { label: t("伏守者"), cmd: "gamerule spawn_wardens {val}", options: ["true", "false"] },
+      { label: t("生怪磚"), cmd: "gamerule spawner_blocks_work {val}", options: ["true", "false"] },
+      { label: t("突襲事件"), cmd: "gamerule raids {val}", options: ["true", "false"] },
     ]
   },
   {
@@ -150,57 +201,6 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("緩降"), cmd: "effect give {player} slow_falling {text} {text}", placeholder: [t("玩家"), t("秒數"), t("等級")] }, 
       { label: t("導引神力"), cmd: "effect give {player} conduit_power {text} {text}", placeholder: [t("玩家"), t("秒數"), t("等級")] }, 
       { label: t("不祥之兆"), cmd: "effect give {player} bad_omen {text} {text}", placeholder: [t("玩家"), t("秒數"), t("等級")] }, 
-    ]
-  },
-  {
-    group: t("遊戲規則 (傷害)"),
-    icon: SettingOutlined,
-    commands: [
-      { label: t("自然回血"), cmd: "gamerule natural_health_regeneration {val}", options: ["true", "false"] },
-      { label: t("溺水傷害"), cmd: "gamerule drowning_damage {val}", options: ["true", "false"] },
-      { label: t("摔落傷害"), cmd: "gamerule fall_damage {val}", options: ["true", "false"] },
-      { label: t("火焰傷害"), cmd: "gamerule fire_damage {val}", options: ["true", "false"] },
-      { label: t("冰凍傷害"), cmd: "gamerule freeze_damage {val}", options: ["true", "false"] },
-      { label: t("原諒死者"), cmd: "gamerule forgive_dead_players {val}", options: ["true", "false"] },
-      { label: t("怪物無差別仇恨"), cmd: "gamerule universal_anger {val}", options: ["true", "false"] },
-    ]
-  },
-  {
-    group: t("遊戲規則 (上帝)"),
-    icon: SettingOutlined,
-    commands: [
-      { label: t("死亡不掉落"), cmd: "gamerule keep_inventory {val}", options: ["true", "false"] },
-      { label: t("生物破壞地形"), cmd: "gamerule mob_griefing {val}", options: ["true", "false"] },
-      { label: t("日夜循環"), cmd: "gamerule advance_time {val}", options: ["true", "false"] },
-      { label: t("指令方塊"), cmd: "gamerule command_blocks_work {val}", options: ["true", "false"] },
-      { label: t("鞘翅移動檢測"), cmd: "gamerule elytra_movement_check {val}", options: ["true", "false"] },
-      { label: t("玩家移動檢測"), cmd: "gamerule player_movement_check {val}", options: ["true", "false"] },
-      { label: t("玩家定位條"), cmd: "gamerule locator_bar {val}", options: ["true", "false"] },
-      { label: t("積雪厚度"), cmd: "gamerule max_snow_accumulation_height {text}", placeholder: t("1 表示一格") },
-      { label: t("創造傳送門等待時間"), cmd: "gamerule players_nether_portal_creative_delay {text}", placeholder: t("20 代表一秒") },
-      { label: t("生存傳送門等待時間"), cmd: "gamerule players_nether_portal_default_delay {text}", placeholder: "80" },
-      { label: t("允許進入地獄"), cmd: "gamerule allow_entering_nether_using_portals {val}", options: ["true", "false"] },
-      { label: t("跳過夜晚睡眠比例"), cmd: "gamerule players_sleeping_percentage {text}", placeholder: t("大於100將無法跳過") },
-      { label: t("PVP"), cmd: "gamerule pvp {val}", options: ["true", "false"] },
-      { label: t("藤蔓蔓延"), cmd: "gamerule spread_vines {val}", options: ["true", "false"] },
-      { label: t("TNT爆炸"), cmd: "gamerule tnt_explodes {val}", options: ["true", "false"] },
-      { label: t("設定世界中心"), cmd: "worldborder center {text}", placeholder: "x z" },
-      { label: t("設定世界邊界"), cmd: "worldborder set {text}", placeholder: "" },
-      { label: t("重置世界邊界"), cmd: "worldborder set 59999968" },
-    ]
-  },
-  {
-    group: t("遊戲規則 (生成)"),
-    icon: SettingOutlined,
-    commands: [
-      { label: t("生物自然生成"), cmd: "gamerule spawn_mobs {val}", options: ["true", "false"] },
-      { label: t("怪物自然生成"), cmd: "gamerule spawn_monsters {val}", options: ["true", "false"] },
-      { label: t("掠奪者巡邏隊"), cmd: "gamerule spawn_patrols {val}", options: ["true", "false"] },
-      { label: t("夜魅"), cmd: "gamerule spawn_phantoms {val}", options: ["true", "false"] },
-      { label: t("流浪商人"), cmd: "gamerule spawn_wandering_traders {val}", options: ["true", "false"] },
-      { label: t("伏守者"), cmd: "gamerule spawn_wardens {val}", options: ["true", "false"] },
-      { label: t("生怪磚"), cmd: "gamerule spawner_blocks_work {val}", options: ["true", "false"] },
-      { label: t("突襲事件"), cmd: "gamerule raids {val}", options: ["true", "false"] },
     ]
   },
   {
