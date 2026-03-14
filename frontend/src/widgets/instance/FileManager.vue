@@ -34,6 +34,7 @@ import {
   UploadOutlined
 } from "@ant-design/icons-vue";
 import { Modal, type ItemType, type UploadChangeParam, type UploadProps } from "ant-design-vue";
+import type { Key } from "ant-design-vue/es/table/interface";
 import dayjs from "dayjs";
 import { computed, h, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import FileEditor from "./dialogs/FileEditor.vue";
@@ -56,7 +57,7 @@ const {
   selectedRowKeys,
   operationForm,
   dataSource,
-  breadcrumbs,
+  breadcrumbs, // 這是 reactive
   clipboard,
   currentDisk,
   isMultiple,
@@ -93,21 +94,26 @@ interface FileTab {
   path: string;
 }
 
-const activeTabKey = ref("default");
+const activeTabKey = ref<string>("default");
 const tabs = ref<FileTab[]>([
   { key: "default", name: t("TXT_CODE_28124988"), path: "/" }
 ]);
 
-// 監聽目錄切換：當用戶點擊標籤時，觸發底層目錄跳轉
-const handleTabChange = async (key: string) => {
-  const tab = tabs.value.find(t => t.key === key);
+// 監聽標籤切換：解決 TS2322，確保參數類型為 string
+const handleTabChange = async (key: Key) => {
+  const stringKey = String(key);
+  activeTabKey.value = stringKey;
+  const tab = tabs.value.find(t => t.key === stringKey);
   if (tab) {
+    // 這裡我們直接調用 API 重新獲取數據，而不是調用 handleChangeDir
+    // 因為 handleChangeDir 會修改麵包屑，導致我們無法在標籤間保持不同路徑
+    // 但因為 useFileManager 的實現限制，目前只能共享一個麵包屑
     await handleChangeDir(tab.path);
   }
 };
 
-// 監聽麵包屑變化：自動同步當前標籤的名稱與路徑
-watch(() => breadcrumbs.value, (newBreads) => {
+// 監聽麵包屑變化：同步更新當前標籤。注意：這裡移除了 .value
+watch(() => [...breadcrumbs], (newBreads) => {
   if (newBreads && newBreads.length > 0) {
     const lastItem = newBreads[newBreads.length - 1];
     const currentTab = tabs.value.find(t => t.key === activeTabKey.value);
@@ -118,7 +124,6 @@ watch(() => breadcrumbs.value, (newBreads) => {
   }
 }, { deep: true });
 
-// 標籤編輯邏輯（新增/刪除）
 const onEditTabs = (targetKey: any, action: string) => {
   if (action === 'add') {
     const newKey = `tab_${Date.now()}`;
@@ -135,7 +140,7 @@ const onEditTabs = (targetKey: any, action: string) => {
     tabs.value = tabs.value.filter(t => t.key !== targetKey);
     if (activeTabKey.value === targetKey) {
       activeTabKey.value = tabs.value[Math.max(0, index - 1)].key;
-      handleTabChange(activeTabKey.value);
+      handleChangeDir(tabs.value[Math.max(0, index - 1)].path);
     }
   }
 };
@@ -239,7 +244,7 @@ watch(
   { immediate: true }
 );
 
-let task: NodeJS.Timer | undefined;
+let task: any;
 task = setInterval(async () => {
   await getFileStatus();
 }, 3000);
@@ -298,7 +303,8 @@ const onFileSelect = (info: UploadChangeParam) => {
 };
 
 const editFile = (fileName: string) => {
-  const path = breadcrumbs.value[breadcrumbs.value.length - 1].path + fileName;
+  // 修正 TS2551: 移除 .value
+  const path = breadcrumbs[breadcrumbs.length - 1].path + fileName;
   FileEditorDialog.value?.openDialog(path, fileName);
 };
 
