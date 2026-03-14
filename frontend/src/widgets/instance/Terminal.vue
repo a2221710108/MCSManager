@@ -73,7 +73,7 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 改進後的日誌過濾邏輯 ---
+// --- 改進後的暴力過濾規則 ---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
@@ -89,33 +89,43 @@ const handleTabChange = async () => {
         data: { target: "logs/latest.log" }
       });
 
-      // 增加編碼相容性處理
-      const rawText = typeof res === "string" ? res : JSON.stringify(res);
+      let rawText = "";
+      if (typeof res === "string") rawText = res;
+      else if (res && typeof res === "object" && (res as any).content) rawText = (res as any).content;
+      else rawText = JSON.stringify(res);
+
       const lines = rawText.split(/\r?\n/);
-      const targetLevel = activeTab.value.toUpperCase();
-      
+      const targetLevel = activeTab.value.toUpperCase(); // "WARN" 或 "ERROR"
       const resultLines: string[] = [];
       let isCapturing = false;
 
+      // 正則解釋：\[ 匹配左中括號，然後匹配等級 WARN/ERROR，接著是 /] 或 ]
+      const levelRegex = new RegExp(`(\\[|\\/)${targetLevel}(\\]|\\:)`, 'i');
+      // 時間戳正則：匹配 [HH:mm:ss]
+      const timestampRegex = /\[\d{2}:\d{2}:\d{2}\]/;
+
       for (const line of lines) {
-        // 同時支持 [WARN] 和 /WARN] 兩種常見格式
-        const hasLevel = line.includes(`/${targetLevel}]`) || line.includes(`[${targetLevel}]`);
-        const isNewLogEntry = (line.startsWith("[") && line.includes("]")) || /^\d{2}:\d{2}:\d{2}/.test(line);
-        
-        if (isNewLogEntry) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === "") continue;
+
+        const hasTimestamp = timestampRegex.test(trimmedLine);
+        const hasLevel = levelRegex.test(trimmedLine);
+
+        if (hasTimestamp) {
           if (hasLevel) {
             isCapturing = true;
             resultLines.push(line);
           } else {
             isCapturing = false;
           }
-        } else if (isCapturing && line.trim() !== "") {
+        } else if (isCapturing) {
+          // 捕獲多行錯誤細節 (Stacktrace)
           resultLines.push(line);
         }
       }
       
       terminalCoreRef.value?.showLogView(
-        resultLines.length > 0 ? resultLines.join("\n") : `--- 沒有發現 ${targetLevel} 級別的日誌 ---`, 
+        resultLines.length > 0 ? resultLines.join("\n") : `--- 未能在 logs/latest.log 發現 ${targetLevel} ---`, 
         false
       );
     } catch (err: any) {
@@ -125,7 +135,7 @@ const handleTabChange = async () => {
   }
 };
 
-// --- 操作按鈕與強制關閉紅色底 ---
+// --- 操作按鈕與強制紅底定義 ---
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 
 const toOpenInstance = async () => {
@@ -193,17 +203,17 @@ const instanceOperations = computed(() =>
       condition: () => isRunning.value
     },
     {
-      title: t("TXT_CODE_7b67813a"), // 強制停止
+      title: t("TXT_CODE_7b67813a"),
       icon: CloseOutlined,
       noConfirm: false,
       type: "danger",
-      class: "force-kill-btn", // 使用自定義類實現紅底
+      class: "force-kill-btn", // 強制紅底按鈕類
       click: async () => {
         try {
           await killInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } });
         } catch (error: any) { reportErrorMsg(error); }
       },
-      props: { type: "primary", danger: true }, // 強制紅底
+      props: { type: "primary", danger: true },
       condition: () => !isStopped.value
     },
     {
@@ -353,13 +363,35 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   </div>
 
   <CardPanel v-else class="containerWrapper" style="height: 100%">
-    </CardPanel>
+    <template #title>
+      <CloudServerOutlined /> <span class="ml-8"> {{ getInstanceName }} </span>
+    </template>
+    <template #operator>
+      <span v-for="item in quickOperations" :key="item.title" class="mr-2">
+        <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
+      </span>
+      <a-dropdown>
+        <template #overlay>
+          <a-menu>
+            <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
+              <component :is="item.icon"></component><span>&nbsp;{{ item.title }}</span>
+            </a-menu-item>
+          </a-menu>
+        </template>
+        <span><IconBtn :icon="DownOutlined" :title="t('TXT_CODE_fe731dfc')"></IconBtn></span>
+      </a-dropdown>
+    </template>
+    <template #body>
+      <div class="mb-6"><TerminalTags :tags="terminalTopTags" /></div>
+      <TerminalCore v-if="instanceId && daemonId" :use-terminal-hook="terminalHook" :instance-id="instanceId" :daemon-id="daemonId" :height="card.height" />
+    </template>
+  </CardPanel>
 </template>
 
 <style lang="scss" scoped>
 .flex-start { 
   display: flex; 
-  justify-content: flex-start; // 貼左
+  justify-content: flex-start; 
   align-items: flex-end; 
   width: 100%;
 }
@@ -393,10 +425,10 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   width: 100%;
   margin-top: -1px;
   z-index: 1;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
-// 強制關閉實例按鈕改為紅色底
+// 強制關閉按鈕樣式
 :deep(.force-kill-btn) {
   background-color: #ff4d4f !important;
   border-color: #ff4d4f !important;
