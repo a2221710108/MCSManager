@@ -73,7 +73,7 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 智能分頁日誌過濾邏輯 ---
+// --- 智能日誌過濾邏輯 ---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
@@ -91,13 +91,13 @@ const handleTabChange = async () => {
 
       const rawText = typeof res === "string" ? res : "";
       const lines = rawText.split("\n");
-      const targetLevel = activeTab.value.toUpperCase(); // "WARN" 或 "ERROR"
+      const targetLevel = activeTab.value.toUpperCase();
       
       const resultLines: string[] = [];
       let isCapturing = false;
 
       for (const line of lines) {
-        // 匹配標題行，例如 [09:11:28] [Server thread/WARN]:
+        // 匹配帶有時間戳的標題行
         const isNewLogEntry = line.startsWith("[") && line.includes("]");
         
         if (isNewLogEntry) {
@@ -108,23 +108,23 @@ const handleTabChange = async () => {
             isCapturing = false;
           }
         } else if (isCapturing && line.trim() !== "") {
-          // 捕獲緊跟在標題行後的堆疊信息（直到下一個時間戳出現）
+          // 捕獲緊隨標題行後的多行內容（報錯堆疊）
           resultLines.push(line);
         }
       }
       
       terminalCoreRef.value?.showLogView(
-        resultLines.length > 0 ? resultLines.join("\n") : t("未在最近日誌中發現相關信息"), 
+        resultLines.length > 0 ? resultLines.join("\n") : t("最近日誌中未發現相關資訊"), 
         false
       );
     } catch (err: any) {
       reportErrorMsg(err.message);
-      terminalCoreRef.value?.showLogView(t("無法讀取日誌文件，請檢查文件是否存在。"), false);
+      terminalCoreRef.value?.showLogView(t("無法讀取日誌文件"), false);
     }
   }
 };
 
-// --- 操作按鈕與權限邏輯 ---
+// --- 操作按鈕 ---
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 
 const toOpenInstance = async () => {
@@ -151,15 +151,19 @@ const quickOperations = computed(() =>
     {
       title: t("TXT_CODE_57245e94"),
       icon: PlayCircleOutlined,
+      noConfirm: true,
       type: "default",
       class: "button-color-success",
       click: toOpenInstance,
+      props: {},
       condition: () => isStopped.value
     },
     {
       title: t("TXT_CODE_b1dedda3"),
       icon: PauseCircleOutlined,
+      noConfirm: false,
       type: "default",
+      class: "",
       click: async () => {
         try {
           await stopInstance().execute({
@@ -180,8 +184,9 @@ const instanceOperations = computed(() =>
     {
       title: t("TXT_CODE_47dcfa5"),
       icon: RedoOutlined,
+      noConfirm: false,
       type: "default",
-      noConfirm: false, // 補上這個屬性
+      class: "",
       click: async () => {
         try {
           await restartInstance().execute({
@@ -191,14 +196,15 @@ const instanceOperations = computed(() =>
           reportErrorMsg(error);
         }
       },
+      props: {},
       condition: () => isRunning.value
     },
     {
       title: t("TXT_CODE_7b67813a"),
       icon: CloseOutlined,
+      noConfirm: false,
       type: "danger",
       class: "color-warning",
-      noConfirm: false, // 補上這個屬性
       click: async () => {
         try {
           await killInstance().execute({
@@ -208,13 +214,15 @@ const instanceOperations = computed(() =>
           reportErrorMsg(error);
         }
       },
+      props: {},
       condition: () => !isStopped.value
     },
     {
       title: t("TXT_CODE_40ca4f2"),
       type: "default",
       icon: CloudDownloadOutlined,
-      noConfirm: true, // 更新操作通常不需要二次確認
+      noConfirm: true,
+      class: "",
       click: async () => {
         try {
           clearTerminal();
@@ -226,12 +234,14 @@ const instanceOperations = computed(() =>
           reportErrorMsg(error);
         }
       },
+      props: {},
       condition: () => isStopped.value && updateCmd.value
     },
     {
       title: t("TXT_CODE_b19ed1dd"),
       icon: InteractionOutlined,
-      noConfirm: true, // 打開彈窗不需要二次確認
+      noConfirm: true,
+      class: "",
       click: async () => {
         try {
           clearTerminal();
@@ -241,7 +251,23 @@ const instanceOperations = computed(() =>
           });
         } catch (error: any) {}
       },
+      props: {},
       condition: () => isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value
+    },
+    {
+      title: t("TXT_CODE_f77093c8"),
+      icon: MoneyCollectOutlined,
+      noConfirm: true,
+      class: "",
+      click: async () => {
+        await openRenewalDialog(
+          instanceInfo.value?.instanceUuid ?? "",
+          daemonId ?? "",
+          instanceInfo.value?.config.category ?? 0
+        );
+      },
+      props: {},
+      condition: () => !!instanceInfo.value?.config?.category
     }
   ])
 );
@@ -252,7 +278,6 @@ const getInstanceName = computed(() => {
     : instanceInfo.value?.config.nickname;
 });
 
-// --- 資源占用顯示格式化 ---
 const useByteUnit = useLocalStorage("useByteUnit", true);
 const prettyBytesConfig: PrettyOptions = { minimumFractionDigits: 2, maximumFractionDigits: 2, binary: true };
 
@@ -278,7 +303,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   const info = instanceInfo.value?.info;
   if (!info || isStopped.value) return [];
   const { cpuUsage, memoryUsage, memoryLimit, memoryUsagePercent, rxBytes, txBytes } = info;
-
   return arrayFilter<TagInfo>([
     { label: t("TXT_CODE_b862a158"), value: `${parseInt(String(cpuUsage))}%`, color: getUsageColor(cpuUsage), icon: BlockOutlined, condition: () => cpuUsage != null },
     { label: t("TXT_CODE_593ee330"), value: formatMemoryUsage(memoryUsage, memoryLimit), color: getUsageColor(memoryUsagePercent), icon: DashboardOutlined, condition: () => memoryUsage != null },
@@ -310,11 +334,11 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         <template #right>
           <div v-if="!isPhone">
             <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
-              <a-button v-if="item.noConfirm || item.type === 'default'" class="ml-8" :class="item.class" :danger="item.type === 'danger'" :disabled="isOpenInstanceLoading" @click="item.click">
+              <a-button v-if="item.noConfirm" class="ml-8" :class="item.class" v-bind="item.props" :disabled="isOpenInstanceLoading" @click="item.click">
                 <component :is="item.icon" /> {{ item.title }}
               </a-button>
               <a-popconfirm v-else :key="item.title" :title="t('TXT_CODE_276756b2')" @confirm="item.click">
-                <a-button class="ml-8" :danger="item.type === 'danger'" :class="item.class">
+                <a-button class="ml-8" :class="item.class" v-bind="item.props">
                   <component :is="item.icon" /> {{ item.title }}
                 </a-button>
               </a-popconfirm>
@@ -350,14 +374,36 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   </div>
 
   <CardPanel v-else class="containerWrapper" style="height: 100%">
-    </CardPanel>
+    <template #title>
+      <CloudServerOutlined /> <span class="ml-8"> {{ getInstanceName }} </span>
+    </template>
+    <template #operator>
+      <span v-for="item in quickOperations" :key="item.title" class="mr-2">
+        <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
+      </span>
+      <a-dropdown>
+        <template #overlay>
+          <a-menu>
+            <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
+              <component :is="item.icon"></component><span>&nbsp;{{ item.title }}</span>
+            </a-menu-item>
+          </a-menu>
+        </template>
+        <span><IconBtn :icon="DownOutlined" :title="t('TXT_CODE_fe731dfc')"></IconBtn></span>
+      </a-dropdown>
+    </template>
+    <template #body>
+      <div class="mb-6"><TerminalTags :tags="terminalTopTags" /></div>
+      <TerminalCore v-if="instanceId && daemonId" :use-terminal-hook="terminalHook" :instance-id="instanceId" :daemon-id="daemonId" :height="card.height" />
+    </template>
+  </CardPanel>
 </template>
 
 <style lang="scss" scoped>
 .flex-between { 
   display: flex; 
   justify-content: space-between; 
-  align-items: flex-end; // 改為底端對齊，讓分頁按鈕貼地
+  align-items: flex-end; 
   width: 100%;
 }
 
@@ -366,7 +412,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   :deep(.ant-radio-group) {
     display: flex;
     .ant-radio-button-wrapper {
-      border-bottom: none !important; // 移除底邊，與下方控制台融合
+      border-bottom: none !important;
       border-radius: 6px 6px 0 0 !important;
       background: #1e1e1e;
       color: #8c8c8c;
@@ -379,10 +425,8 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         color: #ffffff;
         &::before { background-color: transparent !important; }
       }
-
       &:hover { color: #fff; }
     }
-
     .warn-tab.ant-radio-button-wrapper-checked {
        border-top: 2px solid #faad14 !important;
        color: #faad14 !important;
@@ -397,7 +441,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 .console-section { 
   position: relative; 
   width: 100%;
-  margin-top: -1px; // 核心：向上移動 1px 覆蓋邊框達成貼合
+  margin-top: -1px;
   z-index: 1;
   margin-bottom: 20px;
 }
