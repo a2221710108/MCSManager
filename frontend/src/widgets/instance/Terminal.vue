@@ -181,6 +181,7 @@ const instanceOperations = computed(() =>
       title: t("TXT_CODE_47dcfa5"),
       icon: RedoOutlined,
       type: "default",
+      noConfirm: false, // 補上這個屬性
       click: async () => {
         try {
           await restartInstance().execute({
@@ -197,6 +198,7 @@ const instanceOperations = computed(() =>
       icon: CloseOutlined,
       type: "danger",
       class: "color-warning",
+      noConfirm: false, // 補上這個屬性
       click: async () => {
         try {
           await killInstance().execute({
@@ -212,6 +214,7 @@ const instanceOperations = computed(() =>
       title: t("TXT_CODE_40ca4f2"),
       type: "default",
       icon: CloudDownloadOutlined,
+      noConfirm: true, // 更新操作通常不需要二次確認
       click: async () => {
         try {
           clearTerminal();
@@ -228,6 +231,7 @@ const instanceOperations = computed(() =>
     {
       title: t("TXT_CODE_b19ed1dd"),
       icon: InteractionOutlined,
+      noConfirm: true, // 打開彈窗不需要二次確認
       click: async () => {
         try {
           clearTerminal();
