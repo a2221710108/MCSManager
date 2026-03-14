@@ -49,6 +49,21 @@ import { GLOBAL_INSTANCE_NAME } from "../../config/const";
 import { useTerminal, type UseTerminalHook } from "../../hooks/useTerminal";
 import { arrayFilter } from "../../tools/array";
 
+// terminal.vue
+const terminalCoreRef = ref();
+
+const onTabChange = async () => {
+  if (activeTab.value === 'default') {
+    terminalCoreRef.value?.showDefaultView();
+  } else {
+    // 獲取並過濾日誌的邏輯...
+    terminalCoreRef.value?.showLogView("", true); // 先顯示加載狀態
+    const logs = await fetchAndFilter(activeTab.value); 
+    terminalCoreRef.value?.showLogView(logs, false); // 顯示過濾後的內容
+  }
+}
+
+
 const props = defineProps<{
   card: LayoutCard;
 }>();
