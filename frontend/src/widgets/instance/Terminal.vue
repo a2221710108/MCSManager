@@ -216,9 +216,12 @@ const instanceOperations = computed(() =>
 );
 
 const getInstanceName = computed(() => {
-  return instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME
-    ? t("TXT_CODE_5bdaf23d")
-    : instanceInfo.value?.nickname || instanceInfo.value?.config.nickname;
+  // 優先從 config 取 nickname，如果沒有則顯示 ID 或預設名稱
+  const name = instanceInfo.value?.config?.nickname;
+  if (name === GLOBAL_INSTANCE_NAME) {
+    return t("TXT_CODE_5bdaf23d");
+  }
+  return name || instanceId || "Unknown Instance";
 });
 
 const useByteUnit = useLocalStorage("useByteUnit", true);
