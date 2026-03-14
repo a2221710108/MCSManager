@@ -8,7 +8,7 @@ import { useLayoutContainerStore } from "@/stores/useLayoutContainerStore";
 import { CodeOutlined, DeleteOutlined, LoadingOutlined, FileSearchOutlined } from "@ant-design/icons-vue";
 import { Terminal } from "@xterm/xterm";
 import { message } from "ant-design-vue";
-import { onMounted, ref } from "vue";
+import { onMounted, ref, onUnmounted } from "vue";
 import { encodeConsoleColor, type UseTerminalHook } from "../hooks/useTerminal";
 import { getRandomId } from "../tools/randId";
 
@@ -67,37 +67,53 @@ const initTerminal = async () => {
   if (containerState.isDesignMode) return;
   const dom = document.getElementById(terminalDomId);
   if (dom) {
-    // 修正 TS2554：恢復為單個參數，避開類型檢查
-    const term = initTerminalWindow(dom);
-    return term;
+    // 這裡調用 Hook 封裝好的 xterm 初始化邏輯
+    const termInstance = initTerminalWindow(dom);
+    return termInstance;
   }
   throw new Error(t("TXT_CODE_42bcfe0c"));
 };
 
-// --- 日誌過濾分析邏輯 ---
+// --- [核心邏輯] 歷史日誌分析 ---
 const performLogAnalysis = (rawLog: string) => {
   if (!props.filter || !term) return;
   
   const lines = rawLog.split(/\r?\n/);
-  // 分析最後 500 行
-  const last500 = lines.slice(-500);
-  
   const filterKey = props.filter.toUpperCase();
-  const filteredLines = last500.filter(line => 
+  
+  // 匹配關鍵詞：如 [WARN], WARN:, [ERROR] 等
+  const filteredLines = lines.filter(line => 
     line.toUpperCase().includes(`[${filterKey}]`) || 
     line.toUpperCase().includes(`${filterKey}:`)
-  );
+  ).slice(-500); // 只顯示最後 500 行，保證性能
 
   term.clear();
-  term.write(`\x1b[44;37m ${filterKey} 日誌分析 (最後 500 行) \x1b[0m\r\n\n`);
+  // 繪製橫幅
+  term.write(`\x1b[44;37m ${filterKey} LOG ANALYSIS (Last 500 lines) \x1b[0m\r\n\r\n`);
   
   if (filteredLines.length === 0) {
-    term.write(`\x1b[33m目前沒有發現任何 ${filterKey} 級別的信息。\x1b[0m\r\n`);
+    term.write(`\x1b[33m[LazyCloud] Currently no ${filterKey} messages found in history.\x1b[0m\r\n`);
   } else {
-    const output = filteredLines.join('\r\n');
-    term.write(state.value?.config?.terminalOption?.haveColor ? encodeConsoleColor(output) : output);
+    filteredLines.forEach(line => {
+      // 判斷是否需要進行顏色轉義
+      const output = state.value?.config?.terminalOption?.haveColor 
+        ? encodeConsoleColor(line) 
+        : line;
+      term?.write(output + '\r\n');
+    });
   }
 };
+
+// 實時輸出處理：如果是分析模式，則不渲染到終端，避免混亂
+const onStdout = (data: any) => {
+  if (props.filter) return;
+  const text = typeof data === "string" ? data : data?.text;
+  if (text && term) {
+    term.write(state.value?.config?.terminalOption?.haveColor ? encodeConsoleColor(text) : text);
+  }
+};
+
+events.on("stdout", onStdout);
 
 events.on("opened", () => {
   if (!props.filter) message.success(t("TXT_CODE_e13abbb1"));
@@ -111,21 +127,19 @@ events.on("error", (error: Error) => {
   socketError.value = error;
 });
 
+// 當 Socket 詳細信息就緒後觸發
 events.once("detail", async () => {
   try {
     const { value } = await getInstanceOutputLog().execute({
       params: { uuid: instanceId || "", daemonId: daemonId || "" }
     });
 
-    if (value) {
+    if (value && term) {
       if (props.filter) {
         performLogAnalysis(value);
       } else {
-        if (state.value?.config?.terminalOption?.haveColor) {
-          term?.write(encodeConsoleColor(value));
-        } else {
-          term?.write(value);
-        }
+        // 普通模式下，載入全量歷史
+        term.write(state.value?.config?.terminalOption?.haveColor ? encodeConsoleColor(value) : value);
       }
     }
   } catch (error: any) {}
@@ -143,27 +157,22 @@ onMounted(async () => {
     term = await initTerminal();
 
     if (term) {
-      // 修正：手動開啟自動換行，解決過濾模式下的排版問題
+      // 修正排版：分析模式下強制換行
       if (props.filter) {
         term.options.convertEol = true;
       }
 
       term.parser.registerOscHandler(11, () => true);
       term.parser.registerOscHandler(10, () => true);
-
-      const core = (term as any)._core;
-      if (core && core.coreService) {
-        const originalTriggerData = core.coreService.triggerDataEvent.bind(core.coreService);
-        core.coreService.triggerDataEvent = (data: string) => {
-          if (data.includes('\x1b[') && data.endsWith('R')) return; 
-          originalTriggerData(data);
-        };
-      }
     }
   } catch (error: any) {
     console.error(error);
-    throw error;
   }
+});
+
+onUnmounted(() => {
+  // 卸載時移除事件監聽，防止內存洩漏
+  events.off("stdout", onStdout);
 });
 </script>
 
@@ -173,7 +182,7 @@ onMounted(async () => {
       <LoadingOutlined style="font-size: 72px; color: white" />
     </div>
     
-    <div class="terminal-button-group position-absolute-right position-absolute-top">
+    <div v-if="!props.filter" class="terminal-button-group position-absolute-right position-absolute-top">
       <ul>
         <li @click="clearTerminal()">
           <a-tooltip placement="top">
@@ -225,11 +234,12 @@ onMounted(async () => {
           </template>
         </a-input>
       </template>
+
       <template v-else>
         <a-alert type="info" banner>
           <template #message>
             <span style="font-size: 12px; color: #666;">
-              <FileSearchOutlined /> 正在查看 {{ props.filter }} 日誌過濾視圖 (最後 500 行)。
+              <FileSearchOutlined /> 正在查看 {{ props.filter }} 日誌分析視圖 (最後 500 行)。
             </span>
           </template>
         </a-alert>
