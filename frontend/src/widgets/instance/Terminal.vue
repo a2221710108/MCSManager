@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from "vue";
 import CardPanel from "@/components/CardPanel.vue";
-import { openMarketDialog } from "@/components/fc";
+import { openMarketDialog, openRenewalDialog } from "@/components/fc";
 import IconBtn from "@/components/IconBtn.vue";
 import TerminalCore from "@/components/TerminalCore.vue";
 import TerminalTags from "@/components/TerminalTags.vue";
@@ -33,10 +33,13 @@ import {
   DownOutlined,
   InfoCircleOutlined,
   InteractionOutlined,
+  LaptopOutlined,
   LoadingOutlined,
+  MoneyCollectOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
-  RedoOutlined
+  RedoOutlined,
+  FileTextOutlined
 } from "@ant-design/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
 import prettyBytes, { type Options as PrettyOptions } from "pretty-bytes";
@@ -72,6 +75,7 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
+// --- 新增功能邏輯：日誌切換與過濾 ---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
@@ -81,7 +85,8 @@ const handleTabChange = async () => {
     await nextTick();
     terminalCoreRef.value?.showDefaultView();
   } else {
-    terminalCoreRef.value?.showLogView("", true);
+    // 進入日誌過濾模式
+    terminalCoreRef.value?.showLogView("", true); // 顯示 Loading
     try {
       const res: any = await fetchFile({
         params: { daemonId: daemonId ?? "", uuid: instanceId ?? "" },
@@ -95,11 +100,12 @@ const handleTabChange = async () => {
       }
 
       const lines = rawText.split(/\r?\n/);
-      const targetLevel = activeTab.value.toUpperCase(); 
+      const targetLevel = activeTab.value.toUpperCase();
       const resultLines: string[] = [];
       let isCapturing = false;
 
-      const levelRegex = new RegExp(`(\\[|\\/)${targetLevel}(\\]|\\:)`, 'i');
+      // 匹配 [WARN] 或 /WARN: 等格式
+      const levelRegex = new RegExp(`(\\[|\\/)${targetLevel}(\\]|\\:)`, "i");
       const timestampRegex = /\[\d{2}:\d{2}:\d{2}\]/;
 
       for (const line of lines) {
@@ -118,9 +124,9 @@ const handleTabChange = async () => {
           resultLines.push(line);
         }
       }
-      
+
       terminalCoreRef.value?.showLogView(
-        resultLines.length > 0 ? resultLines.join("\n") : `--- 未發現 ${targetLevel} ---`, 
+        resultLines.length > 0 ? resultLines.join("\n") : `--- 未發現 ${targetLevel} 日誌 ---`,
         false
       );
     } catch (err: any) {
@@ -128,8 +134,10 @@ const handleTabChange = async () => {
     }
   }
 };
+// ------------------------------
 
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
+
 const toOpenInstance = async () => {
   clearTerminal();
   try {
@@ -138,8 +146,16 @@ const toOpenInstance = async () => {
       if (!flag) return;
       await sleep(1000);
     }
-    await requestOpenInstance({ params: { uuid: instanceId ?? "", daemonId: daemonId ?? "" } });
-  } catch (error: any) { reportErrorMsg(error); }
+
+    await requestOpenInstance({
+      params: {
+        uuid: instanceId ?? "",
+        daemonId: daemonId ?? ""
+      }
+    });
+  } catch (error: any) {
+    reportErrorMsg(error);
+  }
 };
 
 const updateCmd = computed(() => (instanceInfo.value?.config.updateCommand ? true : false));
@@ -147,23 +163,156 @@ const instanceStatusText = computed(() => INSTANCE_STATUS[instanceInfo.value?.st
 
 const quickOperations = computed(() =>
   arrayFilter([
-    { title: t("啟動"), icon: PlayCircleOutlined, noConfirm: true, type: "default", class: "button-color-success", click: toOpenInstance, props: {}, condition: () => isStopped.value },
-    { title: t("停止"), icon: PauseCircleOutlined, noConfirm: false, type: "default", class: "", click: async () => { try { await stopInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } }); } catch (error: any) { reportErrorMsg(error); } }, props: { danger: true }, condition: () => isRunning.value }
+    {
+      title: t("TXT_CODE_57245e94"),
+      icon: PlayCircleOutlined,
+      noConfirm: false,
+      type: "default",
+      class: "button-color-success",
+      click: toOpenInstance,
+      props: {},
+      condition: () => isStopped.value
+    },
+    {
+      title: t("TXT_CODE_b1dedda3"),
+      icon: PauseCircleOutlined,
+      type: "default",
+      click: async () => {
+        try {
+          await stopInstance().execute({
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || ""
+            }
+          });
+        } catch (error: any) {
+          reportErrorMsg(error);
+        }
+      },
+      props: { danger: true },
+      condition: () => isRunning.value
+    }
   ])
 );
 
 const instanceOperations = computed(() =>
   arrayFilter([
-    { title: t("重啟"), icon: RedoOutlined, noConfirm: false, type: "default", class: "", click: async () => { try { await restartInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } }); } catch (error: any) { reportErrorMsg(error); } }, props: {}, condition: () => isRunning.value },
-    { title: t("強制停止"), icon: CloseOutlined, noConfirm: false, type: "danger", class: "force-kill-btn", click: async () => { try { await killInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "" } }); } catch (error: any) { reportErrorMsg(error); } }, props: { type: "primary", danger: true }, condition: () => !isStopped.value },
-    { title: t("更新"), type: "default", icon: CloudDownloadOutlined, noConfirm: true, class: "", click: async () => { try { clearTerminal(); await updateInstance().execute({ params: { uuid: instanceId || "", daemonId: daemonId || "", task_name: "update" }, data: { time: new Date().getTime() } }); } catch (error: any) { reportErrorMsg(error); } }, props: {}, condition: () => isStopped.value && updateCmd.value },
-    { title: t("TXT_CODE_b19ed1dd"), icon: InteractionOutlined, noConfirm: true, class: "", click: async () => { try { clearTerminal(); await openMarketDialog(daemonId ?? "", instanceId ?? "", { autoInstall: true, onlyDockerTemplate: isDockerMode.value }); } catch (error: any) {} }, props: {}, condition: () => isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value }
+    {
+      title: t("TXT_CODE_47dcfa5"),
+      icon: RedoOutlined,
+      type: "default",
+      noConfirm: false,
+      click: async () => {
+        try {
+          await restartInstance().execute({
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || ""
+            }
+          });
+        } catch (error: any) {
+          reportErrorMsg(error);
+        }
+      },
+      condition: () => isRunning.value
+    },
+    {
+      title: t("TXT_CODE_7b67813a"),
+      icon: CloseOutlined,
+      type: "danger",
+      class: "color-warning",
+      click: async () => {
+        try {
+          await killInstance().execute({
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || ""
+            }
+          });
+        } catch (error: any) {
+          reportErrorMsg(error);
+        }
+      },
+      condition: () => !isStopped.value
+    },
+    {
+      title: t("TXT_CODE_40ca4f2"),
+      type: "default",
+      icon: CloudDownloadOutlined,
+      click: async () => {
+        try {
+          clearTerminal();
+          await updateInstance().execute({
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || "",
+              task_name: "update"
+            },
+            data: {
+              time: new Date().getTime()
+            }
+          });
+        } catch (error: any) {
+          reportErrorMsg(error);
+        }
+      },
+      condition: () => isStopped.value && updateCmd.value
+    },
+    {
+      title: t("TXT_CODE_b19ed1dd"),
+      icon: InteractionOutlined,
+      noConfirm: true,
+      click: async () => {
+        try {
+          clearTerminal();
+          await openMarketDialog(daemonId ?? "", instanceId ?? "", {
+            autoInstall: true,
+            onlyDockerTemplate: isDockerMode.value
+          });
+        } catch (error: any) {}
+      },
+      props: {},
+      condition: () =>
+        isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value
+    },
+    {
+      title: t("TXT_CODE_f77093c8"),
+      icon: MoneyCollectOutlined,
+      noConfirm: true,
+      click: async () => {
+        await openRenewalDialog(
+          instanceInfo.value?.instanceUuid ?? "",
+          daemonId ?? "",
+          instanceInfo.value?.config.category ?? 0
+        );
+      },
+      props: {},
+      condition: () => !!instanceInfo.value?.config?.category
+    }
   ])
 );
 
-const getInstanceName = computed(() => instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME ? t("全局終端") : instanceInfo.value?.config.nickname);
+const getInstanceName = computed(() => {
+  if (instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME) {
+    return t("TXT_CODE_5bdaf23d");
+  } else {
+    return instanceInfo.value?.config.nickname;
+  }
+});
+
 const useByteUnit = useLocalStorage("useByteUnit", true);
-const prettyBytesConfig: PrettyOptions = { minimumFractionDigits: 2, maximumFractionDigits: 2, binary: true };
+const prettyBytesConfig: PrettyOptions = {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  binary: true
+};
+
+const getUsageColor = (percentage?: number) => {
+  percentage = Number(percentage);
+  if (percentage > 600) return "error";
+  if (percentage > 200) return "warning";
+  return "default";
+};
 
 const formatMemoryUsage = (usage?: number, limit?: number) => {
   const fUsage = prettyBytes(usage ?? 0, prettyBytesConfig);
@@ -174,120 +323,262 @@ const formatMemoryUsage = (usage?: number, limit?: number) => {
 const formatNetworkSpeed = (bytes?: number) =>
   useByteUnit.value
     ? prettyBytes(bytes ?? 0, { ...prettyBytesConfig, binary: false }) + "/s"
-    : prettyBytes((bytes ?? 0) * 8, { ...prettyBytesConfig, bits: true, binary: false }).replace(/bit$/, "b") + "ps";
+    : prettyBytes((bytes ?? 0) * 8, { ...prettyBytesConfig, bits: true, binary: false }).replace(
+        /bit$/,
+        "b"
+      ) + "ps";
 
 const terminalTopTags = computed<TagInfo[]>(() => {
   const info = instanceInfo.value?.info;
   if (!info || isStopped.value) return [];
   const { cpuUsage, memoryUsage, memoryLimit, memoryUsagePercent, rxBytes, txBytes } = info;
-  const safeCpu = cpuUsage ?? 0;
-  const safeMemPercent = memoryUsagePercent ?? 0;
 
   return arrayFilter<TagInfo>([
-    { label: t("CPU"), value: `${parseInt(String(safeCpu))}%`, color: safeCpu > 80 ? 'error' : 'default', icon: BlockOutlined, condition: () => cpuUsage != null },
-    { label: t("內存"), value: formatMemoryUsage(memoryUsage, memoryLimit), color: safeMemPercent > 90 ? 'error' : 'default', icon: DashboardOutlined, condition: () => memoryUsage != null },
-    { label: t("網絡"), value: `↓${formatNetworkSpeed(rxBytes)} · ↑${formatNetworkSpeed(txBytes)}`, icon: ApartmentOutlined, condition: () => rxBytes != null || txBytes != null, onClick: () => { useByteUnit.value = !useByteUnit.value; } }
+    {
+      label: t("TXT_CODE_b862a158"),
+      value: `${parseInt(String(cpuUsage))}%`,
+      color: getUsageColor(cpuUsage),
+      icon: BlockOutlined,
+      condition: () => cpuUsage != null
+    },
+    {
+      label: t("TXT_CODE_593ee330"),
+      value: formatMemoryUsage(memoryUsage, memoryLimit),
+      color: getUsageColor(memoryUsagePercent),
+      icon: DashboardOutlined,
+      condition: () => memoryUsage != null
+    },
+    {
+      label: t("TXT_CODE_50daec4"),
+      value: `↓${formatNetworkSpeed(rxBytes)} · ↑${formatNetworkSpeed(txBytes)}`,
+      icon: ApartmentOutlined,
+      condition: () => rxBytes != null || txBytes != null,
+      onClick: () => {
+        useByteUnit.value = !useByteUnit.value;
+      }
+    }
   ]);
 });
 </script>
 
 <template>
-  <CardPanel class="containerWrapper console-wrapper" style="height: 100%">
+  <div v-if="innerTerminalType">
+    <div class="mb-24">
+      <BetweenMenus>
+        <template #left>
+          <div class="align-center">
+            <a-typography-title class="mb-0 mr-12" :level="4">
+              <CloudServerOutlined />
+              <span class="ml-6"> {{ getInstanceName }} </span>
+            </a-typography-title>
+            <a-typography-paragraph v-if="!isPhone" class="mb-0 ml-4">
+              <span class="ml-6">
+                <a-tag v-if="isRunning" color="green">
+                  <CheckCircleOutlined />
+                  {{ instanceStatusText }}
+                </a-tag>
+                <a-tag v-else-if="isBuys" color="red">
+                  <LoadingOutlined />
+                  {{ instanceStatusText }}
+                </a-tag>
+                <a-tag v-else-if="instanceStatusText">
+                  <InfoCircleOutlined />
+                  {{ instanceStatusText }}
+                </a-tag>
+              </span>
+              <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
+
+              <span v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 0" class="ml-16">
+                <a-tooltip>
+                  <template #title> {{ t("TXT_CODE_4a37ec9c") }} </template>
+                  <LaptopOutlined />
+                </a-tooltip>
+                <span class="ml-6" style="opacity: 0.8"> {{ instanceInfo?.watcher }} </span>
+              </span>
+            </a-typography-paragraph>
+          </div>
+        </template>
+        <template #right>
+          <div v-if="!isPhone" class="align-center">
+            <a-radio-group
+              v-model:value="activeTab"
+              size="small"
+              class="mr-12"
+              @change="handleTabChange"
+            >
+              <a-radio-button value="default">{{ t("TXT_CODE_6038148b") }}</a-radio-button>
+              <a-radio-button value="warn">WARN</a-radio-button>
+              <a-radio-button value="error">ERROR</a-radio-button>
+            </a-radio-group>
+
+            <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
+              <a-button
+                v-if="item.noConfirm"
+                class="ml-8"
+                :class="item.class ? item.class : ''"
+                :danger="item.type === 'danger'"
+                :disabled="isOpenInstanceLoading"
+                @click="item.click"
+              >
+                <component :is="item.icon" />
+                {{ item.title }}
+              </a-button>
+              <a-popconfirm
+                v-else
+                :key="item.title"
+                :title="t('TXT_CODE_276756b2')"
+                @confirm="item.click"
+              >
+                <a-button
+                  class="ml-8"
+                  :danger="item.type === 'danger'"
+                  :class="item.class ? item.class : ''"
+                >
+                  <component :is="item.icon" />
+                  {{ item.title }}
+                </a-button>
+              </a-popconfirm>
+            </template>
+          </div>
+
+          <a-dropdown v-else>
+            <template #overlay>
+              <a-menu>
+                <a-menu-item-group :title="t('TXT_CODE_6038148b')">
+                  <a-menu-item @click="(activeTab = 'default'), handleTabChange()">
+                    {{ t("TXT_CODE_6038148b") }}
+                  </a-menu-item>
+                  <a-menu-item @click="(activeTab = 'warn'), handleTabChange()">WARN</a-menu-item>
+                  <a-menu-item @click="(activeTab = 'error'), handleTabChange()">ERROR</a-menu-item>
+                </a-menu-item-group>
+                <a-menu-divider />
+                <a-menu-item
+                  v-for="item in [...quickOperations, ...instanceOperations]"
+                  :key="item.title"
+                  @click="item.click"
+                >
+                  <component :is="item.icon" />
+                  {{ item.title }}
+                </a-menu-item>
+              </a-menu>
+            </template>
+            <a-button type="primary">
+              {{ t("TXT_CODE_fe731dfc") }}
+              <DownOutlined />
+            </a-button>
+          </a-dropdown>
+        </template>
+      </BetweenMenus>
+    </div>
+    <div class="mb-10 justify-end">
+      <TerminalTags :tags="terminalTopTags" />
+    </div>
+    <TerminalCore
+      ref="terminalCoreRef"
+      v-if="instanceId && daemonId"
+      :use-terminal-hook="terminalHook"
+      :instance-id="instanceId"
+      :daemon-id="daemonId"
+      :height="card.height"
+    />
+  </div>
+
+  <CardPanel v-else class="containerWrapper" style="height: 100%">
     <template #title>
       <CloudServerOutlined />
       <span class="ml-8"> {{ getInstanceName }} </span>
-      <span v-if="!isPhone" class="ml-8">
-        <a-tag v-if="isRunning" color="green"><CheckCircleOutlined /> {{ instanceStatusText }}</a-tag>
-        <a-tag v-else-if="isBuys" color="red"><LoadingOutlined /> {{ instanceStatusText }}</a-tag>
-        <a-tag v-else><InfoCircleOutlined /> {{ instanceStatusText }}</a-tag>
-        <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
+      <span class="ml-8">
+        <a-tag v-if="isRunning" color="green">
+          <CheckCircleOutlined />
+          {{ instanceStatusText }}
+        </a-tag>
+        <a-tag v-else-if="isBuys" color="red">
+          <LoadingOutlined />
+          {{ instanceStatusText }}
+        </a-tag>
+        <a-tag v-else>
+          <InfoCircleOutlined />
+          {{ instanceStatusText }}
+        </a-tag>
+        <a-tag color="purple"> {{ instanceTypeText }} </a-tag>
       </span>
     </template>
-
     <template #operator>
-      <a-radio-group v-model:value="activeTab" size="small" class="mr-12" @change="handleTabChange">
-        <a-radio-button value="default">{{ t("控制台") }}</a-radio-button>
-        <a-radio-button value="warn" class="warn-tab">WARN</a-radio-button>
-        <a-radio-button value="error" class="error-tab">ERROR</a-radio-button>
+      <a-radio-group
+        v-if="!isPhone"
+        v-model:value="activeTab"
+        size="small"
+        class="mr-8"
+        @change="handleTabChange"
+      >
+        <a-radio-button value="default"><FileTextOutlined /></a-radio-button>
+        <a-radio-button value="warn">W</a-radio-button>
+        <a-radio-button value="error">E</a-radio-button>
       </a-radio-group>
 
       <span v-for="item in quickOperations" :key="item.title" class="mr-2">
-        <IconBtn :icon="item.icon" :title="item.title" @click="item.click" />
+        <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
       </span>
       <a-dropdown>
         <template #overlay>
           <a-menu>
             <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
-              <component :is="item.icon" /><span>&nbsp;{{ item.title }}</span>
+              <component :is="item.icon"></component>
+              <span>&nbsp;{{ item.title }}</span>
             </a-menu-item>
           </a-menu>
         </template>
-        <IconBtn :icon="DownOutlined" :title="t('更多操作')" />
+        <span>
+          <IconBtn :icon="DownOutlined" :title="t('TXT_CODE_fe731dfc')"></IconBtn>
+        </span>
       </a-dropdown>
     </template>
-
     <template #body>
-      <div class="terminal-wrapper">
-        <div class="terminal-container">
-          <TerminalCore
-            ref="terminalCoreRef"
-            v-if="instanceId && daemonId"
-            :use-terminal-hook="terminalHook"
-            :instance-id="instanceId"
-            :daemon-id="daemonId"
-            :height="card.height"
-          />
-        </div>
-        <div class="terminal-tags-overlay">
-          <TerminalTags :tags="terminalTopTags" />
-        </div>
+      <div class="mb-6">
+        <TerminalTags :tags="terminalTopTags" />
       </div>
+      <TerminalCore
+        ref="terminalCoreRef"
+        v-if="instanceId && daemonId"
+        :use-terminal-hook="terminalHook"
+        :instance-id="instanceId"
+        :daemon-id="daemonId"
+        :height="card.height"
+      />
     </template>
   </CardPanel>
 </template>
 
 <style lang="scss" scoped>
+.align-center {
+  display: flex;
+  align-items: center;
+}
+
+// 保持原版終端樣式，僅對日誌視圖進行必要的深度適配
+:deep(.terminal-log-view) {
+  background: #1e1e1e;
+  padding: 12px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  color: #cccccc;
+  line-height: 1.5;
+}
+
 .console-wrapper {
   position: relative;
-  
   .terminal-wrapper {
     border: 1px solid var(--card-border-color);
-    position: relative;
     background-color: #1e1e1e;
+    padding: 8px;
     border-radius: 6px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    height: 100%;
-
     .terminal-container {
       height: 100%;
-      flex: 1;
     }
-
-    /* 資源監控貼底，保留 3px 空間 */
-    .terminal-tags-overlay {
-      padding: 0 8px 3px 8px; 
-      background: #1e1e1e;
-    }
+    margin-bottom: 12px;
   }
 }
-
-/* 修正 WARN/ERROR 顯示視圖，確保其在終端容器內撐滿 */
-:deep(.terminal-log-view) {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: #1e1e1e;
-  overflow-y: auto;
-  padding: 12px;
-  z-index: 10;
-  font-family: monospace;
-  overscroll-behavior: auto;
-}
-
-.warn-tab.ant-radio-button-wrapper-checked { border-top: 2px solid #faad14 !important; color: #faad14 !important; }
-.error-tab.ant-radio-button-wrapper-checked { border-top: 2px solid #ff4d4f !important; color: #ff4d4f !important; }
-
-.force-kill-btn { color: #ff4d4f !important; }
-.align-center { display: flex; align-items: center; }
 </style>
