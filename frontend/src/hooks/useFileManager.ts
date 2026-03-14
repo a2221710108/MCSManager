@@ -236,22 +236,26 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     });
   };
 
-  const getFileList = async (throwErr = false) => {
-    const { execute } = getFileListApi();
-    const thisTab = currentTabs.value.find((e) => e.key === activeTab.value);
-    try {
-      clearSelected();
-      const path = currentPath.value; // 使用計算出的 currentPath
-      const res = await execute({
-        params: {
-          daemonId: daemonId || "",
-          uuid: instanceId || "",
-          page: operationForm.value.current - 1,
-          page_size: operationForm.value.pageSize,
-          file_name: operationForm.value.name,
-          target: path
-        }
-      });
+  const getFileList = async (throwErr = false, specificPath?: string) => {
+  const { execute } = getFileListApi();
+  const thisTab = currentTabs.value.find((e) => e.key === activeTab.value);
+  try {
+    clearSelected();
+    
+    // 優先使用傳入的 specificPath，否則使用計算出的 currentPath
+    const path = specificPath || currentPath.value; 
+
+    const res = await execute({
+      params: {
+        daemonId: daemonId || "",
+        uuid: instanceId || "",
+        page: operationForm.value.current - 1,
+        page_size: operationForm.value.pageSize,
+        file_name: operationForm.value.name,
+        target: path
+      }
+    });
+    
       dataSource.value = res.value?.items || [];
       operationForm.value.total = res.value?.total || 0;
       
@@ -782,6 +786,7 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     operationForm,
     dataSource,
     breadcrumbs,
+    currentPath,
     permission,
     clipboard,
     selectedRowKeys,
