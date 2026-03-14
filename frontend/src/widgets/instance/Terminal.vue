@@ -386,11 +386,12 @@ const terminalTopTags = computed<TagInfo[]>(() => {
                   {{ instanceStatusText }}
                 </a-tag>
               </span>
+
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
 
               <span v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 0" class="ml-16">
                 <a-tooltip>
-                  <template #title> {{ t("TXT_CODE_4a37ec9c") }} </template>
+                  <template #title> {{ t("正在監看人數") }} </template>
                   <LaptopOutlined />
                 </a-tooltip>
                 <span class="ml-6" style="opacity: 0.8"> {{ instanceInfo?.watcher }} </span>
@@ -399,18 +400,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
           </div>
         </template>
         <template #right>
-          <div v-if="!isPhone" class="align-center">
-            <a-radio-group
-              v-model:value="activeTab"
-              size="small"
-              class="mr-12"
-              @change="handleTabChange"
-            >
-              <a-radio-button value="default">{{ t("TXT_CODE_6038148b") }}</a-radio-button>
-              <a-radio-button value="warn">WARN</a-radio-button>
-              <a-radio-button value="error">ERROR</a-radio-button>
-            </a-radio-group>
-
+          <div v-if="!isPhone">
             <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
               <a-button
                 v-if="item.noConfirm"
@@ -426,7 +416,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
               <a-popconfirm
                 v-else
                 :key="item.title"
-                :title="t('TXT_CODE_276756b2')"
+                :title="t('確認執行此操作？')"
                 @confirm="item.click"
               >
                 <a-button
@@ -444,14 +434,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
           <a-dropdown v-else>
             <template #overlay>
               <a-menu>
-                <a-menu-item-group :title="t('TXT_CODE_6038148b')">
-                  <a-menu-item @click="(activeTab = 'default'), handleTabChange()">
-                    {{ t("TXT_CODE_6038148b") }}
-                  </a-menu-item>
-                  <a-menu-item @click="(activeTab = 'warn'), handleTabChange()">WARN</a-menu-item>
-                  <a-menu-item @click="(activeTab = 'error'), handleTabChange()">ERROR</a-menu-item>
-                </a-menu-item-group>
-                <a-menu-divider />
                 <a-menu-item
                   v-for="item in [...quickOperations, ...instanceOperations]"
                   :key="item.title"
@@ -463,16 +445,27 @@ const terminalTopTags = computed<TagInfo[]>(() => {
               </a-menu>
             </template>
             <a-button type="primary">
-              {{ t("TXT_CODE_fe731dfc") }}
+              {{ t("操作") }}
               <DownOutlined />
             </a-button>
           </a-dropdown>
         </template>
       </BetweenMenus>
     </div>
-    <div class="mb-10 justify-end">
-      <TerminalTags :tags="terminalTopTags" />
+
+    <div class="mb-10 status-bar-row">
+      <div class="status-bar-left">
+        <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
+          <a-radio-button value="default">{{ t("控制台") }}</a-radio-button>
+          <a-radio-button value="warn">WARN</a-radio-button>
+          <a-radio-button value="error">ERROR</a-radio-button>
+        </a-radio-group>
+      </div>
+      <div class="status-bar-right">
+        <TerminalTags :tags="terminalTopTags" />
+      </div>
     </div>
+
     <TerminalCore
       ref="terminalCoreRef"
       v-if="instanceId && daemonId"
@@ -504,19 +497,12 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       </span>
     </template>
     <template #operator>
-      <a-radio-group
-        v-if="!isPhone"
-        v-model:value="activeTab"
-        size="small"
-        class="mr-8"
-        @change="handleTabChange"
+      <span
+        v-for="item in quickOperations"
+        :key="item.title"
+        class="mr-2"
+        v-bind="item.props"
       >
-        <a-radio-button value="default"><FileTextOutlined /></a-radio-button>
-        <a-radio-button value="warn">W</a-radio-button>
-        <a-radio-button value="error">E</a-radio-button>
-      </a-radio-group>
-
-      <span v-for="item in quickOperations" :key="item.title" class="mr-2">
         <IconBtn :icon="item.icon" :title="item.title" @click="item.click"></IconBtn>
       </span>
       <a-dropdown>
@@ -528,14 +514,23 @@ const terminalTopTags = computed<TagInfo[]>(() => {
             </a-menu-item>
           </a-menu>
         </template>
-        <span>
-          <IconBtn :icon="DownOutlined" :title="t('TXT_CODE_fe731dfc')"></IconBtn>
+        <span size="default">
+          <IconBtn :icon="DownOutlined" :title="t('操作')"></IconBtn>
         </span>
       </a-dropdown>
     </template>
     <template #body>
-      <div class="mb-6">
-        <TerminalTags :tags="terminalTopTags" />
+      <div class="mb-6 status-bar-row">
+        <div class="status-bar-left">
+          <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
+            <a-radio-button value="default">LOG</a-radio-button>
+            <a-radio-button value="warn">W</a-radio-button>
+            <a-radio-button value="error">E</a-radio-button>
+          </a-radio-group>
+        </div>
+        <div class="status-bar-right">
+          <TerminalTags :tags="terminalTopTags" />
+        </div>
       </div>
       <TerminalCore
         ref="terminalCoreRef"
@@ -550,35 +545,107 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 </template>
 
 <style lang="scss" scoped>
+// --- 新增佈局樣式 ---
+.status-bar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.status-bar-left {
+  display: flex;
+  align-items: center;
+}
+
+.status-bar-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+// --- 視圖切換按鈕極簡風格化 (Stripe 風) ---
+:deep(.ant-radio-button-wrapper) {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-weight: 500;
+  color: var(--color-gray-8);
+  &::before {
+    display: none !important;
+  }
+  &:hover {
+    color: var(--primary-color);
+  }
+}
+
+:deep(.ant-radio-button-wrapper-checked) {
+  background: var(--color-gray-3) !important;
+  border-radius: 4px;
+  color: var(--primary-color) !important;
+}
+
+// --- 日誌視圖容器 ---
+:deep(.terminal-log-view) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #1e1e1e;
+  padding: 12px;
+  z-index: 10;
+  font-family: "JetBrains Mono", monospace;
+  overflow-y: auto;
+}
+
+// --- 保留原版樣式 ---
 .align-center {
   display: flex;
   align-items: center;
 }
 
-// 保持原版終端樣式，僅對日誌視圖進行必要的深度適配
-:deep(.terminal-log-view) {
-  background: #1e1e1e;
-  padding: 12px;
-  font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 13px;
-  color: #cccccc;
-  line-height: 1.5;
+.justify-end {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.error-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 0;
+  z-index: 10;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .error-card-container {
+    overflow: hidden;
+    max-width: 440px;
+    border: 1px solid var(--color-gray-6) !important;
+    background-color: var(--color-gray-1);
+    border-radius: 4px;
+    padding: 12px;
+    box-shadow: 0px 0px 2px var(--color-gray-7);
+  }
+
+  @media (max-width: 992px) {
+    .error-card-container {
+      max-width: 90vw !important;
+    }
+  }
 }
 
 .console-wrapper {
   position: relative;
-  .terminal-wrapper {
-    border: 1px solid var(--card-border-color);
-    background-color: #1e1e1e;
-    padding: 8px;
-    border-radius: 6px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    .terminal-container {
-      height: 100%;
-    }
-    margin-bottom: 12px;
+  .terminal-loading {
+    z-index: 12;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
   }
 }
 </style>
