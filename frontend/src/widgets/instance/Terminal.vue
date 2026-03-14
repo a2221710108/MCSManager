@@ -44,9 +44,8 @@ import type { TagInfo } from "../../components/interface";
 import { GLOBAL_INSTANCE_NAME } from "../../config/const";
 import { useTerminal, type UseTerminalHook } from "../../hooks/useTerminal";
 import { arrayFilter } from "../../tools/array";
-import { ref, computed, onMounted } from "vue"; // 把需要用的都放這裡
+import { ref, computed } from "vue"; 
 
-// 標籤頁狀態：all (控制台), warn (警告), error (錯誤)
 const activeTab = ref("all");
   
 const props = defineProps<{
@@ -57,9 +56,6 @@ const { isPhone } = useScreen();
 const { state, isAdmin } = useAppStateStore();
 const { getMetaOrRouteValue } = useLayoutCardTools(props.card);
 
-// The `useTerminal` is shared by this component and `TerminalCore`.
-// Please do not initialize `useTerminal` in this component; all initialization logic should be placed in its child component `TerminalCore.vue`.
-// The state of the shared terminal is used here.
 const terminalHook: UseTerminalHook = useTerminal();
 const {
   state: instanceInfo,
@@ -103,6 +99,7 @@ const toOpenInstance = async () => {
 
 const updateCmd = computed(() => (instanceInfo.value?.config.updateCommand ? true : false));
 const instanceStatusText = computed(() => INSTANCE_STATUS[instanceInfo.value?.status ?? -1]);
+
 const quickOperations = computed(() =>
   arrayFilter([
     {
@@ -122,22 +119,18 @@ const quickOperations = computed(() =>
       click: async () => {
         try {
           await stopInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || ""
-            }
+            params: { uuid: instanceId || "", daemonId: daemonId || "" }
           });
         } catch (error: any) {
           reportErrorMsg(error);
         }
       },
-      props: {
-        danger: true
-      },
+      props: { danger: true },
       condition: () => isRunning.value
     }
   ])
 );
+
 const instanceOperations = computed(() =>
   arrayFilter([
     {
@@ -148,10 +141,7 @@ const instanceOperations = computed(() =>
       click: async () => {
         try {
           await restartInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || ""
-            }
+            params: { uuid: instanceId || "", daemonId: daemonId || "" }
           });
         } catch (error: any) {
           reportErrorMsg(error);
@@ -167,74 +157,13 @@ const instanceOperations = computed(() =>
       click: async () => {
         try {
           await killInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || ""
-            }
+            params: { uuid: instanceId || "", daemonId: daemonId || "" }
           });
         } catch (error: any) {
           reportErrorMsg(error);
         }
       },
       condition: () => !isStopped.value
-    },
-    {
-      title: t("TXT_CODE_40ca4f2"),
-      type: "default",
-      icon: CloudDownloadOutlined,
-      click: async () => {
-        try {
-          clearTerminal();
-          await updateInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || "",
-              task_name: "update"
-            },
-            data: {
-              time: new Date().getTime()
-            }
-          });
-        } catch (error: any) {
-          reportErrorMsg(error);
-        }
-      },
-      condition: () => isStopped.value && updateCmd.value
-    },
-    {
-      title: t("TXT_CODE_b19ed1dd"),
-      icon: InteractionOutlined,
-      noConfirm: true,
-      click: async () => {
-        try {
-          clearTerminal();
-          await openMarketDialog(daemonId ?? "", instanceId ?? "", {
-            autoInstall: true,
-            onlyDockerTemplate: isDockerMode.value
-          });
-        } catch (error: any) {
-          // ignore
-        }
-      },
-      props: {},
-      condition: () =>
-        isStopped.value &&
-        (state.settings.allowUsePreset || isAdmin.value) &&
-        !isGlobalTerminal.value
-    },
-    {
-      title: t("TXT_CODE_f77093c8"),
-      icon: MoneyCollectOutlined,
-      noConfirm: true,
-      click: async () => {
-        await openRenewalDialog(
-          instanceInfo.value?.instanceUuid ?? "",
-          daemonId ?? "",
-          instanceInfo.value?.config.category ?? 0
-        );
-      },
-      props: {},
-      condition: () => !!instanceInfo.value?.config?.category
     }
   ])
 );
@@ -247,7 +176,7 @@ const getInstanceName = computed(() => {
   }
 });
 
-const useByteUnit = useLocalStorage("useByteUnit", true); // true: bytes, false: bits
+const useByteUnit = useLocalStorage("useByteUnit", true); 
 const prettyBytesConfig: PrettyOptions = {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -264,15 +193,13 @@ const getUsageColor = (percentage?: number) => {
 const formatMemoryUsage = (usage?: number, limit?: number) => {
   const fUsage = prettyBytes(usage ?? 0, prettyBytesConfig);
   const fLimit = prettyBytes(limit ?? 0, prettyBytesConfig);
-
   return limit ? `${fUsage} / ${fLimit}` : fUsage;
 };
 
 const formatNetworkSpeed = (bytes?: number) =>
   useByteUnit.value
     ? prettyBytes(bytes ?? 0, { ...prettyBytesConfig, binary: false }) + "/s"
-    : prettyBytes((bytes ?? 0) * 8, { ...prettyBytesConfig, bits: true, binary: false }).replace(/bit$/, "b") +
-      "ps";
+    : prettyBytes((bytes ?? 0) * 8, { ...prettyBytesConfig, bits: true, binary: false }).replace(/bit$/, "b") + "ps";
 
 const terminalTopTags = computed<TagInfo[]>(() => {
   const info = instanceInfo.value?.info;
@@ -299,17 +226,14 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       value: `↓${formatNetworkSpeed(rxBytes)} · ↑${formatNetworkSpeed(txBytes)}`,
       icon: ApartmentOutlined,
       condition: () => rxBytes != null || txBytes != null,
-      onClick: () => {
-        useByteUnit.value = !useByteUnit.value;
-      }
+      onClick: () => { useByteUnit.value = !useByteUnit.value; }
     }
   ]);
 });
 </script>
 
 <template>
-  <!-- Terminal Page View -->
-  <div v-if="innerTerminalType">
+  <div v-if="innerTerminalType" class="console-wrapper">
     <div class="mb-24">
       <BetweenMenus>
         <template #left>
@@ -319,129 +243,31 @@ const terminalTopTags = computed<TagInfo[]>(() => {
               <span class="ml-6"> {{ getInstanceName }} </span>
             </a-typography-title>
             <a-typography-paragraph v-if="!isPhone" class="mb-0 ml-4">
-              <span class="ml-6">
-                <a-tag v-if="isRunning" color="green">
-                  <CheckCircleOutlined />
-                  {{ instanceStatusText }}
-                </a-tag>
-                <a-tag v-else-if="isBuys" color="red">
-                  <LoadingOutlined />
-                  {{ instanceStatusText }}
-                </a-tag>
-                <a-tag v-else-if="instanceStatusText">
-                  <InfoCircleOutlined />
-                  {{ instanceStatusText }}
-                </a-tag>
-              </span>
-
-              <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
-
-              <span
-  v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 0"
-  class="ml-16"
->
-  <a-tooltip>
-    <template #title>
-      {{ t("TXT_CODE_4a37ec9c") }}
-    </template>
-    <LaptopOutlined />
-  </a-tooltip>
-  <span class="ml-6" style="opacity: 0.8">
-    {{ instanceInfo?.watcher }}
-  </span>
-</span>
+              <a-tag v-if="isRunning" color="green"><CheckCircleOutlined /> {{ instanceStatusText }}</a-tag>
+              <a-tag v-else-if="isBuys" color="red"><LoadingOutlined /> {{ instanceStatusText }}</a-tag>
+              <a-tag v-else-if="instanceStatusText"><InfoCircleOutlined /> {{ instanceStatusText }}</a-tag>
+              <a-tag v-if="instanceTypeText" color="purple" class="ml-4"> {{ instanceTypeText }} </a-tag>
             </a-typography-paragraph>
           </div>
         </template>
         <template #right>
           <div v-if="!isPhone">
             <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
-              <a-button
-                v-if="item.noConfirm"
-                class="ml-8"
-                :class="item.class ? item.class : ''"
-                :danger="item.type === 'danger'"
-                :disabled="isOpenInstanceLoading"
-                @click="item.click"
-              >
-                <component :is="item.icon" />
-                {{ item.title }}
+              <a-button class="ml-8" :class="item.class" :danger="item.type === 'danger'" @click="item.click">
+                <component :is="item.icon" /> {{ item.title }}
               </a-button>
-              <a-popconfirm
-                v-else
-                :key="item.title"
-                :title="t('TXT_CODE_276756b2')"
-                @confirm="item.click"
-              >
-                <a-button
-                  class="ml-8"
-                  :danger="item.type === 'danger'"
-                  :class="item.class ? item.class : ''"
-                >
-                  <component :is="item.icon" />
-                  {{ item.title }}
-                </a-button>
-              </a-popconfirm>
             </template>
           </div>
-
-          <a-dropdown v-else>
-            <template #overlay>
-              <a-menu>
-                <a-menu-item
-                  v-for="item in [...quickOperations, ...instanceOperations]"
-                  :key="item.title"
-                  @click="item.click"
-                >
-                  <component :is="item.icon" />
-                  {{ item.title }}
-                </a-menu-item>
-              </a-menu>
-            </template>
-            <a-button type="primary">
-              {{ t("TXT_CODE_fe731dfc") }}
-              <DownOutlined />
-            </a-button>
-          </a-dropdown>
         </template>
       </BetweenMenus>
     </div>
-    <div class="mb-10 justify-end">
-      <TerminalTags :tags="terminalTopTags" />
-    </div>
-    <TerminalCore
-      v-if="instanceId && daemonId"
-      :use-terminal-hook="terminalHook"
-      :instance-id="instanceId"
-      :daemon-id="daemonId"
-      :height="card.height"
-    />
-  </div>
-
-  <!-- Other Page View -->
-  <CardPanel v-else class="containerWrapper" style="height: 100%">
-<template>
-  <div v-if="innerTerminalType">
-    <div class="mb-24">
-      <BetweenMenus>
-        <template #left>
-          <div class="align-center">
-            <a-typography-title class="mb-0 mr-12" :level="4">
-              <CloudServerOutlined />
-              <span class="ml-6"> {{ getInstanceName }} </span>
-            </a-typography-title>
-            </div>
-        </template>
-        </BetweenMenus>
-    </div>
 
     <div class="mb-10 justify-end">
       <TerminalTags :tags="terminalTopTags" />
     </div>
 
-    <div class="terminal-tabs-container">
+    <div class="terminal-tabs-wrapper">
       <a-tabs v-model:activeKey="activeTab" type="card" :animated="false">
-        
         <a-tab-pane key="all" :tab="t('控制台')">
           <TerminalCore
             v-if="instanceId && daemonId"
@@ -452,30 +278,27 @@ const terminalTopTags = computed<TagInfo[]>(() => {
           />
         </a-tab-pane>
 
-        <template v-if="isMinecraft">
-          <a-tab-pane key="warn" tab="WARN">
-            <TerminalCore
-              v-if="instanceId && daemonId && activeTab === 'warn'"
-              :use-terminal-hook="terminalHook"
-              :instance-id="instanceId"
-              :daemon-id="daemonId"
-              :height="card.height"
-              filter="WARN"
-            />
-          </a-tab-pane>
+        <a-tab-pane key="warn" tab="WARN">
+          <TerminalCore
+            v-if="instanceId && daemonId && activeTab === 'warn'"
+            :use-terminal-hook="terminalHook"
+            :instance-id="instanceId"
+            :daemon-id="daemonId"
+            :height="card.height"
+            filter="WARN"
+          />
+        </a-tab-pane>
 
-          <a-tab-pane key="error" tab="ERROR">
-            <TerminalCore
-              v-if="instanceId && daemonId && activeTab === 'error'"
-              :use-terminal-hook="terminalHook"
-              :instance-id="instanceId"
-              :daemon-id="daemonId"
-              :height="card.height"
-              filter="ERROR"
-            />
-          </a-tab-pane>
-        </template>
-
+        <a-tab-pane key="error" tab="ERROR">
+          <TerminalCore
+            v-if="instanceId && daemonId && activeTab === 'error'"
+            :use-terminal-hook="terminalHook"
+            :instance-id="instanceId"
+            :daemon-id="daemonId"
+            :height="card.height"
+            filter="ERROR"
+          />
+        </a-tab-pane>
       </a-tabs>
     </div>
   </div>
@@ -495,6 +318,8 @@ const terminalTopTags = computed<TagInfo[]>(() => {
     </template>
   </CardPanel>
 </template>
+
+
 
 <style lang="scss" scoped>
 .error-card {
