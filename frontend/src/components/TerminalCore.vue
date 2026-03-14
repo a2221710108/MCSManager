@@ -271,19 +271,19 @@ onMounted(async () => {
 </template>
 
 <style lang="scss" scoped>
-/* 錯誤提示卡片樣式 - 保持原樣但確保層級正確 */
+/* 錯誤提示卡片 - 保持原樣 */
 .error-card {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   top: 0;
-  z-index: 20; // 提高層級，確保蓋過所有內容
-  border-radius: 20px;
+  z-index: 20;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.3); // 增加一點遮罩感
+  background-color: rgba(0, 0, 0, 0.4);
 
   .error-card-container {
     overflow: hidden;
@@ -294,83 +294,36 @@ onMounted(async () => {
     padding: 16px;
     box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
   }
-
-  @media (max-width: 992px) {
-    .error-card-container {
-      max-width: 90vw !important;
-    }
-  }
 }
 
 .console-wrapper {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%; // 繼承父組件傳入的高度
+  height: 100%;
   width: 100%;
 
-  /* 實時終端與靜態視圖的封裝容器 */
-  .realtime-terminal-container, 
-  .static-log-view-wrapper {
+  /* 實時終端容器 */
+  .realtime-terminal-container {
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 100%;
   }
 
-  .terminal-loading {
-    z-index: 12;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-  /* 終端操作按鈕組 (清屏等) */
-  .terminal-button-group {
-    z-index: 11;
-    margin-right: 20px;
-    color: #fff;
-
-    &:hover {
-      ul {
-        transition: opacity 0.3s;
-        opacity: 0.8;
-      }
-    }
-
-    ul {
-      display: flex;
-      opacity: 0;
-      margin: 0;
-      padding: 0;
-
-      li {
-        cursor: pointer;
-        list-style: none;
-        padding: 5px;
-        margin-left: 5px;
-        border-radius: 6px;
-        font-size: 20px;
-        &:hover {
-          background-color: #3e3e3e;
-        }
-      }
-    }
-  }
-
-  /* 終端視窗主容器 */
+  /* 終端視窗主體 - 與 Xterm 顏色統一 */
   .terminal-wrapper {
-    flex: 1; // 核心：自動佔據上方剩餘所有空間
+    flex: 1;
     border: 1px solid var(--card-border-color);
     position: relative;
-    background-color: #1e1e1e;
+    background-color: #1e1e1e; // Xterm 背景色
     padding: 8px;
     border-radius: 6px;
-    overflow: hidden; // 必須隱藏溢出，交給內層控制
+    border-top-left-radius: 0; // 核心：貼合上方分頁按鈕
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    margin-bottom: 12px; // 與下方輸入框保持間距
+    margin-bottom: 8px;
 
     .terminal-container {
       flex: 1;
@@ -379,10 +332,10 @@ onMounted(async () => {
     }
   }
 
-  /* 指令輸入框容器 */
+  /* 指令輸入框 - 確保不與終端重疊 */
   .command-input {
     position: relative;
-    flex-shrink: 0; // 核心：禁止被壓縮，確保輸入框始終可見
+    flex-shrink: 0;
     width: 100%;
     z-index: 10;
 
@@ -394,7 +347,6 @@ onMounted(async () => {
       position: absolute;
       top: -35px;
       left: 0;
-
       li {
         list-style: none;
         margin-right: 4px;
@@ -406,30 +358,61 @@ onMounted(async () => {
           cursor: pointer;
         }
       }
-
-      &::-webkit-scrollbar {
-        height: 0 !important;
-      }
+      &::-webkit-scrollbar { height: 0 !important; }
     }
   }
 
-  .terminal-design-tip {
-    color: rgba(255, 255, 255, 0.4);
-    padding: 20px;
-    text-align: center;
+  /* 頂部操作組 (清屏等) */
+  .terminal-button-group {
+    z-index: 11;
+    position: absolute;
+    top: 12px;
+    right: 20px;
+    color: #fff;
+
+    ul {
+      display: flex;
+      opacity: 0;
+      transition: opacity 0.3s;
+      margin: 0;
+      padding: 0;
+      li {
+        cursor: pointer;
+        list-style: none;
+        padding: 5px;
+        margin-left: 5px;
+        border-radius: 4px;
+        font-size: 18px;
+        &:hover { background-color: rgba(255, 255, 255, 0.1); }
+      }
+    }
+
+    &:hover ul { opacity: 0.8; }
   }
 }
 
-/* 靜態日誌視圖專屬樣式 */
+/* 靜態日誌視圖 (WARN/ERROR 分頁) */
 .static-log-view-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: #1e1e1e;
+  border: 1px solid var(--card-border-color);
+  border-radius: 6px;
+  border-top-left-radius: 0; // 核心：貼合上方分頁按鈕
+  overflow: hidden;
+  margin-bottom: 8px;
+
   .static-log-content {
     flex: 1;
     overflow-y: auto;
     padding: 12px;
     color: #d4d4d4;
-    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    /* 強制使用與終端一致的等寬字體 */
+    font-family: "Menlo", "Monaco", "Consolas", "Courier New", monospace;
     font-size: 13px;
-    line-height: 1.6;
+    line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-all;
     background-color: #1e1e1e;
@@ -441,30 +424,39 @@ onMounted(async () => {
       border: none;
       padding: 0;
     }
-  }
 
-  :deep(.ant-spin-nested-loading) {
-    height: 100%;
-    .ant-spin-container {
-      height: 100%;
-      display: flex;
-      flex-direction: column;
+    /* 滾動條美化 - 讓它看起來更像終端內部滾動 */
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+    &::-webkit-scrollbar-track {
+      background: #1e1e1e;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 4px;
+      &:hover { background: #444; }
     }
   }
+
+  /* 確保 Spin 加載動畫覆蓋整個區域 */
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.terminal-loading {
+  z-index: 12;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 /* 全域輔助類 */
-.flex-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.flex-column {
-  flex-direction: column;
-}
-
-.mt-10 {
-  margin-top: 10px;
-}
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.mt-10 { margin-top: 10px; }
 </style>
