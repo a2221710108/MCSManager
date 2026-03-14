@@ -16,7 +16,6 @@ import {
   stopInstance,
   updateInstance
 } from "@/services/apis/instance";
-// 引入你提供的檔案讀取 API
 import { fileContent } from "@/services/apis/fileManager";
 import { useAppStateStore } from "@/stores/useAppStateStore";
 import { sleep } from "@/tools/common";
@@ -34,13 +33,11 @@ import {
   DownOutlined,
   InfoCircleOutlined,
   InteractionOutlined,
-  LaptopOutlined,
   LoadingOutlined,
   MoneyCollectOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
-  RedoOutlined,
-  FileTextOutlined
+  RedoOutlined
 } from "@ant-design/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
 import prettyBytes, { type Options as PrettyOptions } from "pretty-bytes";
@@ -48,21 +45,6 @@ import type { TagInfo } from "../../components/interface";
 import { GLOBAL_INSTANCE_NAME } from "../../config/const";
 import { useTerminal, type UseTerminalHook } from "../../hooks/useTerminal";
 import { arrayFilter } from "../../tools/array";
-
-// terminal.vue
-const terminalCoreRef = ref();
-
-const onTabChange = async () => {
-  if (activeTab.value === 'default') {
-    terminalCoreRef.value?.showDefaultView();
-  } else {
-    // 獲取並過濾日誌的邏輯...
-    terminalCoreRef.value?.showLogView("", true); // 先顯示加載狀態
-    const logs = await fetchAndFilter(activeTab.value); 
-    terminalCoreRef.value?.showLogView(logs, false); // 顯示過濾後的內容
-  }
-}
-
 
 const props = defineProps<{
   card: LayoutCard;
@@ -91,53 +73,44 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 新增分頁邏輯開始 ---
+// --- 修正後的邏輯控制開始 ---
+const terminalCoreRef = ref(); // 必須對應到模板中的 ref="terminalCoreRef"
 const activeTab = ref("default");
-const filteredLogs = ref("");
-const isLogLoading = ref(false);
 const { execute: fetchFile } = fileContent();
 
-const loadAndFilterLogs = async (type: string) => {
-  if (type === "default") return;
-  isLogLoading.value = true;
-  try {
-    const res = await fetchFile({
-      params: {
-        daemonId: daemonId ?? "",
-        uuid: instanceId ?? ""
-      },
-      data: {
-        target: "/workspace/logs/latest.log"
+const handleTabChange = async () => {
+  if (activeTab.value === "default") {
+    terminalCoreRef.value?.showDefaultView();
+  } else {
+    // 1. 先通知子組件進入加載狀態
+    terminalCoreRef.value?.showLogView("", true);
+    
+    try {
+      const res = await fetchFile({
+        params: { daemonId: daemonId ?? "", uuid: instanceId ?? "" },
+        data: { target: "/workspace/logs/latest.log" }
+      });
+
+      const rawText = typeof res === "string" ? res : "";
+      const lines = rawText.split("\n");
+      const last500Lines = lines.slice(-500);
+
+      let logs = "";
+      if (activeTab.value === "warn") {
+        logs = last500Lines.filter(l => l.toUpperCase().includes("WARN") || l.toUpperCase().includes("WARNING")).join("\n");
+      } else if (activeTab.value === "error") {
+        logs = last500Lines.filter(l => l.toUpperCase().includes("ERROR") || l.toUpperCase().includes("FATAL")).join("\n");
       }
-    });
-
-    const rawText = typeof res === "string" ? res : "";
-    const lines = rawText.split("\n");
-    // 取最後 500 行
-    const last500Lines = lines.slice(-500);
-
-    if (type === "warn") {
-      filteredLogs.value = last500Lines
-        .filter((l) => l.toUpperCase().includes("WARN") || l.toUpperCase().includes("WARNING"))
-        .join("\n");
-    } else if (type === "error") {
-      filteredLogs.value = last500Lines
-        .filter((l) => l.toUpperCase().includes("ERROR") || l.toUpperCase().includes("FATAL"))
-        .join("\n");
+      
+      // 2. 傳遞過濾後的內容給子組件
+      terminalCoreRef.value?.showLogView(logs, false);
+    } catch (err: any) {
+      reportErrorMsg(err.message);
+      terminalCoreRef.value?.showLogView("", false);
     }
-  } catch (err: any) {
-    reportErrorMsg(err.message);
-  } finally {
-    isLogLoading.value = false;
   }
 };
-
-const handleTabChange = () => {
-  if (activeTab.value !== "default") {
-    loadAndFilterLogs(activeTab.value);
-  }
-};
-// --- 新增分頁邏輯結束 ---
+// --- 修正後的邏輯控制結束 ---
 
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 
@@ -151,10 +124,7 @@ const toOpenInstance = async () => {
     }
 
     await requestOpenInstance({
-      params: {
-        uuid: instanceId ?? "",
-        daemonId: daemonId ?? ""
-      }
+      params: { uuid: instanceId ?? "", daemonId: daemonId ?? "" }
     });
   } catch (error: any) {
     reportErrorMsg(error);
@@ -183,18 +153,13 @@ const quickOperations = computed(() =>
       click: async () => {
         try {
           await stopInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || ""
-            }
+            params: { uuid: instanceId || "", daemonId: daemonId || "" }
           });
         } catch (error: any) {
           reportErrorMsg(error);
         }
       },
-      props: {
-        danger: true
-      },
+      props: { danger: true },
       condition: () => isRunning.value
     }
   ])
@@ -210,10 +175,7 @@ const instanceOperations = computed(() =>
       click: async () => {
         try {
           await restartInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || ""
-            }
+            params: { uuid: instanceId || "", daemonId: daemonId || "" }
           });
         } catch (error: any) {
           reportErrorMsg(error);
@@ -229,10 +191,7 @@ const instanceOperations = computed(() =>
       click: async () => {
         try {
           await killInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || ""
-            }
+            params: { uuid: instanceId || "", daemonId: daemonId || "" }
           });
         } catch (error: any) {
           reportErrorMsg(error);
@@ -248,14 +207,8 @@ const instanceOperations = computed(() =>
         try {
           clearTerminal();
           await updateInstance().execute({
-            params: {
-              uuid: instanceId || "",
-              daemonId: daemonId || "",
-              task_name: "update"
-            },
-            data: {
-              time: new Date().getTime()
-            }
+            params: { uuid: instanceId || "", daemonId: daemonId || "", task_name: "update" },
+            data: { time: new Date().getTime() }
           });
         } catch (error: any) {
           reportErrorMsg(error);
@@ -274,28 +227,17 @@ const instanceOperations = computed(() =>
             autoInstall: true,
             onlyDockerTemplate: isDockerMode.value
           });
-        } catch (error: any) {
-          // ignore
-        }
+        } catch (error: any) {}
       },
-      props: {},
-      condition: () =>
-        isStopped.value &&
-        (state.settings.allowUsePreset || isAdmin.value) &&
-        !isGlobalTerminal.value
+      condition: () => isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value
     },
     {
       title: t("TXT_CODE_f77093c8"),
       icon: MoneyCollectOutlined,
       noConfirm: true,
       click: async () => {
-        await openRenewalDialog(
-          instanceInfo.value?.instanceUuid ?? "",
-          daemonId ?? "",
-          instanceInfo.value?.config.category ?? 0
-        );
+        await openRenewalDialog(instanceInfo.value?.instanceUuid ?? "", daemonId ?? "", instanceInfo.value?.config.category ?? 0);
       },
-      props: {},
       condition: () => !!instanceInfo.value?.config?.category
     }
   ])
@@ -310,11 +252,7 @@ const getInstanceName = computed(() => {
 });
 
 const useByteUnit = useLocalStorage("useByteUnit", true);
-const prettyBytesConfig: PrettyOptions = {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-  binary: true
-};
+const prettyBytesConfig: PrettyOptions = { minimumFractionDigits: 2, maximumFractionDigits: 2, binary: true };
 
 const getUsageColor = (percentage?: number) => {
   percentage = Number(percentage);
@@ -332,10 +270,7 @@ const formatMemoryUsage = (usage?: number, limit?: number) => {
 const formatNetworkSpeed = (bytes?: number) =>
   useByteUnit.value
     ? prettyBytes(bytes ?? 0, { ...prettyBytesConfig, binary: false }) + "/s"
-    : prettyBytes((bytes ?? 0) * 8, { ...prettyBytesConfig, bits: true, binary: false }).replace(
-        /bit$/,
-        "b"
-      ) + "ps";
+    : prettyBytes((bytes ?? 0) * 8, { ...prettyBytesConfig, bits: true, binary: false }).replace(/bit$/, "b") + "ps";
 
 const terminalTopTags = computed<TagInfo[]>(() => {
   const info = instanceInfo.value?.info;
@@ -343,29 +278,9 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   const { cpuUsage, memoryUsage, memoryLimit, memoryUsagePercent, rxBytes, txBytes } = info;
 
   return arrayFilter<TagInfo>([
-    {
-      label: t("TXT_CODE_b862a158"),
-      value: `${parseInt(String(cpuUsage))}%`,
-      color: getUsageColor(cpuUsage),
-      icon: BlockOutlined,
-      condition: () => cpuUsage != null
-    },
-    {
-      label: t("TXT_CODE_593ee330"),
-      value: formatMemoryUsage(memoryUsage, memoryLimit),
-      color: getUsageColor(memoryUsagePercent),
-      icon: DashboardOutlined,
-      condition: () => memoryUsage != null
-    },
-    {
-      label: t("TXT_CODE_50daec4"),
-      value: `↓${formatNetworkSpeed(rxBytes)} · ↑${formatNetworkSpeed(txBytes)}`,
-      icon: ApartmentOutlined,
-      condition: () => rxBytes != null || txBytes != null,
-      onClick: () => {
-        useByteUnit.value = !useByteUnit.value;
-      }
-    }
+    { label: t("TXT_CODE_b862a158"), value: `${parseInt(String(cpuUsage))}%`, color: getUsageColor(cpuUsage), icon: BlockOutlined, condition: () => cpuUsage != null },
+    { label: t("TXT_CODE_593ee330"), value: formatMemoryUsage(memoryUsage, memoryLimit), color: getUsageColor(memoryUsagePercent), icon: DashboardOutlined, condition: () => memoryUsage != null },
+    { label: t("TXT_CODE_50daec4"), value: `↓${formatNetworkSpeed(rxBytes)} · ↑${formatNetworkSpeed(txBytes)}`, icon: ApartmentOutlined, condition: () => rxBytes != null || txBytes != null, onClick: () => { useByteUnit.value = !useByteUnit.value; } }
   ]);
 });
 </script>
@@ -382,18 +297,9 @@ const terminalTopTags = computed<TagInfo[]>(() => {
             </a-typography-title>
             <a-typography-paragraph v-if="!isPhone" class="mb-0 ml-4">
               <span class="ml-6">
-                <a-tag v-if="isRunning" color="green">
-                  <CheckCircleOutlined />
-                  {{ instanceStatusText }}
-                </a-tag>
-                <a-tag v-else-if="isBuys" color="red">
-                  <LoadingOutlined />
-                  {{ instanceStatusText }}
-                </a-tag>
-                <a-tag v-else-if="instanceStatusText">
-                  <InfoCircleOutlined />
-                  {{ instanceStatusText }}
-                </a-tag>
+                <a-tag v-if="isRunning" color="green"><CheckCircleOutlined /> {{ instanceStatusText }}</a-tag>
+                <a-tag v-else-if="isBuys" color="red"><LoadingOutlined /> {{ instanceStatusText }}</a-tag>
+                <a-tag v-else-if="instanceStatusText"><InfoCircleOutlined /> {{ instanceStatusText }}</a-tag>
               </span>
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
             </a-typography-paragraph>
@@ -402,30 +308,12 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         <template #right>
           <div v-if="!isPhone">
             <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
-              <a-button
-                v-if="item.noConfirm"
-                class="ml-8"
-                :class="item.class ? item.class : ''"
-                :danger="item.type === 'danger'"
-                :disabled="isOpenInstanceLoading"
-                @click="item.click"
-              >
-                <component :is="item.icon" />
-                {{ item.title }}
+              <a-button v-if="item.noConfirm" class="ml-8" :class="item.class" :danger="item.type === 'danger'" :disabled="isOpenInstanceLoading" @click="item.click">
+                <component :is="item.icon" /> {{ item.title }}
               </a-button>
-              <a-popconfirm
-                v-else
-                :key="item.title"
-                :title="t('TXT_CODE_276756b2')"
-                @confirm="item.click"
-              >
-                <a-button
-                  class="ml-8"
-                  :danger="item.type === 'danger'"
-                  :class="item.class ? item.class : ''"
-                >
-                  <component :is="item.icon" />
-                  {{ item.title }}
+              <a-popconfirm v-else :key="item.title" :title="t('TXT_CODE_276756b2')" @confirm="item.click">
+                <a-button class="ml-8" :danger="item.type === 'danger'" :class="item.class">
+                  <component :is="item.icon" /> {{ item.title }}
                 </a-button>
               </a-popconfirm>
             </template>
@@ -438,10 +326,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       <TerminalTags :tags="terminalTopTags" />
       <div class="tab-controls">
         <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
-          <a-radio-button value="default">
-            <template #icon><DashboardOutlined /></template>
-            {{ t("控制台") }}
-          </a-radio-button>
+          <a-radio-button value="default"><DashboardOutlined /> {{ t("控制台") }}</a-radio-button>
           <a-radio-button value="warn" class="warn-tab">WARN</a-radio-button>
           <a-radio-button value="error" class="error-tab">ERROR</a-radio-button>
         </a-radio-group>
@@ -450,29 +335,19 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 
     <div class="console-section" :style="{ height: card.height }">
       <TerminalCore
-        v-show="activeTab === 'default'"
+        ref="terminalCoreRef"
         v-if="instanceId && daemonId"
         :use-terminal-hook="terminalHook"
         :instance-id="instanceId"
         :daemon-id="daemonId"
         :height="card.height"
       />
-
-      <div v-if="activeTab !== 'default'" class="static-log-view">
-        <a-spin :spinning="isLogLoading">
-          <div v-if="filteredLogs" class="log-container">
-            <pre>{{ filteredLogs }}</pre>
-          </div>
-          <a-empty v-else :description="t('無相關日誌信息')" class="mt-20" />
-        </a-spin>
-      </div>
     </div>
   </div>
 
   <CardPanel v-else class="containerWrapper" style="height: 100%">
     <template #title>
-      <CloudServerOutlined />
-      <span class="ml-8"> {{ getInstanceName }} </span>
+      <CloudServerOutlined /> <span class="ml-8"> {{ getInstanceName }} </span>
     </template>
     <template #operator>
       <span v-for="item in quickOperations" :key="item.title" class="mr-2">
@@ -482,8 +357,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
         <template #overlay>
           <a-menu>
             <a-menu-item v-for="item in instanceOperations" :key="item.title" @click="item.click">
-              <component :is="item.icon"></component>
-              <span>&nbsp;{{ item.title }}</span>
+              <component :is="item.icon"></component><span>&nbsp;{{ item.title }}</span>
             </a-menu-item>
           </a-menu>
         </template>
@@ -491,78 +365,15 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       </a-dropdown>
     </template>
     <template #body>
-      <div class="mb-6">
-        <TerminalTags :tags="terminalTopTags" />
-      </div>
-      <TerminalCore
-        v-if="instanceId && daemonId"
-        :use-terminal-hook="terminalHook"
-        :instance-id="instanceId"
-        :daemon-id="daemonId"
-        :height="card.height"
-      />
+      <div class="mb-6"><TerminalTags :tags="terminalTopTags" /></div>
+      <TerminalCore v-if="instanceId && daemonId" :use-terminal-hook="terminalHook" :instance-id="instanceId" :daemon-id="daemonId" :height="card.height" />
     </template>
   </CardPanel>
 </template>
 
 <style lang="scss" scoped>
-.flex-between {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.console-section {
-  position: relative;
-  width: 100%;
-}
-
-.static-log-view {
-  background-color: #1e1e1e;
-  border: 1px solid var(--card-border-color);
-  border-radius: 6px;
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-
-  .log-container {
-    padding: 12px;
-    height: 100%;
-    overflow-y: auto;
-    font-family: "Consolas", "Monaco", "Courier New", monospace;
-    font-size: 13px;
-    line-height: 1.5;
-    color: #d4d4d4;
-    white-space: pre-wrap;
-    word-break: break-all;
-  }
-
-  pre {
-    margin: 0;
-    background: transparent;
-    color: inherit;
-  }
-}
-
-.warn-tab:hover {
-  color: #faad14 !important;
-}
-.error-tab:hover {
-  color: #ff4d4f !important;
-}
-
-// 保持原有的樣式適配
-.console-wrapper {
-  position: relative;
-  .terminal-wrapper {
-    border: 1px solid var(--card-border-color);
-    background-color: #1e1e1e;
-    padding: 8px;
-    border-radius: 6px;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
-}
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.console-section { position: relative; width: 100%; }
+.warn-tab:hover { color: #faad14 !important; }
+.error-tab:hover { color: #ff4d4f !important; }
 </style>
