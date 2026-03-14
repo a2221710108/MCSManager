@@ -40,12 +40,11 @@ import {
 } from "@ant-design/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
 import prettyBytes, { type Options as PrettyOptions } from "pretty-bytes";
-import { computed } from "vue";
 import type { TagInfo } from "../../components/interface";
 import { GLOBAL_INSTANCE_NAME } from "../../config/const";
 import { useTerminal, type UseTerminalHook } from "../../hooks/useTerminal";
 import { arrayFilter } from "../../tools/array";
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue"; // 把需要用的都放這裡
 
 // 標籤頁狀態：all (控制台), warn (警告), error (錯誤)
 const activeTab = ref("all");
