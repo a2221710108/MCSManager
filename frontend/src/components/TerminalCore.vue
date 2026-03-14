@@ -271,18 +271,19 @@ onMounted(async () => {
 </template>
 
 <style lang="scss" scoped>
+/* 錯誤提示卡片樣式 - 保持原樣但確保層級正確 */
 .error-card {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   top: 0;
-  z-index: 10;
+  z-index: 20; // 提高層級，確保蓋過所有內容
   border-radius: 20px;
-
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: rgba(0, 0, 0, 0.3); // 增加一點遮罩感
 
   .error-card-container {
     overflow: hidden;
@@ -290,8 +291,8 @@ onMounted(async () => {
     border: 1px solid var(--color-gray-6) !important;
     background-color: var(--color-gray-1);
     border-radius: 4px;
-    padding: 12px;
-    box-shadow: 0px 0px 2px var(--color-gray-7);
+    padding: 16px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
   }
 
   @media (max-width: 992px) {
@@ -303,6 +304,19 @@ onMounted(async () => {
 
 .console-wrapper {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%; // 繼承父組件傳入的高度
+  width: 100%;
+
+  /* 實時終端與靜態視圖的封裝容器 */
+  .realtime-terminal-container, 
+  .static-log-view-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+  }
 
   .terminal-loading {
     z-index: 12;
@@ -312,17 +326,15 @@ onMounted(async () => {
     transform: translate(-50%, -50%);
   }
 
+  /* 終端操作按鈕組 (清屏等) */
   .terminal-button-group {
     z-index: 11;
     margin-right: 20px;
-    padding-bottom: 50px;
-    padding-left: 50px;
-    border-radius: 6px;
     color: #fff;
 
     &:hover {
       ul {
-        transition: all 1s;
+        transition: opacity 0.3s;
         opacity: 0.8;
       }
     }
@@ -330,6 +342,8 @@ onMounted(async () => {
     ul {
       display: flex;
       opacity: 0;
+      margin: 0;
+      padding: 0;
 
       li {
         cursor: pointer;
@@ -338,7 +352,6 @@ onMounted(async () => {
         margin-left: 5px;
         border-radius: 6px;
         font-size: 20px;
-
         &:hover {
           background-color: #3e3e3e;
         }
@@ -346,41 +359,48 @@ onMounted(async () => {
     }
   }
 
+  /* 終端視窗主容器 */
   .terminal-wrapper {
+    flex: 1; // 核心：自動佔據上方剩餘所有空間
     border: 1px solid var(--card-border-color);
     position: relative;
-    overflow: hidden;
-    height: 100%;
     background-color: #1e1e1e;
     padding: 8px;
     border-radius: 6px;
+    overflow: hidden; // 必須隱藏溢出，交給內層控制
     display: flex;
     flex-direction: column;
+    margin-bottom: 12px; // 與下方輸入框保持間距
 
     .terminal-container {
+      flex: 1;
       height: 100%;
+      width: 100%;
     }
-
-    margin-bottom: 12px;
   }
 
+  /* 指令輸入框容器 */
   .command-input {
     position: relative;
+    flex-shrink: 0; // 核心：禁止被壓縮，確保輸入框始終可見
+    width: 100%;
+    z-index: 10;
 
     .history {
       display: flex;
       max-width: 100%;
-      overflow: scroll;
-      z-index: 10;
+      overflow-x: auto;
+      z-index: 15;
       position: absolute;
       top: -35px;
       left: 0;
 
       li {
         list-style: none;
+        margin-right: 4px;
         span {
-          padding: 3px 20px;
-          max-width: 300px;
+          padding: 3px 12px;
+          max-width: 200px;
           overflow: hidden;
           text-overflow: ellipsis;
           cursor: pointer;
@@ -388,21 +408,22 @@ onMounted(async () => {
       }
 
       &::-webkit-scrollbar {
-        width: 0 !important;
         height: 0 !important;
       }
     }
   }
 
   .terminal-design-tip {
-    color: rgba(255, 255, 255, 0.584);
+    color: rgba(255, 255, 255, 0.4);
+    padding: 20px;
+    text-align: center;
   }
 }
 
-/* --- 以下是為分頁功能新增的完整適配樣式 --- */
-
+/* 靜態日誌視圖專屬樣式 */
 .static-log-view-wrapper {
   .static-log-content {
+    flex: 1;
     overflow-y: auto;
     padding: 12px;
     color: #d4d4d4;
@@ -422,15 +443,17 @@ onMounted(async () => {
     }
   }
 
-  // 確保加載動畫居中且美觀
   :deep(.ant-spin-nested-loading) {
     height: 100%;
     .ant-spin-container {
       height: 100%;
+      display: flex;
+      flex-direction: column;
     }
   }
 }
 
+/* 全域輔助類 */
 .flex-center {
   display: flex;
   align-items: center;
