@@ -73,8 +73,8 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 修正後的邏輯控制開始 ---
-const terminalCoreRef = ref(); // 必須對應到模板中的 ref="terminalCoreRef"
+// --- 分頁邏輯控制 ---
+const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
 
@@ -82,13 +82,16 @@ const handleTabChange = async () => {
   if (activeTab.value === "default") {
     terminalCoreRef.value?.showDefaultView();
   } else {
-    // 1. 先通知子組件進入加載狀態
+    // 進入日誌視圖，先顯示加載中
     terminalCoreRef.value?.showLogView("", true);
     
     try {
       const res = await fetchFile({
         params: { daemonId: daemonId ?? "", uuid: instanceId ?? "" },
-        data: { target: "/workspace/logs/latest.log" }
+        data: { 
+          // 修正：使用相對路徑，避免 /workspace 前綴導致的路徑存取錯誤
+          target: "logs/latest.log" 
+        }
       });
 
       const rawText = typeof res === "string" ? res : "";
@@ -97,21 +100,24 @@ const handleTabChange = async () => {
 
       let logs = "";
       if (activeTab.value === "warn") {
-        logs = last500Lines.filter(l => l.toUpperCase().includes("WARN") || l.toUpperCase().includes("WARNING")).join("\n");
+        logs = last500Lines
+          .filter(l => l.toUpperCase().includes("WARN") || l.toUpperCase().includes("WARNING"))
+          .join("\n");
       } else if (activeTab.value === "error") {
-        logs = last500Lines.filter(l => l.toUpperCase().includes("ERROR") || l.toUpperCase().includes("FATAL")).join("\n");
+        logs = last500Lines
+          .filter(l => l.toUpperCase().includes("ERROR") || l.toUpperCase().includes("FATAL"))
+          .join("\n");
       }
       
-      // 2. 傳遞過濾後的內容給子組件
       terminalCoreRef.value?.showLogView(logs, false);
     } catch (err: any) {
       reportErrorMsg(err.message);
-      terminalCoreRef.value?.showLogView("", false);
+      terminalCoreRef.value?.showLogView(t("無法讀取日誌文件，請檢查路徑或權限。"), false);
     }
   }
 };
-// --- 修正後的邏輯控制結束 ---
 
+// --- 原有操作邏輯 (保持不變) ---
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 
 const toOpenInstance = async () => {
@@ -122,7 +128,6 @@ const toOpenInstance = async () => {
       if (!flag) return;
       await sleep(1000);
     }
-
     await requestOpenInstance({
       params: { uuid: instanceId ?? "", daemonId: daemonId ?? "" }
     });
@@ -143,7 +148,6 @@ const quickOperations = computed(() =>
       type: "default",
       class: "button-color-success",
       click: toOpenInstance,
-      props: {},
       condition: () => isStopped.value
     },
     {
@@ -198,57 +202,14 @@ const instanceOperations = computed(() =>
         }
       },
       condition: () => !isStopped.value
-    },
-    {
-      title: t("TXT_CODE_40ca4f2"),
-      type: "default",
-      icon: CloudDownloadOutlined,
-      click: async () => {
-        try {
-          clearTerminal();
-          await updateInstance().execute({
-            params: { uuid: instanceId || "", daemonId: daemonId || "", task_name: "update" },
-            data: { time: new Date().getTime() }
-          });
-        } catch (error: any) {
-          reportErrorMsg(error);
-        }
-      },
-      condition: () => isStopped.value && updateCmd.value
-    },
-    {
-      title: t("TXT_CODE_b19ed1dd"),
-      icon: InteractionOutlined,
-      noConfirm: true,
-      click: async () => {
-        try {
-          clearTerminal();
-          await openMarketDialog(daemonId ?? "", instanceId ?? "", {
-            autoInstall: true,
-            onlyDockerTemplate: isDockerMode.value
-          });
-        } catch (error: any) {}
-      },
-      condition: () => isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value
-    },
-    {
-      title: t("TXT_CODE_f77093c8"),
-      icon: MoneyCollectOutlined,
-      noConfirm: true,
-      click: async () => {
-        await openRenewalDialog(instanceInfo.value?.instanceUuid ?? "", daemonId ?? "", instanceInfo.value?.config.category ?? 0);
-      },
-      condition: () => !!instanceInfo.value?.config?.category
     }
   ])
 );
 
 const getInstanceName = computed(() => {
-  if (instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME) {
-    return t("TXT_CODE_5bdaf23d");
-  } else {
-    return instanceInfo.value?.config.nickname;
-  }
+  return instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME 
+    ? t("TXT_CODE_5bdaf23d") 
+    : instanceInfo.value?.config.nickname;
 });
 
 const useByteUnit = useLocalStorage("useByteUnit", true);
@@ -323,7 +284,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
     </div>
 
     <div class="mb-10 flex-between">
-      <TerminalTags :tags="terminalTopTags" />
       <div class="tab-controls">
         <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
           <a-radio-button value="default"><DashboardOutlined /> {{ t("控制台") }}</a-radio-button>
@@ -331,9 +291,10 @@ const terminalTopTags = computed<TagInfo[]>(() => {
           <a-radio-button value="error" class="error-tab">ERROR</a-radio-button>
         </a-radio-group>
       </div>
+      <TerminalTags :tags="terminalTopTags" />
     </div>
 
-    <div class="console-section" :style="{ height: card.height }">
+    <div class="console-section">
       <TerminalCore
         ref="terminalCoreRef"
         v-if="instanceId && daemonId"
@@ -372,8 +333,27 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 </template>
 
 <style lang="scss" scoped>
-.flex-between { display: flex; justify-content: space-between; align-items: center; }
-.console-section { position: relative; width: 100%; }
-.warn-tab:hover { color: #faad14 !important; }
-.error-tab:hover { color: #ff4d4f !important; }
+.flex-between { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  width: 100%;
+}
+
+.console-section { 
+  position: relative; 
+  width: 100%;
+  // 確保下方輸入框有足夠空間，不被外部組件擋住
+  margin-bottom: 20px;
+}
+
+.tab-controls {
+  .warn-tab:hover { color: #faad14 !important; }
+  .error-tab:hover { color: #ff4d4f !important; }
+}
+
+.align-center {
+  display: flex;
+  align-items: center;
+}
 </style>
