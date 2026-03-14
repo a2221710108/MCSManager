@@ -218,7 +218,7 @@ onMounted(async () => {
             <pre v-if="staticLogContent">{{ staticLogContent }}</pre>
             <div v-else-if="!isLogLoading" class="flex-center flex-column empty-box">
               <InfoCircleOutlined style="font-size: 32px;" />
-              <p class="mt-10">{{ t("暫無相關日誌信息") }}</p>
+              <p class="mt-10">{{ t("暫無相關信息") }}</p>
             </div>
           </div>
         </a-spin>
