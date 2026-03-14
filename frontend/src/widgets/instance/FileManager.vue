@@ -34,7 +34,6 @@ import {
   UploadOutlined
 } from "@ant-design/icons-vue";
 import { Modal, type ItemType, type UploadChangeParam, type UploadProps } from "ant-design-vue";
-import type { Key } from "ant-design-vue/es/table/interface";
 import dayjs from "dayjs";
 import { computed, h, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import FileEditor from "./dialogs/FileEditor.vue";
@@ -57,10 +56,15 @@ const {
   selectedRowKeys,
   operationForm,
   dataSource,
-  breadcrumbs, // 這是 reactive
+  breadcrumbs,
+  currentPath,
   clipboard,
   currentDisk,
   isMultiple,
+  activeTab,
+  currentTabs,
+  onEditTabs,
+  handleChangeTab,
   selectChanged,
   getFileList,
   touchFile,
@@ -86,65 +90,6 @@ const {
 } = useFileManager(instanceId, daemonId);
 
 const { openRightClickMenu } = useRightClickMenu();
-
-// --- 多標籤頁邏輯實作 ---
-interface FileTab {
-  key: string;
-  name: string;
-  path: string;
-}
-
-const activeTabKey = ref<string>("default");
-const tabs = ref<FileTab[]>([
-  { key: "default", name: t("TXT_CODE_28124988"), path: "/" }
-]);
-
-// 監聽標籤切換：解決 TS2322，確保參數類型為 string
-const handleTabChange = async (key: Key) => {
-  const stringKey = String(key);
-  activeTabKey.value = stringKey;
-  const tab = tabs.value.find(t => t.key === stringKey);
-  if (tab) {
-    // 這裡我們直接調用 API 重新獲取數據，而不是調用 handleChangeDir
-    // 因為 handleChangeDir 會修改麵包屑，導致我們無法在標籤間保持不同路徑
-    // 但因為 useFileManager 的實現限制，目前只能共享一個麵包屑
-    await handleChangeDir(tab.path);
-  }
-};
-
-// 監聽麵包屑變化：同步更新當前標籤。注意：這裡移除了 .value
-watch(() => [...breadcrumbs], (newBreads) => {
-  if (newBreads && newBreads.length > 0) {
-    const lastItem = newBreads[newBreads.length - 1];
-    const currentTab = tabs.value.find(t => t.key === activeTabKey.value);
-    if (currentTab) {
-      currentTab.path = lastItem.path;
-      currentTab.name = lastItem.name || t("TXT_CODE_28124988");
-    }
-  }
-}, { deep: true });
-
-const onEditTabs = (targetKey: any, action: string) => {
-  if (action === 'add') {
-    const newKey = `tab_${Date.now()}`;
-    tabs.value.push({
-      key: newKey,
-      name: t("TXT_CODE_28124988"),
-      path: "/"
-    });
-    activeTabKey.value = newKey;
-    handleChangeDir("/");
-  } else if (action === 'remove') {
-    if (tabs.value.length <= 1) return;
-    const index = tabs.value.findIndex(t => t.key === targetKey);
-    tabs.value = tabs.value.filter(t => t.key !== targetKey);
-    if (activeTabKey.value === targetKey) {
-      activeTabKey.value = tabs.value[Math.max(0, index - 1)].key;
-      handleChangeDir(tabs.value[Math.max(0, index - 1)].path);
-    }
-  }
-};
-// --- 多標籤頁邏輯結束 ---
 
 const isShowDiskList = computed(
   () =>
@@ -244,7 +189,7 @@ watch(
   { immediate: true }
 );
 
-let task: any;
+let task: NodeJS.Timer | undefined;
 task = setInterval(async () => {
   await getFileStatus();
 }, 3000);
@@ -275,10 +220,10 @@ const handleDrop = (e: DragEvent) => {
     for (const file of files) {
       name += file.name + ", ";
     }
-    name = name.slice(0, -2);
+    name = name.slice(0, -2); // trailing comma
   }
   if (name.length > 30) {
-    name = name.slice(0, 27) + "...";
+    name = name.slice(0, 27) + "..."; // cut if too long
   }
   if (files.length > 1) {
     name += ` (${files.length})`;
@@ -288,7 +233,7 @@ const handleDrop = (e: DragEvent) => {
     icon: h(ExclamationCircleOutlined),
     content: t("TXT_CODE_52bc24ec") + ` ${name} ?`,
     onOk() {
-      selectedFiles([...files]);
+      selectedFiles([...files]); // files:FileList not instanceof Array
     }
   });
 };
@@ -303,8 +248,7 @@ const onFileSelect = (info: UploadChangeParam) => {
 };
 
 const editFile = (fileName: string) => {
-  // 修正 TS2551: 移除 .value
-  const path = breadcrumbs[breadcrumbs.length - 1].path + fileName;
+  const path = currentPath.value + fileName;
   FileEditorDialog.value?.openDialog(path, fileName);
 };
 
@@ -413,6 +357,13 @@ onMounted(async () => {
   await getFileStatus();
   dialog.value.loading = true;
   await getFileList();
+  if (currentTabs.value.length) {
+    const thisTab = currentTabs.value[0];
+    activeTab.value = thisTab.key;
+    await getFileList(false, thisTab.path);
+  } else {
+    await getFileList(false);
+  }
   dialog.value.loading = false;
 });
 
@@ -530,18 +481,6 @@ onUnmounted(() => {
           @drop="handleDrop"
         >
           <template #body>
-            <div class="file-tabs-container">
-              <a-tabs
-                v-model:activeKey="activeTabKey"
-                type="editable-card"
-                size="small"
-                @change="handleTabChange"
-                @edit="onEditTabs"
-              >
-                <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.name" />
-              </a-tabs>
-            </div>
-
             <div v-if="uploadData.current" class="flex-nowrap w-100">
               <a-typography-text :ellipsis="true">
                 {{ uploadData.currentFile }}
@@ -591,6 +530,17 @@ onUnmounted(() => {
                 {{ convertFileSize(uploadData.current![1].toString()) }}
               </a-typography-text>
             </div>
+
+            <a-tabs
+              v-model:activeKey="activeTab"
+              type="editable-card"
+              @edit="onEditTabs"
+              @change="(key) => handleChangeTab(key as string)"
+            >
+              <a-tab-pane v-for="b in currentTabs" :key="b.key" :tab="b.name" :closable="true">
+              </a-tab-pane>
+            </a-tabs>
+
             <div class="flex-wrap items-flex-start">
               <a-select
                 v-if="isShowDiskList"
@@ -816,29 +766,6 @@ onUnmounted(() => {
 </template>
 
 <style lang="scss" scoped>
-/* 多標籤頁專用樣式 */
-.file-tabs-container {
-  margin-bottom: 8px;
-  :deep(.ant-tabs-nav) {
-    margin-bottom: 0 !important;
-    &::before {
-      border-bottom: none !important;
-    }
-  }
-  :deep(.ant-tabs-tab) {
-    background: transparent !important;
-    border: 1px solid var(--color-gray-4) !important;
-    border-bottom: none !important;
-    border-radius: 6px 6px 0 0 !important;
-    margin-right: 2px !important;
-    transition: all 0.3s;
-  }
-  :deep(.ant-tabs-tab-active) {
-    background: var(--color-gray-2) !important;
-    border-color: var(--color-gray-5) !important;
-  }
-}
-
 .search-input {
   transition: all 0.4s;
   text-align: center;
@@ -847,13 +774,24 @@ onUnmounted(() => {
 
 .file-name {
   color: inherit;
+
   &:hover {
     color: #1677ff;
   }
 }
 
+.upload-tip {
+  position: absolute;
+  right: 0;
+  left: 0;
+  top: 0;
+  bottom: 0;
+}
+
 @media (max-width: 992px) {
   .search-input {
+    transition: all 0.4s;
+    text-align: center;
     width: 100% !important;
   }
 }
@@ -866,6 +804,7 @@ onUnmounted(() => {
   border: 1px solid var(--color-gray-5);
   border-radius: 6px;
   flex: 1;
+
   .file-breadcrumbs-item {
     padding: 8px;
     cursor: pointer;
@@ -874,6 +813,7 @@ onUnmounted(() => {
     min-width: 32px;
     text-align: center;
   }
+
   .file-breadcrumbs-item:hover {
     background-color: var(--color-gray-4);
   }
@@ -882,6 +822,7 @@ onUnmounted(() => {
 @media (max-width: 350px) {
   .permission {
     flex-direction: column;
+
     .son {
       width: 100%;
     }
