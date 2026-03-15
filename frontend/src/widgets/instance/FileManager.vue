@@ -87,7 +87,8 @@ const {
   toDisk,
   oneSelected,
   isImage,
-  showImage
+  showImage,
+  openInNewTab
 } = useFileManager(instanceId, daemonId);
 
 const { openRightClickMenu } = useRightClickMenu();
