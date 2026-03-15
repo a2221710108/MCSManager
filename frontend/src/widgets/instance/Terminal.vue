@@ -99,17 +99,12 @@ const handleTabChange = async () => {
         rawText = res._value || res.value || res.data || res.content || "";
       }
 
-      // 1. 先切割行，並限制只處理最後 1000 行
-      const lines = rawText.split(/\r?\n/).slice(-1000); 
+      const lines = rawText.split(/\r?\n/);
       const targetLevel = activeTab.value.toUpperCase();
       const resultLines: string[] = [];
       let isCapturing = false;
 
-      // 定義 ANSI 顏色代碼
-      // \x1B[1;33m = 粗體黃色 (Warn), \x1B[1;31m = 粗體紅色 (Error), \x1B[0m = 重置
-      const colorCode = targetLevel === "WARN" ? "\x1B[1;33m" : "\x1B[1;31m";
-      const resetCode = "\x1B[0m";
-
+      // 匹配 [WARN] 或 /WARN: 等格式
       const levelRegex = new RegExp(`(\\[|\\/)${targetLevel}(\\]|\\:)`, "i");
       const timestampRegex = /\[\d{2}:\d{2}:\d{2}\]/;
 
@@ -121,34 +116,21 @@ const handleTabChange = async () => {
         if (hasTimestamp) {
           if (hasLevel) {
             isCapturing = true;
-            // 2. 將整行加上顏色與加粗
-            resultLines.push(`${colorCode}${line}${resetCode}`);
+            resultLines.push(line);
           } else {
             isCapturing = false;
           }
         } else if (isCapturing) {
-          // 屬於上一條 Log 的後續內容（如 Error Stack Trace）
-          resultLines.push(`${colorCode}${line}${resetCode}`);
+          resultLines.push(line);
         }
       }
 
-      // 渲染過濾後的內容
       terminalCoreRef.value?.showLogView(
         resultLines.length > 0 ? resultLines.join("\n") : `--- 未發現 ${targetLevel} ---`,
         false
       );
-
-      // 3. 關鍵：確保在渲染後滾動到底部
-      // 使用 setTimeout 確保 Xterm.js 已經完成字元解析
-      setTimeout(() => {
-        const term = terminalCoreRef.value?.getTerminal?.();
-        if (term) {
-          term.scrollToBottom();
-        }
-      }, 50);
-      
     } catch (err: any) {
-      terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版：" + err.message, false);
+      terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版");
     }
   }
 };
