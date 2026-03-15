@@ -447,7 +447,18 @@ defineExpose({ openDialog });
           <template #icon><ReloadOutlined /></template>
         </a-button>
       </div>
-
+      
+     <div class="search-container">
+  <a-input
+    v-model:value="searchQuery"
+    :placeholder="t('搜索指令或關鍵字...')"
+    allow-clear
+    class="custom-search-input"
+  >
+    <template #prefix><SearchOutlined /></template>
+  </a-input>
+</div>
+      
       <a-collapse v-model:activeKey="activeKeys" ghost expand-icon-position="right" class="custom-collapse">
         <a-collapse-panel v-for="group in COMMAND_GROUPS" :key="group.group">
           <template #header>
@@ -689,4 +700,28 @@ defineExpose({ openDialog });
     justify-content: flex-end;
   }
 }
+
+/* 新增搜索框樣式，確保不影響原有 layout */
+.search-container {
+  padding: 0 12px 16px 12px;
+}
+
+.custom-search-input {
+  background: rgba(140, 140, 140, 0.05) !important;
+  border: 1px solid rgba(140, 140, 140, 0.1) !important;
+  border-radius: 8px !important;
+  height: 36px;
+  transition: all 0.2s;
+}
+
+.custom-search-input:hover, .custom-search-input:focus-within {
+  background: rgba(255, 255, 255, 1) !important;
+  border-color: #1677ff !important;
+  box-shadow: 0 2px 6px rgba(22, 119, 255, 0.1);
+}
+
+/* 確保搜尋時列表過渡平滑 */
+.custom-collapse {
+  transition: all 0.3s ease;
+  
 </style>
