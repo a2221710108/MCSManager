@@ -408,56 +408,56 @@ const terminalTopTags = computed<TagInfo[]>(() => {
             </a-typography-paragraph>
           </div>
         </template>
-<template #right>
-  <div v-if="!isPhone">
-    <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
-      <a-button
-        v-if="item.noConfirm"
-        class="ml-8"
-        :class="item.class ? item.class : ''"
-        :danger="item.type === 'danger'"
-        :disabled="isOpenInstanceLoading"
-        @click="item.click"
-      >
-        <component :is="item.icon" />
-        {{ item.title }}
-      </a-button>
-      <a-popconfirm
-        v-else
-        :key="item.title"
-        :title="t('TXT_CODE_276756b2')"
-        @confirm="item.click"
-      >
-        <a-button
-          class="ml-8"
-          :danger="item.type === 'danger'"
-          :class="item.class ? item.class : ''"
-        >
-          <component :is="item.icon" />
-          {{ item.title }}
-        </a-button>
-      </a-popconfirm>
-    </template>
-  </div>
 
-  <a-dropdown v-else>
-    <template #overlay>
-      <a-menu>
-        <a-menu-item
-          v-for="item in [...quickOperations, ...instanceOperations]"
-          :key="item.title"
-          @click="item.click"
-        >
-          <component :is="item.icon" />
-          <span class="ml-8">{{ item.title }}</span>
-        </a-menu-item>
-      </a-menu>
-    </template>
-    <a-button type="primary">
-      {{ t("TXT_CODE_fe731dfc") }} <DownOutlined />
-    </a-button>
-  </a-dropdown>
-</template>
+        <template #right>
+          <div v-if="!isPhone">
+            <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
+              <a-button
+                v-if="item.noConfirm"
+                class="ml-8"
+                :class="item.class ? item.class : ''"
+                :danger="item.type === 'danger'"
+                :disabled="isOpenInstanceLoading"
+                @click="item.click"
+              >
+                <component :is="item.icon" />
+                {{ item.title }}
+              </a-button>
+              <a-popconfirm
+                v-else
+                :key="item.title"
+                :title="t('TXT_CODE_276756b2')"
+                @confirm="item.click"
+              >
+                <a-button
+                  class="ml-8"
+                  :danger="item.type === 'danger'"
+                  :class="item.class ? item.class : ''"
+                >
+                  <component :is="item.icon" />
+                  {{ item.title }}
+                </a-button>
+              </a-popconfirm>
+            </template>
+          </div>
+
+          <a-dropdown v-else>
+            <template #overlay>
+              <a-menu>
+                <a-menu-item
+                  v-for="item in [...quickOperations, ...instanceOperations]"
+                  :key="item.title"
+                  @click="item.click"
+                >
+                  <component :is="item.icon" />
+                  <span class="ml-8">{{ item.title }}</span>
+                </a-menu-item>
+              </a-menu>
+            </template>
+            <a-button type="primary">
+              {{ t("TXT_CODE_fe731dfc") }} <DownOutlined />
+            </a-button>
+          </a-dropdown>
         </template>
       </BetweenMenus>
     </div>
@@ -489,7 +489,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
     <template #title>
       <CloudServerOutlined />
       <span class="ml-8"> {{ getInstanceName }} </span>
-      </template>
+    </template>
     
     <template #operator>
       </template>
