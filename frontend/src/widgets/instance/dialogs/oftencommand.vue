@@ -363,20 +363,27 @@ const COMMAND_GROUPS: CommandGroup[] = [
   }
 ];
 
+// --- 核心過濾邏輯：修正後 ---
 const filteredGroups = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  // 如果沒有搜索內容，返回原始完整數據
   if (!query) return COMMAND_GROUPS;
 
   return COMMAND_GROUPS.map(group => {
-    // 執行深度克隆或展開，避免污染原始數據
     const matchedCommands = group.commands.filter(cmd => 
       cmd.label.toLowerCase().includes(query) || 
       cmd.cmd.toLowerCase().includes(query)
     );
-    // 返回包含匹配指令的新分類對象
     return { ...group, commands: matchedCommands };
-  }).filter(group => group.commands.length > 0); // 核心：只保留有匹配項的分類
+  }).filter(group => group.commands.length > 0);
+});
+
+// 監聽搜索詞，實現自動展開
+watch(searchQuery, (val) => {
+  if (val.trim()) {
+    activeKeys.value = filteredGroups.value.map(g => g.group);
+  } else {
+    activeKeys.value = [t("環境與時間")];
+  }
 });
   
 // --- 邏輯函數 ---
