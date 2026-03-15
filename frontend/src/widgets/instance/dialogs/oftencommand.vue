@@ -363,26 +363,20 @@ const COMMAND_GROUPS: CommandGroup[] = [
   }
 ];
 
-// 核心過濾邏輯：保留分類結構，僅過濾內部的 commands
 const filteredGroups = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
+  // 如果沒有搜索內容，返回原始完整數據
   if (!query) return COMMAND_GROUPS;
 
   return COMMAND_GROUPS.map(group => {
-    // 檢查指令標籤或指令內容是否符合搜索
+    // 執行深度克隆或展開，避免污染原始數據
     const matchedCommands = group.commands.filter(cmd => 
       cmd.label.toLowerCase().includes(query) || 
       cmd.cmd.toLowerCase().includes(query)
     );
+    // 返回包含匹配指令的新分類對象
     return { ...group, commands: matchedCommands };
-  }).filter(group => group.commands.length > 0); // 只顯示有匹配項的分類
-});
-
-// 優化體驗：搜索時自動展開有結果的摺疊面板
-watch(searchQuery, (val) => {
-  if (val) {
-    activeKeys.value = filteredGroups.value.map(g => g.group);
-  }
+  }).filter(group => group.commands.length > 0); // 核心：只保留有匹配項的分類
 });
   
 // --- 邏輯函數 ---
@@ -701,27 +695,39 @@ defineExpose({ openDialog });
   }
 }
 
-/* 新增搜索框樣式，確保不影響原有 layout */
-.search-container {
+/* 搜索框容器 */
+.search-box {
   padding: 0 12px 16px 12px;
 }
 
-.custom-search-input {
-  background: rgba(140, 140, 140, 0.05) !important;
-  border: 1px solid rgba(140, 140, 140, 0.1) !important;
+/* 適配深色模式的搜索框 */
+.custom-search {
+  /* 使用透明度疊加，這樣在深色背景下會變深，淺色下會變淺 */
+  background: var(--ant-input-bg, rgba(140, 140, 140, 0.05)) !important;
   border-radius: 8px !important;
-  height: 36px;
-  transition: all 0.2s;
+  border: 1px solid rgba(140, 140, 140, 0.1) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.custom-search-input:hover, .custom-search-input:focus-within {
-  background: rgba(255, 255, 255, 1) !important;
-  border-color: #1677ff !important;
-  box-shadow: 0 2px 6px rgba(22, 119, 255, 0.1);
+.custom-search:hover, .custom-search:focus-within {
+  border-color: var(--ant-primary-color) !important;
+  background: var(--ant-component-background, #ffffff) !important;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
 }
 
-/* 確保搜尋時列表過渡平滑 */
-.custom-collapse {
-  transition: all 0.3s ease;
-  }
+/* 針對輸入框內文字與圖標的深色模式優化 */
+.custom-search :deep(.ant-input),
+.custom-search :deep(.ant-input-prefix) {
+  color: var(--ant-text-color) !important;
+  background: transparent !important;
+}
+
+.custom-search :deep(.ant-input::placeholder) {
+  color: var(--ant-text-color-placeholder);
+}
+
+/* 讓清除按鈕也適配 */
+.custom-search :deep(.ant-input-clear-icon) {
+  color: var(--ant-text-color-secondary);
+}
 </style>
