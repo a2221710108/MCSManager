@@ -14,7 +14,7 @@ import {
   ThunderboltOutlined,
   SearchOutlined,
   TeamOutlined,
-  ShopOutline,
+  ShopOutlined,
   SubnodeOutlined
 } from "@ant-design/icons-vue";
 
