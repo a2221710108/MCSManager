@@ -265,8 +265,6 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("Warden的心跳"), cmd: "playsound entity.warden.heartbeat master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
       { label: t("Warden的超音波"), cmd: "playsound entity.warden.sonic_boom master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
       { label: t("末影龍死亡"), cmd: "playsound entity.wither.death master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
-      { label: t("凋零死亡"), cmd: "playsound entity.ender_dragon.death master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
-      { label: t("凋零死亡"), cmd: "playsound entity.wither.death master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
     ]
   },
   {
