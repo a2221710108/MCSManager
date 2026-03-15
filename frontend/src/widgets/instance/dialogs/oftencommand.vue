@@ -461,7 +461,7 @@ defineExpose({ openDialog });
 </div>
       
       <a-collapse v-model:activeKey="activeKeys" ghost expand-icon-position="right" class="custom-collapse">
-        <a-collapse-panel v-for="group in COMMAND_GROUPS" :key="group.group">
+        <a-collapse-panel v-for="group in filteredGroups" :key="group.group">
           <template #header>
             <div class="group-header">
               <component :is="group.icon" class="group-icon" />
