@@ -213,4 +213,24 @@ defineExpose({
 }
 .ml-12 { margin-left: 12px; }
 .empty-state { padding: 40px 0; text-align: center; }
+
+/* 手機適應性修改 */
+@media (max-width: 768px) {
+  .player-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .player-ops {
+    width: 100%;
+    :deep(.ant-btn-group) {
+      display: flex;
+      width: 100%;
+      .ant-btn {
+        flex: 1;
+        padding: 4px 8px;
+      }
+    }
+  }
+}
 </style>
