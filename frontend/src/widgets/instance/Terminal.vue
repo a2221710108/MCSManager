@@ -133,21 +133,23 @@ const handleTabChange = async () => {
         false
       );
 
-      // 3. 關鍵：確保在渲染後滾動到底部
-      // 使用 setTimeout 確保 Xterm.js 已經完成字元解析
-      setTimeout(() => {
-        const term = terminalCoreRef.value?.getTerminal?.();
-        if (term) {
-          term.scrollToBottom();
-        }
-      }, 50);
+      // --- 新增：顯示後自動捲動到底部 ---
+      await nextTick();
+      const el = terminalCoreRef.value?.$el; // 獲取組件根元素
+      if (el) {
+        // 尋找組件內真正負責捲動的容器（通常是 pre, code 或自定義的 wrapper）
+        // 如果 TerminalCore 內部直接是滾動區域，可以直接 el.scrollTop
+        // 這裡嘗試尋找常見的滾動容器類名，或者直接捲動根元素
+        const container = el.querySelector(".xterm-viewport") || el.querySelector(".log-view-container") || el;
+        container.scrollTop = container.scrollHeight;
+      }
       
     } catch (err: any) {
-      terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版");
+      terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版：" + err.message, false);
     }
   }
 };
-// ------------------------------terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版：" + err.message, false);
+// ------------------------------
 
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 
