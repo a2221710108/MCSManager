@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive } from "vue";
+import { ref, reactive, computed, watch } from "vue";
 import { t } from "@/lang/i18n";
 import { message } from "ant-design-vue";
 import type { InstanceDetail } from "@/types";
@@ -17,7 +17,8 @@ import {
   ShopOutlined,
   SubnodeOutlined
 } from "@ant-design/icons-vue";
-
+  
+const searchQuery = ref("");
 // --- 類型定義 ---
 interface CommandItem {
   label: string;
@@ -362,6 +363,28 @@ const COMMAND_GROUPS: CommandGroup[] = [
   }
 ];
 
+// 核心過濾邏輯：保留分類結構，僅過濾內部的 commands
+const filteredGroups = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase();
+  if (!query) return COMMAND_GROUPS;
+
+  return COMMAND_GROUPS.map(group => {
+    // 檢查指令標籤或指令內容是否符合搜索
+    const matchedCommands = group.commands.filter(cmd => 
+      cmd.label.toLowerCase().includes(query) || 
+      cmd.cmd.toLowerCase().includes(query)
+    );
+    return { ...group, commands: matchedCommands };
+  }).filter(group => group.commands.length > 0); // 只顯示有匹配項的分類
+});
+
+// 優化體驗：搜索時自動展開有結果的摺疊面板
+watch(searchQuery, (val) => {
+  if (val) {
+    activeKeys.value = filteredGroups.value.map(g => g.group);
+  }
+});
+  
 // --- 邏輯函數 ---
 const getParams = (cmd: string) => {
   const matches = cmd.match(/\{(player|val|text)\}/g) || [];
