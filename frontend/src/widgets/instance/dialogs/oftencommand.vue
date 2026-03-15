@@ -180,66 +180,6 @@ const COMMAND_GROUPS: CommandGroup[] = [
     ]
   },
   {
-    group: t("召喚（敵對生物）"),
-    icon: ThunderboltOutlined,
-    commands: [
-      { label: t("殭尸"), cmd: "execute at {player} run summon zombie ~ ~ ~" }, 
-      { label: t("骷髏"), cmd: "execute at {player} run summon skeleton ~ ~ ~" }, 
-      { label: t("苦力怕"), cmd: "execute at {player} run summon creeper ~ ~ ~" }, 
-      { label: t("蜘蛛"), cmd: "execute at {player} run summon spider ~ ~ ~" }, 
-      { label: t("幽靈"), cmd: "execute at {player} run summon ghast ~ ~ ~" }, 
-      { label: t("末影龍（會破壞地形）"), cmd: "execute at {player} run summon ender_dragon ~ ~ ~" }, 
-      { label: t("凋零"), cmd: "execute at {player} run summon wither ~ ~ ~" }, 
-      { label: t("監守者"), cmd: "execute at {player} run summon warden ~ ~ ~" }, 
-      { label: t("微風"), cmd: "execute at {player} run summon breeze ~ ~ ~" }, 
-      { label: t("沼骸"), cmd: "execute at {player} run summon bogged ~ ~ ~" }, 
-      { label: t("掠奪者"), cmd: "execute at {player} run summon pillager ~ ~ ~" }, 
-      { label: t("衛道士"), cmd: "execute at {player} run summon vindicator ~ ~ ~" }, 
-      { label: t("喚魔者"), cmd: "execute at {player} run summon evoker ~ ~ ~" }, 
-      { label: t("幻術師"), cmd: "execute at {player} run summon illusioner ~ ~ ~" }, 
-    ]
-  },
-  {
-    group: t("召喚（中立生物）"),
-    icon: ThunderboltOutlined,
-    commands: [
-      { label: t("末影人"), cmd: "execute at {player} run summon enderman ~ ~ ~" }, 
-      { label: t("狼 (狗)"), cmd: "execute at {player} run summon wolf ~ ~ ~" }, 
-      { label: t("鐵人"), cmd: "execute at {player} run summon iron_golem ~ ~ ~" }, 
-      { label: t("蜜蜂"), cmd: "execute at {player} run summon bee ~ ~ ~" }, 
-      { label: t("豬靈"), cmd: "execute at {player} run summon piglin ~ ~ ~" }, 
-      { label: t("山羊"), cmd: "execute at {player} run summon goat ~ ~ ~" }, 
-      { label: t("駱駝"), cmd: "execute at {player} run summon camel ~ ~ ~" }, 
-    ]
-  },
-  {
-    group: t("召喚（友好生物）"),
-    icon: ThunderboltOutlined,
-    commands: [
-      { label: t("村民"), cmd: "execute at {player} run summon villager ~ ~ ~" }, 
-      { label: t("豬"), cmd: "execute at {player} run summon pig ~ ~ ~" }, 
-      { label: t("牛"), cmd: "execute at {player} run summon cow ~ ~ ~" }, 
-      { label: t("羊"), cmd: "execute at {player} run summon sheep ~ ~ ~" }, 
-      { label: t("雞"), cmd: "execute at {player} run summon chicken ~ ~ ~" }, 
-      { label: t("馬"), cmd: "execute at {player} run summon horse ~ ~ ~" }, 
-      { label: t("貓"), cmd: "execute at {player} run summon cat ~ ~ ~" }, 
-      { label: t("Allay"), cmd: "execute at {player} run summon allay ~ ~ ~" }, 
-      { label: t("Sniffer"), cmd: "execute at {player} run summon sniffer ~ ~ ~" }, 
-      { label: t("犰狳"), cmd: "execute at {player} run summon armadillo ~ ~ ~" }, 
-      { label: t("青蛙"), cmd: "execute at {player} run summon frog ~ ~ ~" }, 
-      { label: t("殭屍巨人"), cmd: "execute at {player} run summon giant ~ ~ ~" }, 
-    ]
-  },
-  {
-    group: t("召喚（特殊實體）"),
-    icon: ThunderboltOutlined,
-    commands: [
-      { label: t("閃電"), cmd: "execute at {player} run summon lightning_bolt ~ ~ ~" }, 
-      { label: t("盔甲架"), cmd: "execute at {player} run summon armor_stand ~ ~ ~" }, 
-      { label: t("船"), cmd: "execute at {player} run summon boat ~ ~ ~" }, 
-    ]
-  },
-  {
     group: t("基礎屬性（個人）"),
     icon: SubnodeOutlined,
     commands: [
@@ -307,6 +247,66 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("水中移動效率"), cmd: "attribute @a minecraft:water_movement_efficiency base set {text}", placeholder: t("數值") }, 
       { label: t("路徑點傳輸距離"), cmd: "attribute @a minecraft:waypoint_transmit_range base set {text}", placeholder: t("數值") }, 
       { label: t("路徑點接收距離"), cmd: "attribute @a minecraft:waypoint_receive_range base set {text}", placeholder: t("數值") }, 
+    ]
+  },
+  {
+    group: t("召喚（敵對生物）"),
+    icon: ThunderboltOutlined,
+    commands: [
+      { label: t("殭尸"), cmd: "execute at {player} run summon zombie ~ ~ ~" }, 
+      { label: t("骷髏"), cmd: "execute at {player} run summon skeleton ~ ~ ~" }, 
+      { label: t("苦力怕"), cmd: "execute at {player} run summon creeper ~ ~ ~" }, 
+      { label: t("蜘蛛"), cmd: "execute at {player} run summon spider ~ ~ ~" }, 
+      { label: t("幽靈"), cmd: "execute at {player} run summon ghast ~ ~ ~" }, 
+      { label: t("末影龍（會破壞地形）"), cmd: "execute at {player} run summon ender_dragon ~ ~ ~" }, 
+      { label: t("凋零"), cmd: "execute at {player} run summon wither ~ ~ ~" }, 
+      { label: t("監守者"), cmd: "execute at {player} run summon warden ~ ~ ~" }, 
+      { label: t("微風"), cmd: "execute at {player} run summon breeze ~ ~ ~" }, 
+      { label: t("沼骸"), cmd: "execute at {player} run summon bogged ~ ~ ~" }, 
+      { label: t("掠奪者"), cmd: "execute at {player} run summon pillager ~ ~ ~" }, 
+      { label: t("衛道士"), cmd: "execute at {player} run summon vindicator ~ ~ ~" }, 
+      { label: t("喚魔者"), cmd: "execute at {player} run summon evoker ~ ~ ~" }, 
+      { label: t("幻術師"), cmd: "execute at {player} run summon illusioner ~ ~ ~" }, 
+    ]
+  },
+  {
+    group: t("召喚（中立生物）"),
+    icon: ThunderboltOutlined,
+    commands: [
+      { label: t("末影人"), cmd: "execute at {player} run summon enderman ~ ~ ~" }, 
+      { label: t("狼 (狗)"), cmd: "execute at {player} run summon wolf ~ ~ ~" }, 
+      { label: t("鐵人"), cmd: "execute at {player} run summon iron_golem ~ ~ ~" }, 
+      { label: t("蜜蜂"), cmd: "execute at {player} run summon bee ~ ~ ~" }, 
+      { label: t("豬靈"), cmd: "execute at {player} run summon piglin ~ ~ ~" }, 
+      { label: t("山羊"), cmd: "execute at {player} run summon goat ~ ~ ~" }, 
+      { label: t("駱駝"), cmd: "execute at {player} run summon camel ~ ~ ~" }, 
+    ]
+  },
+  {
+    group: t("召喚（友好生物）"),
+    icon: ThunderboltOutlined,
+    commands: [
+      { label: t("村民"), cmd: "execute at {player} run summon villager ~ ~ ~" }, 
+      { label: t("豬"), cmd: "execute at {player} run summon pig ~ ~ ~" }, 
+      { label: t("牛"), cmd: "execute at {player} run summon cow ~ ~ ~" }, 
+      { label: t("羊"), cmd: "execute at {player} run summon sheep ~ ~ ~" }, 
+      { label: t("雞"), cmd: "execute at {player} run summon chicken ~ ~ ~" }, 
+      { label: t("馬"), cmd: "execute at {player} run summon horse ~ ~ ~" }, 
+      { label: t("貓"), cmd: "execute at {player} run summon cat ~ ~ ~" }, 
+      { label: t("Allay"), cmd: "execute at {player} run summon allay ~ ~ ~" }, 
+      { label: t("Sniffer"), cmd: "execute at {player} run summon sniffer ~ ~ ~" }, 
+      { label: t("犰狳"), cmd: "execute at {player} run summon armadillo ~ ~ ~" }, 
+      { label: t("青蛙"), cmd: "execute at {player} run summon frog ~ ~ ~" }, 
+      { label: t("殭屍巨人"), cmd: "execute at {player} run summon giant ~ ~ ~" }, 
+    ]
+  },
+  {
+    group: t("召喚（特殊實體）"),
+    icon: ThunderboltOutlined,
+    commands: [
+      { label: t("閃電"), cmd: "execute at {player} run summon lightning_bolt ~ ~ ~" }, 
+      { label: t("盔甲架"), cmd: "execute at {player} run summon armor_stand ~ ~ ~" }, 
+      { label: t("船"), cmd: "execute at {player} run summon boat ~ ~ ~" }, 
     ]
   },
   {
