@@ -9,7 +9,7 @@ import os from "os";
 import { normalizedJoin } from "../tools/filepath";
 
 const ERROR_MSG_01 = $t("TXT_CODE_system_file.illegalAccess");
-const MAX_EDIT_SIZE = 1024 * 1024 * 5;
+const MAX_EDIT_SIZE = 1024 * 1024 * 15;
 
 interface IFile {
   name: string;
