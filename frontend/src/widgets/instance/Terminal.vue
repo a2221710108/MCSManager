@@ -99,14 +99,17 @@ const handleTabChange = async () => {
         rawText = res._value || res.value || res.data || res.content || "";
       }
 
-      const lines = rawText.split(/\r?\n/);
+      // 1. 先切割行，並限制只處理最後 1000 行
+      const lines = rawText.split(/\r?\n/).slice(-3000); 
       const targetLevel = activeTab.value.toUpperCase();
       const resultLines: string[] = [];
       let isCapturing = false;
+      
 
       // 匹配 [WARN] 或 /WARN: 等格式
       const levelRegex = new RegExp(`(\\[|\\/)${targetLevel}(\\]|\\:)`, "i");
-      const timestampRegex = /\[\d{2}:\d{2}:\d{2}\]/;
+      const timestampRegex = /\[.*?\d{2}:\d{2}:\d{2}.*?\]/;
+      // const timestampRegex = /\[\d{2}:\d{2}:\d{2}\]/;
 
       for (const line of lines) {
         if (!line.trim()) continue;
@@ -129,6 +132,16 @@ const handleTabChange = async () => {
         resultLines.length > 0 ? resultLines.join("\n") : `--- 未發現 ${targetLevel} ---`,
         false
       );
+
+      // 3. 關鍵：確保在渲染後滾動到底部
+      // 使用 setTimeout 確保 Xterm.js 已經完成字元解析
+      setTimeout(() => {
+        const term = terminalCoreRef.value?.getTerminal?.();
+        if (term) {
+          term.scrollToBottom();
+        }
+      }, 50);
+      
     } catch (err: any) {
       terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版");
     }
