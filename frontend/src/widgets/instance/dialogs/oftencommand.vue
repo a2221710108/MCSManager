@@ -723,5 +723,5 @@ defineExpose({ openDialog });
 /* 確保搜尋時列表過渡平滑 */
 .custom-collapse {
   transition: all 0.3s ease;
-  
+  }
 </style>
