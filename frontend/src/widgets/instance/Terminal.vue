@@ -108,6 +108,10 @@ const handleTabChange = async () => {
       const levelRegex = new RegExp(`(\\[|\\/)${targetLevel}(\\]|\\:)`, "i");
       const timestampRegex = /\[\d{2}:\d{2}:\d{2}\]/;
 
+      // 定義 ANSI 顏色代碼：黃色 (33), 紅色 (31), 粗體 (1)
+      const colorCode = targetLevel === "WARN" ? "\x1b[1;33m" : "\x1b[1;31m";
+      const resetCode = "\x1b[0m";
+
       for (const line of lines) {
         if (!line.trim()) continue;
         const hasTimestamp = timestampRegex.test(line);
@@ -129,8 +133,14 @@ const handleTabChange = async () => {
         resultLines.length > 0 ? resultLines.join("\n") : `--- 未發現 ${targetLevel} ---`,
         false
       );
+
+      // 確保在渲染後滾動到底部
+      await nextTick();
+      const term = terminalCoreRef.value?.getTerminal?.();
+      if (term) term.scrollToBottom();
+      
     } catch (err: any) {
-      terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版");
+      terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版 + err.message, false");
     }
   }
 };
