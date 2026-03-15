@@ -31,7 +31,8 @@ import {
   PlusOutlined,
   ScissorOutlined,
   SearchOutlined,
-  UploadOutlined
+  UploadOutlined,
+  ExportOutlined
 } from "@ant-design/icons-vue";
 import { Modal, type ItemType, type UploadChangeParam, type UploadProps } from "ant-design-vue";
 import dayjs from "dayjs";
@@ -261,6 +262,20 @@ const handleClickFile = async (file: DataType) => {
 
 const menuList = (record: DataType) =>
   arrayFilter<ItemType & { style?: CSSProperties }>([
+    // --- 新增開始 ---
+    {
+      label: "在新分頁開啟", // 或者使用 t("TXT_CODE_NEW_TAB") 如果你有翻譯的話
+      key: "open-new-tab",
+      icon: h(ExportOutlined), // 你也可以換成其他圖標
+      onClick: () => {
+        // 這裡調用你之前在 useFileManager 定義的 openInNewTab
+        // 傳入資料夾名稱和當前路徑
+        openInNewTab(record.name, currentPath.value);
+      },
+      // 關鍵：只有當類型是資料夾 (type === 0) 且不是多選模式時顯示
+      condition: () => record.type === 0 && !isMultiple.value
+    },
+    // --- 新增結束 ---
     {
       label: t("TXT_CODE_b147fabc"),
       key: "new",
