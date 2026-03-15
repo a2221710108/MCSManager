@@ -133,16 +133,19 @@ const handleTabChange = async () => {
         false
       );
 
-      // --- 新增：顯示後自動捲動到底部 ---
+      // --- 針對 static-log-content 進行捲動 ---
       await nextTick();
-      const el = terminalCoreRef.value?.$el; // 獲取組件根元素
-      if (el) {
-        // 尋找組件內真正負責捲動的容器（通常是 pre, code 或自定義的 wrapper）
-        // 如果 TerminalCore 內部直接是滾動區域，可以直接 el.scrollTop
-        // 這裡嘗試尋找常見的滾動容器類名，或者直接捲動根元素
-        const container = el.querySelector(".xterm-viewport") || el.querySelector(".log-view-container") || el;
-        container.scrollTop = container.scrollHeight;
-      }
+      // 使用 setTimeout 確保 content 已經填充到 pre 標籤內
+      setTimeout(() => {
+        const el = terminalCoreRef.value?.$el;
+        if (el) {
+          // 關鍵點：尋找 TerminalCore.vue 裡面定義的那個滾動容器
+          const container = el.querySelector(".static-log-content");
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          }
+        }
+      }, 60);
       
     } catch (err: any) {
       terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版：" + err.message, false);
