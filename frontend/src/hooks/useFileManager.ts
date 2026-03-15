@@ -115,6 +115,28 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     return result;
   };
 
+  // 在 useFileManager 內部添加這個函數
+const openInNewTab = (name: string, path: string) => {
+  if (currentTabs.value.length >= 10) {
+    return message.warning(t("TXT_CODE_22042570")); // 標籤上限
+  }
+  
+  const fullPath = removeTrail(path, "/") + "/" + name;
+  const key = v4();
+  
+  // 1. 推入新標籤
+  currentTabs.value.push({
+    name: name, // 標籤顯示資料夾名
+    path: fullPath,
+    closable: true,
+    key,
+    pushedTime: Date.now()
+  });
+  
+  // 2. 切換到該標籤
+  handleChangeTab(key);
+};
+  
   const getLastNameFromPath = (path: string) => {
     if (path === "/" || !path) return "/";
     const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
@@ -825,6 +847,7 @@ export const useFileManager = (instanceId: string = "", daemonId: string = "") =
     pushSelected,
     oneSelected,
     isImage,
-    showImage
+    showImage,
+    openInNewTab
   };
 };
