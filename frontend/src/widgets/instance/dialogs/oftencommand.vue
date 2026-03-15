@@ -15,7 +15,8 @@ import {
   SearchOutlined,
   TeamOutlined,
   ShopOutlined,
-  SubnodeOutlined
+  SubnodeOutlined,
+  PlayCircleOutlined
 } from "@ant-design/icons-vue";
   
 const searchQuery = ref("");
@@ -243,6 +244,29 @@ const COMMAND_GROUPS: CommandGroup[] = [
       { label: t("水中移動效率"), cmd: "attribute @a minecraft:water_movement_efficiency base set {text}", placeholder: t("數值") }, 
       { label: t("路徑點傳輸距離"), cmd: "attribute @a minecraft:waypoint_transmit_range base set {text}", placeholder: t("數值") }, 
       { label: t("路徑點接收距離"), cmd: "attribute @a minecraft:waypoint_receive_range base set {text}", placeholder: t("數值") }, 
+    ]
+  },
+  {
+    group: t("播放音效"),
+    icon: PlayCircleOutlined,
+    commands: [
+      { label: t("苦力怕即將爆炸"), cmd: "playsound entity.creeper.primed master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("隨機洞穴音效"), cmd: "playsound ambient.cave master master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("終界使者瞬移"), cmd: "playsound entity.enderman.teleport master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("惡魂的尖叫"), cmd: "playsound entity.ghast.scream master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("殭屍敲門"), cmd: "playsound entity.zombie.attack_wooden_door master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("村民的憤怒"), cmd: "playsound entity.villager.no master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("地獄門"), cmd: "playsound block.portal.ambient master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("閃電"), cmd: "playsound entity.lightning_bolt.thunder master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("吃東西"), cmd: "playsound entity.generic.eat master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("凋零誕生"), cmd: "playsound entity.wither.spawn master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("凋零死亡"), cmd: "playsound entity.wither.death master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("守衛者驚嚇"), cmd: "playsound entity.elder_guardian.curse master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("Warden的心跳"), cmd: "playsound entity.warden.heartbeat master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("Warden的超音波"), cmd: "playsound entity.warden.sonic_boom master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("末影龍死亡"), cmd: "playsound entity.wither.death master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("凋零死亡"), cmd: "playsound entity.ender_dragon.death master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
+      { label: t("凋零死亡"), cmd: "playsound entity.wither.death master {player} ~ ~ ~ {text} {text}", placeholder: [t("玩家"), t("範圍(0.1以上)"), t("音調(0.1以上)")] },
     ]
   },
   {
