@@ -25,10 +25,7 @@ const open = ref(false);
 const uploading = ref(false);
 const { isPhone } = useScreen();
 
-const props = defineProps<{
-  daemonId: string;
-  instanceId: string;
-}>();
+const props = defineProps<{ daemonId: string; instanceId: string; }>();
 
 const { execute: fetchFiles } = getFileListApi();
 const { execute: executeDelete } = deleteFileApi();
@@ -53,28 +50,31 @@ interface DetectedWorld {
 
 const openDialog = () => { open.value = true; };
 
-// 歸一化路徑，確保結尾只有一個 /
 const normalizePath = (path: string) => {
-  const p = path.replace(/\/+$/, "");
-  return p + "/";
+  return path.replace(/\/+$/, "") + "/";
 };
 
-// 智慧掃描：找出所有包含 level.dat 的目錄
+// --- 重構後的智慧掃描 ---
 const deepScanWorlds = async (targetPath: string, results: DetectedWorld[] = []) => {
   const currentPath = normalizePath(targetPath);
+  console.log(`[Scanning] Checking directory: ${currentPath}`);
+  
   try {
     const res = await fetchFiles({
       params: { 
         daemonId: props.daemonId, uuid: props.instanceId, 
-        target: currentPath, page: 0, page_size: 100, file_name: "" 
+        target: currentPath, page: 0, page_size: 1000, file_name: "" 
       }
     });
     
     const items = res.value?.items || [];
+    console.log(`[Scanning] Found ${items.length} items in ${currentPath}`);
+
+    // 檢查是否有 level.dat
     const hasLevelDat = items.some(i => i.name.toLowerCase() === "level.dat");
 
     if (hasLevelDat) {
-      console.log("Found level.dat at:", currentPath);
+      console.log(`[Found] level.dat detected at: ${currentPath}`);
       const lowerPath = currentPath.toLowerCase();
       results.push({
         path: currentPath,
@@ -83,16 +83,18 @@ const deepScanWorlds = async (targetPath: string, results: DetectedWorld[] = [])
       });
     }
 
+    // 使用 for...of 確保異步順序執行
     for (const item of items) {
-      // 排除非資料夾，以及常見的非地圖大資料夾以提升掃描性能
-      if (item.type === 1) {
+      if (item.type === 1) { // 僅處理資料夾
         const folderName = item.name.toLowerCase();
-        if (["logs", "plugins", "cache", "region", "entities", "poi"].includes(folderName)) continue;
+        // 排除掉不可能是存檔目錄的地方，避免無限遞歸
+        if (["logs", "plugins", "cache", "region", "entities", "poi", "playerdata"].includes(folderName)) continue;
+        
         await deepScanWorlds(`${currentPath}${item.name}/`, results);
       }
     }
   } catch (e) {
-    console.error("Scan Error at " + currentPath, e);
+    console.error(`[Scan Error] Failed to scan ${currentPath}:`, e);
   }
   return results;
 };
@@ -107,14 +109,13 @@ const handleMapReplace = async (file: File) => {
 
   Modal.confirm({
     title: t("確認智慧替換？"),
-    icon: createVNode(WarningOutlined),
-    content: t("系統將自動分析結構並對齊 /world，原有地圖將被覆蓋。"),
+    content: t("系統將分析結構並自動對齊維度，覆蓋原有 /world 目錄。"),
     onOk: async () => {
       try {
         uploading.value = true;
         const tempDirName = `tmp_map_${Date.now()}`;
         
-        // --- 階段 A: 上傳 ---
+        // --- 1. 上傳 ---
         message.loading({ content: t("正在準備通道..."), key: msgKey });
         const mission = await getUploadMissionCfg({
           params: { upload_dir: "/", daemonId: props.daemonId, uuid: props.instanceId, file_name: file.name }
@@ -131,32 +132,29 @@ const handleMapReplace = async (file: File) => {
           });
         });
 
-        // --- 階段 B: 解壓 ---
+        // --- 2. 解壓 ---
         message.loading({ content: t("正在解壓分析..."), key: msgKey });
         await executeCompress({
           params: { uuid: props.instanceId, daemonId: props.daemonId },
           data: { type: 2, code: "utf-8", source: "/" + file.name, targets: `/${tempDirName}/` }
         });
 
-        // --- 階段 C: 智慧識別 ---
-        console.log("Starting deep scan...");
+        // --- 3. 掃描與決策 ---
+        console.log("--- Starting Deep Scan Process ---");
         const allDetected = await deepScanWorlds(`/${tempDirName}/`);
-        console.log("All detected paths:", JSON.parse(JSON.stringify(allDetected)));
+        console.log("--- Scan Finished ---", allDetected);
 
-        // 找主世界：路徑最短且不含維度關鍵字
         const mainWorld = allDetected
           .filter(w => !w.isNether && !w.isEnd)
           .sort((a, b) => a.path.length - b.path.length)[0];
 
         if (!mainWorld) {
-          console.error("Scan result empty. Detected list:", allDetected);
-          throw new Error(t("壓縮包內找不到有效的主世界存檔 (level.dat)"));
+          throw new Error(t("無法在壓縮包中定位 level.dat。請確保上傳的是正確的存檔包。"));
         }
 
         const moveTargets: [string, string][] = [[mainWorld.path, "/world/"]];
         const deleteTargets = ["/world", "/world_nether", "/world_the_end"];
 
-        // 檢查地獄與末地（若不在主世界目錄下才獨立移動）
         const nether = allDetected.find(w => w.isNether);
         if (nether && !nether.path.startsWith(mainWorld.path)) {
           moveTargets.push([nether.path, "/world_nether/"]);
@@ -167,8 +165,8 @@ const handleMapReplace = async (file: File) => {
           moveTargets.push([end.path, "/world_the_end/"]);
         }
 
-        // --- 階段 D: 執行對齊 ---
-        message.loading({ content: t("正在重組地圖目錄..."), key: msgKey });
+        // --- 4. 套用 ---
+        message.loading({ content: t("正在重組目錄..."), key: msgKey });
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: deleteTargets }
@@ -179,16 +177,16 @@ const handleMapReplace = async (file: File) => {
           data: { targets: moveTargets }
         });
 
-        // --- 階段 E: 清理 ---
+        // --- 5. 清理 ---
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: ["/" + file.name, "/" + tempDirName] }
         });
 
-        message.success({ content: t("智慧替換完成！"), key: msgKey });
+        message.success({ content: t("智慧替換成功！"), key: msgKey });
         open.value = false;
       } catch (err: any) {
-        message.error({ content: t("錯誤: ") + err.message, key: msgKey });
+        message.error({ content: t("失敗: ") + err.message, key: msgKey });
       } finally {
         uploading.value = false;
       }
@@ -200,48 +198,40 @@ defineExpose({ openDialog });
 </script>
 
 <template>
-  <a-modal v-model:open="open" :title="t('智慧替換地圖')" :footer="null" centered :mask-closable="!uploading" width="480px">
+  <a-modal v-model:open="open" :title="t('地圖智慧替換')" :footer="null" centered :mask-closable="!uploading" width="480px">
     <div class="p-4">
       <div v-if="!uploading">
         <a-upload-dragger :show-upload-list="false" :before-upload="(file: any) => { handleMapReplace(file); return false; }">
           <p class="ant-upload-drag-icon"><CloudUploadOutlined /></p>
-          <p class="ant-upload-text">{{ t('點擊或拖入地圖壓縮包') }}</p>
-          <p class="ant-upload-hint">{{ t('自動識別 level.dat 並對齊維度目錄') }}</p>
+          <p class="ant-upload-text">拖入地圖壓縮包</p>
+          <p class="ant-upload-hint">自動對齊 /world、/world_nether 等目錄</p>
         </a-upload-dragger>
       </div>
 
-      <div v-else class="status-container py-4">
-        <div class="flex items-center justify-center mb-6">
+      <div v-else class="py-10 text-center">
+        <div class="mb-4 flex items-center justify-center">
           <LoadingOutlined v-if="uploadData.current" spin />
           <InteractionOutlined v-else spin />
-          <span class="ml-2 text-lg">
-            {{ uploadData.current ? t('正在上傳...') : t('正在處理文件...') }}
+          <span class="ml-2 text-base">
+            {{ uploadData.current ? t('正在傳輸...') : t('分析重組中...') }}
           </span>
         </div>
 
-        <div v-if="uploadData.current" class="px-4">
-          <div class="flex justify-between text-sm mb-1">
-            <span class="truncate w-64">{{ uploadData.currentFile }}</span>
-            <span>{{ progress }}%</span>
-          </div>
-          <a-progress :percent="progress" status="active" :show-info="false" :stroke-color="{ '0%': '#108ee9', '100%': '#87d068' }" />
-          <div class="text-right text-xs text-gray-400 mt-1">
+        <div v-if="uploadData.current" class="px-6">
+          <a-progress :percent="progress" status="active" :stroke-color="{ '0%': '#108ee9', '100%': '#87d068' }" />
+          <div class="mt-2 text-xs text-gray-400">
             {{ convertFileSize(uploadData.current[0].toString()) }} / {{ convertFileSize(uploadData.current[1].toString()) }}
           </div>
         </div>
-        <div v-else class="px-4">
-          <a-alert :message="t('正在執行智慧識別與目錄重組，請勿關閉...') " type="info" />
+        <div v-else class="px-6">
+          <a-alert :message="t('正在定位存檔特徵並對齊，請勿刷新頁面') " type="info" show-icon />
         </div>
-      </div>
-      <div class="mt-4 text-center text-gray-300 text-xs">
-        <p>* {{ t('支援識別單人存檔 (DIM-1) 或平級維度資料夾結構') }}</p>
       </div>
     </div>
   </a-modal>
 </template>
 
 <style scoped>
-.status-container { min-height: 180px; display: flex; flex-direction: column; justify-content: center; }
 .ml-2 { margin-left: 8px; }
 :deep(.ant-upload-drag) { border-radius: 12px; }
 </style>
