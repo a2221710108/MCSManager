@@ -14,7 +14,7 @@ import { CloudUploadOutlined, LoadingOutlined, DeleteOutlined } from "@ant-desig
 import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
 
-// 強制定義類型，避免 undefined 賦值錯誤
+// 定義掃描結果的類型接口
 interface WorldScanResult {
   path: string;
   isNether: boolean;
@@ -46,29 +46,48 @@ const progress = computed(() => {
 const openDialog = () => { open.value = true; };
 const normalizePath = (path: string) => path.replace(/\/+$/, "") + "/";
 
+/**
+ * 核心輔助：延遲與自動重試
+ */
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const safeExecute = async (fn: () => Promise<any>, retryCount = 0): Promise<any> => {
+  try {
+    await sleep(2500); // 每次執行 API 前強行冷靜 1 秒
+    return await fn();
+  } catch (err: any) {
+    if (err.message?.includes("冷卻期") && retryCount < 3) {
+      await sleep(2500); // 遇到冷卻期，等 2.5 秒後重試
+      return safeExecute(fn, retryCount + 1);
+    }
+    throw err;
+  }
+};
+
+/**
+ * 刪除現有存檔按鈕
+ */
 const handleDeleteCurrentWorld = async () => {
   const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
   if (info.value?.status !== 0) {
     return Modal.error({
       title: t("無法刪除存檔"),
-      content: t("伺服器正在運行或維護中，請先關閉伺服器後再清理檔案。"),
+      content: t("這將永久刪除您現有的存檔，除非你建立了備份。刪除後預設情況下，下次啟動伺服器將重新生成地圖。"),
       okText: t("知道了")
     });
   }
 
   Modal.confirm({
     title: t("確認刪除現有存檔？"),
-    content: t("這將永久刪除您現有的存檔，除非你建立了備份。刪除後預設情況下，下次啟動伺服器將重新生成地圖。"),
+    content: t("這將永久刪除您現有的存檔，除非你建立了備份"),
     okText: t("確定刪除"),
     okType: "danger",
     onOk: async () => {
       try {
-        await executeDelete({
+        await safeExecute(() => executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: ["/world", "/world_nether", "/world_the_end"] }
-        });
+        }));
         message.success(t("現有存檔已刪除"));
       } catch (err: any) {
         message.error(t("刪除失敗: ") + err.message);
@@ -86,29 +105,21 @@ const deepScanWorlds = async (targetPath: string, results: WorldScanResult[] = [
   const currentPath = normalizePath(targetPath);
   if (depth > 5) return results;
 
-  await sleep(2500);
-
   try {
-    const res = await fetchFiles({
+    const res = await safeExecute(() => fetchFiles({
       params: { daemonId: props.daemonId, uuid: props.instanceId, target: currentPath, page: 0, page_size: 100, file_name: "" }
-    });
+    }));
     
     const items = res.value?.items || [];
     const hasLevelDat = items.some(i => i.name.toLowerCase() === "level.dat" && i.type === 1);
     
     if (hasLevelDat) {
       const lowerPath = currentPath.toLowerCase();
-      
-      // 使用 !! 強制轉為布林值，確保不為 undefined
       const isNether: boolean = !!(lowerPath.endsWith("/dim-1/") || lowerPath.endsWith("/world_nether/") || lowerPath.endsWith("/nether/"));
       const isEndRaw: boolean = !!(lowerPath.endsWith("/dim1/") || lowerPath.endsWith("/world_the_end/") || lowerPath.endsWith("/the_end/") ||
                     (lowerPath.includes("end") && !lowerPath.includes("friend") && lowerPath.split('/').filter(Boolean).pop()?.includes("end")));
 
-      results.push({ 
-        path: currentPath, 
-        isNether: isNether, 
-        isEnd: isEndRaw && !isNether 
-      });
+      results.push({ path: currentPath, isNether: isNether, isEnd: isEndRaw && !isNether });
     }
 
     const subDirs = items.filter(i => i.type === 0 && !["logs", "plugins", "cache", "bin", "libraries", "versions", "config"].includes(i.name.toLowerCase()));
@@ -116,19 +127,16 @@ const deepScanWorlds = async (targetPath: string, results: WorldScanResult[] = [
       await deepScanWorlds(`${currentPath}${dir.name}/`, results, depth + 1);
     }
   } catch (e: any) {
-    if (e.message?.includes("冷卻期")) {
-      await sleep(2500);
-      return await deepScanWorlds(targetPath, results, depth);
-    }
+    console.error("Scan error:", e);
   }
   return results;
 };
 
 const resolveFinalPath = async (detectedPath: string, dimFolderName: string) => {
   try {
-    const res = await fetchFiles({
+    const res = await safeExecute(() => fetchFiles({
       params: { daemonId: props.daemonId, uuid: props.instanceId, target: detectedPath, page: 0, page_size: 50, file_name: "" }
-    });
+    }));
     const subDim = res.value?.items.find(i => i.name.toUpperCase() === dimFolderName && i.type === 0);
     return subDim ? normalizePath(`${detectedPath}${subDim.name}`) : detectedPath;
   } catch {
@@ -136,6 +144,9 @@ const resolveFinalPath = async (detectedPath: string, dimFolderName: string) => 
   }
 };
 
+/**
+ * 替換流程
+ */
 const handleMapReplace = async (file: File) => {
   if (!agreeTest.value || !agreeBackup.value) return message.error(t("請先勾選所有同意項目"));
 
@@ -157,53 +168,56 @@ const handleMapReplace = async (file: File) => {
         task.instanceInfo = { instanceId: props.instanceId, daemonId: props.daemonId };
       });
       const unwatch = watch(() => uploadService.uiData.value.current, (curr) => {
-        if (!uploading.value) { 
-          unwatch(); 
-          uploadService.stop(); 
-          reject(new Error("CANCEL")); 
-          return;
-        }
+        if (!uploading.value) { unwatch(); uploadService.stop(); reject(new Error("CANCEL")); return; }
         if (!curr) { unwatch(); resolve(); }
       });
     });
 
-    message.loading({ content: t("正在分析存檔結構..."), key: msgKey });
-    await executeCompress({ 
+    // --- 以下所有步驟都使用 safeExecute 並增加間隔 ---
+    
+    message.loading({ content: t("正在解壓存檔..."), key: msgKey });
+    await safeExecute(() => executeCompress({ 
       params: { uuid: props.instanceId, daemonId: props.daemonId }, 
       data: { type: 2, code: "utf-8", source: "/" + file.name, targets: `/${tempDirName}/` } 
-    });
+    }));
 
+    message.loading({ content: t("正在分析存檔結構..."), key: msgKey });
     const allDetected: WorldScanResult[] = await deepScanWorlds(`/${tempDirName}/`);
+    
     const nether = allDetected.find((w: WorldScanResult) => w.isNether);
     const end = allDetected.find((w: WorldScanResult) => w.isEnd);
-    const mainWorld = allDetected.filter((w: WorldScanResult) => !w.isNether && !w.isEnd).sort((a: WorldScanResult, b: WorldScanResult) => a.path.length - b.path.length)[0];
+    const mainWorld = allDetected.filter((w: WorldScanResult) => !w.isNether && !w.isEnd).sort((a, b) => a.path.length - b.path.length)[0];
 
     if (!mainWorld) throw new Error(t("無法定位主世界存檔"));
 
+    message.loading({ content: t("正在準備移動存檔..."), key: msgKey });
     const moveTasks: [string, string][] = [[mainWorld.path, "/world/"]];
     if (nether) moveTasks.push([await resolveFinalPath(nether.path, "DIM-1"), "/world/DIM-1/"]);
     if (end) moveTasks.push([await resolveFinalPath(end.path, "DIM1"), "/world/DIM1/"]);
 
-    await executeDelete({ 
+    // 刪除舊的
+    await safeExecute(() => executeDelete({ 
       params: { daemonId: props.daemonId, uuid: props.instanceId }, 
       data: { targets: ["/world", "/world_nether", "/world_the_end"] } 
-    });
+    }));
 
-    await executeMove({ 
+    // 移動新的
+    await safeExecute(() => executeMove({ 
       params: { daemonId: props.daemonId, uuid: props.instanceId }, 
       data: { targets: moveTasks } 
-    });
+    }));
 
-    await executeDelete({ 
+    // 清理臨時
+    await safeExecute(() => executeDelete({ 
       params: { daemonId: props.daemonId, uuid: props.instanceId }, 
       data: { targets: ["/" + file.name, "/" + tempDirName] } 
-    });
+    }));
 
     message.success({ content: t("存檔替換完成！"), key: msgKey });
     open.value = false;
   } catch (err: any) {
     if (err.message !== "CANCEL") message.error({ content: t("失敗: ") + err.message, key: msgKey });
-    executeDelete({ params: { daemonId: props.daemonId, uuid: props.instanceId }, data: { targets: ["/" + tempDirName] } });
+    safeExecute(() => executeDelete({ params: { daemonId: props.daemonId, uuid: props.instanceId }, data: { targets: ["/" + tempDirName] } }));
   } finally {
     uploading.value = false;
   }
