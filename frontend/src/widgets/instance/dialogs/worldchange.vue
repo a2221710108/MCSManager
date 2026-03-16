@@ -81,7 +81,7 @@ const deepScanWorlds = async (targetPath: string, results: any[] = [], depth = 0
   const currentPath = normalizePath(targetPath);
   if (depth > 5) return results;
   try {
-    const res = await fetchFiles({ params: { daemonId: props.daemonId, uuid: props.instanceId, target: currentPath, page: 0, page_size: 150, file_name: "" } });
+    const res = await fetchFiles({ params: { daemonId: props.daemonId, uuid: props.instanceId, target: currentPath, page: 0, page_size: 100, file_name: "" } });
     const items = res.value?.items || [];
     const hasLevelDat = items.some(i => i.name.toLowerCase() === "level.dat");
     if (hasLevelDat) {
