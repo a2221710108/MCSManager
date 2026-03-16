@@ -418,10 +418,9 @@ watch(instanceInfo, (cfg, oldCfg) => {
 
   <worldchange
     ref="worldchangeDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
+    :instance-id="instanceId ?? ''"
+    :daemon-id="daemonId ?? ''"
+    @save="refreshInstanceInfo"
   />
   
 </template> 
