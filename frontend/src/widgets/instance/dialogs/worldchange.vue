@@ -232,7 +232,7 @@ defineExpose({ openDialog });
           <span class="text-gray-400 text-xs">{{ t('存檔管理') }}</span>
           <a-button danger size="small" type="text" @click="handleDeleteCurrentWorld">
             <template #icon><DeleteOutlined /></template>
-            {{ t('刪除現有存檔') }}
+            {{ t('僅刪除現有存檔') }}
           </a-button>
         </div>
 
