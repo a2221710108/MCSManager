@@ -10,11 +10,7 @@ import {
   moveFile as moveFileApi 
 } from "@/services/apis/fileManager";
 import { getInstanceInfo } from "@/services/apis/instance";
-import { 
-  CloudUploadOutlined, 
-  InteractionOutlined,
-  LoadingOutlined 
-} from "@ant-design/icons-vue";
+import { CloudUploadOutlined, LoadingOutlined } from "@ant-design/icons-vue";
 import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
 
@@ -44,81 +40,83 @@ interface DetectedWorld {
 }
 
 const openDialog = () => { open.value = true; };
-
-const normalizePath = (path: string) => {
-  return path.replace(/\/+$/, "") + "/";
-};
+const normalizePath = (path: string) => path.replace(/\/+$/, "") + "/";
 
 /**
- * 精準掃描器：利用 type 標記區分目錄與檔案
- * 只有 type 為 0 (目錄) 時才進行遞歸
+ * 核心掃描器：基於內容特徵識別維度
  */
 const deepScanWorlds = async (targetPath: string, results: DetectedWorld[] = [], depth = 0) => {
   const currentPath = normalizePath(targetPath);
-  
-  // 地圖結構通常不會太深，5層是合理的防護界限
-  if (depth > 5) return results; 
+  if (depth > 5) return results;
 
   try {
     const res = await fetchFiles({
-      params: { 
-        daemonId: props.daemonId, uuid: props.instanceId, 
-        target: currentPath, page: 0, page_size: 100, file_name: "" 
-      }
+      params: { daemonId: props.daemonId, uuid: props.instanceId, target: currentPath, page: 0, page_size: 150, file_name: "" }
     });
-    
     const items = res.value?.items || [];
 
-    // 1. 檢查當前目錄下是否存在 level.dat (必須是檔案，type === 1)
+    // 1. 特徵檢測
     const hasLevelDat = items.some(i => i.name.toLowerCase() === "level.dat" && i.type === 1);
+    const hasDimMinus1 = items.some(i => i.name.toUpperCase() === "DIM-1" && i.type === 0);
+    const hasDimPlus1 = items.some(i => i.name.toUpperCase() === "DIM1" && i.type === 0);
+    const pathLower = currentPath.toLowerCase();
 
     if (hasLevelDat) {
-      const lowerPath = currentPath.toLowerCase();
-      // 識別維度 (地獄/末地)
-      const isNether = lowerPath.includes("nether") || lowerPath.includes("dim-1");
-      const isEnd = (lowerPath.includes("the_end") || lowerPath.includes("dim1") || lowerPath.includes("end")) && !lowerPath.includes("friend");
+      // 判定邏輯：不管資料夾叫什麼，裡面有 DIM-1 或路徑含 nether 就是地獄
+      const isNether = hasDimMinus1 || pathLower.includes("nether") || pathLower.includes("dim-1");
+      const isEnd = hasDimPlus1 || ((pathLower.includes("end") || pathLower.includes("dim1")) && !pathLower.includes("friend"));
       
-      results.push({ path: currentPath, isNether, isEnd });
-      // 找到 level.dat 後通常不需要再深入該目錄的子資料夾
-      return results;
+      results.push({ 
+        path: currentPath, 
+        isNether: !!isNether, 
+        isEnd: !!isEnd && !isNether // 防止雙重判定
+      });
     }
 
-    // 2. 篩選出真正的子目錄 (type === 0) 並排除無關路徑
-    const subDirs = items.filter(item => {
-      const name = item.name.toLowerCase();
-      const isSystemDir = ["logs", "plugins", "cache", "bin", "libraries", "versions", "config", "metadata"].includes(name);
-      return item.type === 0 && !isSystemDir;
-    });
-
-    // 3. 併發遞歸掃描，提升效能
-    await Promise.all(subDirs.map(dir => 
-      deepScanWorlds(`${currentPath}${dir.name}/`, results, depth + 1)
-    ));
-
+    // 2. 獲取子目錄並遞歸（循序掃描避免 500 錯誤）
+    const subDirs = items.filter(i => i.type === 0 && !["logs", "plugins", "cache", "bin", "libraries", "versions", "config"].includes(i.name.toLowerCase()));
+    for (const dir of subDirs) {
+      await deepScanWorlds(`${currentPath}${dir.name}/`, results, depth + 1);
+    }
   } catch (e) {
-    console.warn(`[Scan] 無法讀取路徑: ${currentPath}`, e);
+    console.warn(`[Scan] Skip: ${currentPath}`);
   }
   return results;
+};
+
+/**
+ * 路徑穿透器：解決套娃問題
+ * 如果 detectedPath 裡面還有一個 DIM 資料夾，則返回子資料夾路徑
+ */
+const resolveFinalPath = async (detectedPath: string, dimFolderName: string) => {
+  try {
+    const res = await fetchFiles({
+      params: { daemonId: props.daemonId, uuid: props.instanceId, target: detectedPath, page: 0, page_size: 50, file_name: "" }
+    });
+    const items = res.value?.items || [];
+    const subDim = items.find(i => i.name.toUpperCase() === dimFolderName && i.type === 0);
+    return subDim ? normalizePath(`${detectedPath}${subDim.name}`) : detectedPath;
+  } catch {
+    return detectedPath;
+  }
 };
 
 const handleMapReplace = async (file: File) => {
   const msgKey = "map_replace_task";
   const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
   
-  if (info.value?.status !== 0) {
-    return Modal.warning({ title: t("伺服器運行中"), content: t("請先關閉伺服器後再進行地圖替換。") });
-  }
+  if (info.value?.status !== 0) return Modal.warning({ title: t("伺服器運行中"), content: t("請先關閉伺服器。") });
 
   Modal.confirm({
     title: t("地圖智慧替換"),
-    content: t("系統將精準解析壓縮包結構並自動對齊維度。這將覆蓋現有的 world 資料夾，確定繼續嗎？"),
+    content: t("系統將自動識別並對齊存檔結構（支持亂序命名與插件服結構）。確定繼續嗎？"),
     onOk: async () => {
       try {
         uploading.value = true;
         const tempDirName = `tmp_map_${Date.now()}`;
         
-        // 1. 上傳壓縮包
-        message.loading({ content: t("正在上傳存檔..."), key: msgKey });
+        // 1. 上傳
+        message.loading({ content: t("正在上傳..."), key: msgKey });
         const mission = await getUploadMissionCfg({
           params: { upload_dir: "/", daemonId: props.daemonId, uuid: props.instanceId, file_name: file.name }
         });
@@ -133,53 +131,53 @@ const handleMapReplace = async (file: File) => {
         });
 
         // 2. 解壓
-        message.loading({ content: t("正在解壓並分析結構..."), key: msgKey });
+        message.loading({ content: t("正在解壓分析..."), key: msgKey });
         await executeCompress({
           params: { uuid: props.instanceId, daemonId: props.daemonId },
           data: { type: 2, code: "utf-8", source: "/" + file.name, targets: `/${tempDirName}/` }
         });
 
-        // 3. 掃描分析
+        // 3. 執行智慧掃描
         const allDetected = await deepScanWorlds(`/${tempDirName}/`);
         
-        // 提取主世界 (取路徑最短的那個)
-        const mainWorld = allDetected
-          .filter(w => !w.isNether && !w.isEnd)
-          .sort((a, b) => a.path.length - b.path.length)[0];
+        // 篩選邏輯
+        const nether = allDetected.find(w => w.isNether);
+        const end = allDetected.find(w => w.isEnd);
+        const mainWorld = allDetected.filter(w => !w.isNether && !w.isEnd).sort((a, b) => a.path.length - b.path.length)[0];
 
-        if (!mainWorld) throw new Error(t("壓縮包內找不到有效的 level.dat 存檔。"));
+        if (!mainWorld) throw new Error(t("壓縮包內找不到有效的主世界存檔 (level.dat)"));
 
-        // 4. 重組搬運
-        message.loading({ content: t("正在對齊存檔結構..."), key: msgKey });
-        
-        // 準備搬運清單
+        // 4. 構建搬運任務並執行「路徑穿透」
+        message.loading({ content: t("正在對齊結構..."), key: msgKey });
         const moveTasks: [string, string][] = [[mainWorld.path, "/world/"]];
 
-        const nether = allDetected.find(w => w.isNether);
-        if (nether) moveTasks.push([nether.path, "/world/DIM-1/"]);
+        if (nether) {
+          const finalNetherPath = await resolveFinalPath(nether.path, "DIM-1");
+          moveTasks.push([finalNetherPath, "/world/DIM-1/"]);
+        }
+        if (end) {
+          const finalEndPath = await resolveFinalPath(end.path, "DIM1");
+          moveTasks.push([finalEndPath, "/world/DIM1/"]);
+        }
 
-        const end = allDetected.find(w => w.isEnd);
-        if (end) moveTasks.push([end.path, "/world/DIM1/"]);
-
-        // 清理舊資料夾
+        // 5. 清理舊地圖並移動新地圖
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
-          data: { targets: ["/world", "/world_nether", "/world_the_end"] }
+          data: { targets: ["/world"] } 
         });
 
-        // 執行搬運
         await executeMove({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: moveTasks }
         });
 
-        // 5. 清理臨時檔案
+        // 6. 最終清理
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: ["/" + file.name, "/" + tempDirName] }
         });
 
-        message.success({ content: t("地圖替換完成！"), key: msgKey });
+        message.success({ content: t("地圖智慧替換完成！"), key: msgKey });
         open.value = false;
       } catch (err: any) {
         message.error({ content: t("操作失敗: ") + err.message, key: msgKey });
@@ -197,19 +195,16 @@ defineExpose({ openDialog });
   <a-modal v-model:open="open" :title="t('地圖智慧替換')" :footer="null" centered :mask-closable="!uploading" width="480px">
     <div class="p-4">
       <div v-if="!uploading">
-        <a-upload-dragger 
-          :show-upload-list="false" 
-          :before-upload="(file: any) => { handleMapReplace(file); return false; }"
-        >
+        <a-upload-dragger :show-upload-list="false" :before-upload="(file: any) => { handleMapReplace(file); return false; }">
           <p class="ant-upload-drag-icon"><CloudUploadOutlined style="color: #1890ff" /></p>
           <p class="ant-upload-text">點擊或拖拽地圖壓縮包至此</p>
-          <p class="ant-upload-hint">支持自動分析子目錄，利用文件類型標記實現快速結構對齊</p>
+          <p class="ant-upload-hint">無視目錄命名、自動識別插件服/原版結構並對齊維度</p>
         </a-upload-dragger>
       </div>
       <div v-else class="py-10 text-center">
         <LoadingOutlined spin style="font-size: 24px; color: #1890ff" />
         <div class="mt-4 text-base font-medium">
-          {{ uploadData.current ? t('正在傳輸存檔文件...') : t('正在處理地圖結構...') }}
+          {{ uploadData.current ? t('數據傳輸中...') : t('分析與對齊結構中...') }}
         </div>
         <div v-if="uploadData.current" class="mt-4 px-10">
           <a-progress :percent="progress" status="active" size="small" />
