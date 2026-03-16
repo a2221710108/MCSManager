@@ -29,7 +29,6 @@ const { execute: executeMove } = moveFileApi();
 
 const uploadData = uploadService.uiData;
 
-// 恢復原始的進度條計算邏輯
 const progress = computed(() => {
   if (uploadData.value.current) {
     return Math.floor((uploadData.value.current[0] * 100) / uploadData.value.current[1]);
@@ -41,23 +40,26 @@ const openDialog = () => { open.value = true; };
 const normalizePath = (path: string) => path.replace(/\/+$/, "") + "/";
 
 /**
- * 刪除現有存檔按鈕（新增伺服器狀態檢查）
+ * 輔助函數：延遲
+ */
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * 刪除現有存檔按鈕
  */
 const handleDeleteCurrentWorld = async () => {
-  // 1. 檢查伺服器狀態
   const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
   if (info.value?.status !== 0) {
     return Modal.error({
       title: t("無法刪除存檔"),
-      content: t("伺服器正在運行或維護中，請先關閉伺服器後再清理檔案。"),
+      content: t("這將永久刪除您現有的存檔，除非你建立了備份。刪除後預設情況下，下次啟動伺服器將重新生成地圖。"),
       okText: t("知道了")
     });
   }
 
-  // 2. 狀態檢查通過後彈出確認框
   Modal.confirm({
     title: t("確認刪除現有存檔？"),
-    content: t("這將永久刪除您現有的存檔，除非你建立了備份。刪除後預設情況下，下次啟動伺服器將重新生成地圖。"),
+    content: t("這將永久刪除您現有的存檔，除非你建立了備份"),
     okText: t("確定刪除"),
     okType: "danger",
     onOk: async () => {
@@ -79,56 +81,50 @@ const handleDeleteCurrentWorld = async () => {
  */
 const handleCancelUpload = () => {
   uploading.value = false;
-  // 這裡不直接寫 stop，交給 handleMapReplace 裡的 watch 統一處理 reject 和 stop
   message.warn(t("操作已取消"));
 };
 
 /**
- * 智慧掃描器：修正主世界判定邏輯
+ * 智慧掃描器：加入延遲以避開 API 冷卻期
  */
 const deepScanWorlds = async (targetPath: string, results: any[] = [], depth = 0) => {
   const currentPath = normalizePath(targetPath);
   if (depth > 5) return results;
 
+  // 1. 主動延遲，避免請求過快觸發後端限流
+  await sleep(3000);
+
   try {
     const res = await fetchFiles({
       params: { daemonId: props.daemonId, uuid: props.instanceId, target: currentPath, page: 0, page_size: 100, file_name: "" }
     });
+    
     const items = res.value?.items || [];
-
     const hasLevelDat = items.some(i => i.name.toLowerCase() === "level.dat" && i.type === 1);
     
     if (hasLevelDat) {
       const lowerPath = currentPath.toLowerCase();
-      
-      // 精確判定：只有路徑本身以維度關鍵字結尾才判定為維度
-      const isNether = lowerPath.endsWith("/dim-1/") || 
-                       lowerPath.endsWith("/world_nether/") || 
-                       lowerPath.endsWith("/nether/");
-
-      const isEnd = lowerPath.endsWith("/dim1/") || 
-                    lowerPath.endsWith("/world_the_end/") || 
-                    lowerPath.endsWith("/the_end/") ||
+      const isNether = lowerPath.endsWith("/dim-1/") || lowerPath.endsWith("/world_nether/") || lowerPath.endsWith("/nether/");
+      const isEnd = lowerPath.endsWith("/dim1/") || lowerPath.endsWith("/world_the_end/") || lowerPath.endsWith("/the_end/") ||
                     (lowerPath.includes("end") && !lowerPath.includes("friend") && lowerPath.split('/').filter(Boolean).pop()?.includes("end"));
 
-      results.push({ 
-        path: currentPath, 
-        isNether: isNether, 
-        isEnd: isEnd && !isNether 
-      });
+      results.push({ path: currentPath, isNether: isNether, isEnd: isEnd && !isNether });
     }
 
     const subDirs = items.filter(i => i.type === 0 && !["logs", "plugins", "cache", "bin", "libraries", "versions", "config"].includes(i.name.toLowerCase()));
     for (const dir of subDirs) {
       await deepScanWorlds(`${currentPath}${dir.name}/`, results, depth + 1);
     }
-  } catch (e) {}
+  } catch (e: any) {
+    // 2. 被動重試：如果遇到冷卻期報錯，等待後重試當前目錄
+    if (e.message?.includes("冷卻期")) {
+      await sleep(2500);
+      return await deepScanWorlds(targetPath, results, depth);
+    }
+  }
   return results;
 };
 
-/**
- * 穿透檢查：防止套娃
- */
 const resolveFinalPath = async (detectedPath: string, dimFolderName: string) => {
   try {
     const res = await fetchFiles({
@@ -155,7 +151,6 @@ const handleMapReplace = async (file: File) => {
   const tempDirName = `tmp_map_${Date.now()}`;
 
   try {
-    // 1. 上傳
     message.loading({ content: t("開始上載..."), key: msgKey });
     const mission = await getUploadMissionCfg({ params: { upload_dir: "/", daemonId: props.daemonId, uuid: props.instanceId, file_name: file.name } });
     const config = mission.value;
@@ -166,26 +161,22 @@ const handleMapReplace = async (file: File) => {
         task.instanceInfo = { instanceId: props.instanceId, daemonId: props.daemonId };
       });
       const unwatch = watch(() => uploadService.uiData.value.current, (curr) => {
-        // 如果用戶點擊取消，觸發 stop 並 reject
         if (!uploading.value) { 
           unwatch(); 
           uploadService.stop(); 
           reject(new Error("CANCEL")); 
           return;
         }
-        // 如果當前任務已消失（完成），則 resolve
         if (!curr) { unwatch(); resolve(); }
       });
     });
 
-    // 2. 解壓
     message.loading({ content: t("正在分析存檔結構..."), key: msgKey });
     await executeCompress({ 
       params: { uuid: props.instanceId, daemonId: props.daemonId }, 
       data: { type: 2, code: "utf-8", source: "/" + file.name, targets: `/${tempDirName}/` } 
     });
 
-    // 3. 掃描
     const allDetected = await deepScanWorlds(`/${tempDirName}/`);
     const nether = allDetected.find(w => w.isNether);
     const end = allDetected.find(w => w.isEnd);
@@ -193,7 +184,6 @@ const handleMapReplace = async (file: File) => {
 
     if (!mainWorld) throw new Error(t("無法定位主世界存檔"));
 
-    // 4. 對齊與搬運
     const moveTasks: [string, string][] = [[mainWorld.path, "/world/"]];
     if (nether) moveTasks.push([await resolveFinalPath(nether.path, "DIM-1"), "/world/DIM-1/"]);
     if (end) moveTasks.push([await resolveFinalPath(end.path, "DIM1"), "/world/DIM1/"]);
@@ -208,7 +198,6 @@ const handleMapReplace = async (file: File) => {
       data: { targets: moveTasks } 
     });
 
-    // 5. 清理臨時檔案
     await executeDelete({ 
       params: { daemonId: props.daemonId, uuid: props.instanceId }, 
       data: { targets: ["/" + file.name, "/" + tempDirName] } 
@@ -217,10 +206,7 @@ const handleMapReplace = async (file: File) => {
     message.success({ content: t("存檔替換完成！"), key: msgKey });
     open.value = false;
   } catch (err: any) {
-    if (err.message !== "CANCEL") {
-      message.error({ content: t("失敗: ") + err.message, key: msgKey });
-    }
-    // 發生錯誤或取消時也嘗試清理臨時目錄
+    if (err.message !== "CANCEL") message.error({ content: t("失敗: ") + err.message, key: msgKey });
     executeDelete({ params: { daemonId: props.daemonId, uuid: props.instanceId }, data: { targets: ["/" + tempDirName] } });
   } finally {
     uploading.value = false;
