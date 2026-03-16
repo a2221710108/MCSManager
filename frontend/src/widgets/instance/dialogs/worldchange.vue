@@ -14,7 +14,7 @@ import { CloudUploadOutlined, LoadingOutlined, DeleteOutlined } from "@ant-desig
 import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
 
-// 定義掃描結果的類型接口
+// 強制定義類型，避免 undefined 賦值錯誤
 interface WorldScanResult {
   path: string;
   isNether: boolean;
@@ -46,14 +46,8 @@ const progress = computed(() => {
 const openDialog = () => { open.value = true; };
 const normalizePath = (path: string) => path.replace(/\/+$/, "") + "/";
 
-/**
- * 輔助函數：延遲
- */
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * 刪除現有存檔按鈕
- */
 const handleDeleteCurrentWorld = async () => {
   const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
   if (info.value?.status !== 0) {
@@ -83,17 +77,11 @@ const handleDeleteCurrentWorld = async () => {
   });
 };
 
-/**
- * 取消上傳邏輯
- */
 const handleCancelUpload = () => {
   uploading.value = false;
   message.warn(t("操作已取消"));
 };
 
-/**
- * 智慧掃描器：明確指定返回類型為 Promise<WorldScanResult[]>
- */
 const deepScanWorlds = async (targetPath: string, results: WorldScanResult[] = [], depth = 0): Promise<WorldScanResult[]> => {
   const currentPath = normalizePath(targetPath);
   if (depth > 5) return results;
@@ -110,11 +98,17 @@ const deepScanWorlds = async (targetPath: string, results: WorldScanResult[] = [
     
     if (hasLevelDat) {
       const lowerPath = currentPath.toLowerCase();
-      const isNether = lowerPath.endsWith("/dim-1/") || lowerPath.endsWith("/world_nether/") || lowerPath.endsWith("/nether/");
-      const isEnd = lowerPath.endsWith("/dim1/") || lowerPath.endsWith("/world_the_end/") || lowerPath.endsWith("/the_end/") ||
-                    (lowerPath.includes("end") && !lowerPath.includes("friend") && lowerPath.split('/').filter(Boolean).pop()?.includes("end"));
+      
+      // 使用 !! 強制轉為布林值，確保不為 undefined
+      const isNether: boolean = !!(lowerPath.endsWith("/dim-1/") || lowerPath.endsWith("/world_nether/") || lowerPath.endsWith("/nether/"));
+      const isEndRaw: boolean = !!(lowerPath.endsWith("/dim1/") || lowerPath.endsWith("/world_the_end/") || lowerPath.endsWith("/the_end/") ||
+                    (lowerPath.includes("end") && !lowerPath.includes("friend") && lowerPath.split('/').filter(Boolean).pop()?.includes("end")));
 
-      results.push({ path: currentPath, isNether: isNether, isEnd: isEnd && !isNether });
+      results.push({ 
+        path: currentPath, 
+        isNether: isNether, 
+        isEnd: isEndRaw && !isNether 
+      });
     }
 
     const subDirs = items.filter(i => i.type === 0 && !["logs", "plugins", "cache", "bin", "libraries", "versions", "config"].includes(i.name.toLowerCase()));
@@ -142,9 +136,6 @@ const resolveFinalPath = async (detectedPath: string, dimFolderName: string) => 
   }
 };
 
-/**
- * 替換流程
- */
 const handleMapReplace = async (file: File) => {
   if (!agreeTest.value || !agreeBackup.value) return message.error(t("請先勾選所有同意項目"));
 
