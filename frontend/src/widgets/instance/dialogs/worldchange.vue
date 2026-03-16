@@ -6,7 +6,8 @@ import {
   fileList as getFileListApi, 
   deleteFile as deleteFileApi, 
   compressFile as compressFileApi,
-  uploadAddress 
+  uploadAddress,
+  moveFile as moveFileApi 
 } from "@/services/apis/fileManager";
 import { getInstanceInfo } from "@/services/apis/instance";
 import { useScreen } from "@/hooks/useScreen";
@@ -35,8 +36,9 @@ const { execute: executeDelete } = deleteFileApi();
 const { execute: executeCompress } = compressFileApi();
 const { execute: fetchInstanceInfo } = getInstanceInfo();
 const { execute: getUploadMissionCfg } = uploadAddress();
+const { execute: executeMove } = moveFileApi();
 
-// 進度條相關計算 (參考你提供的邏輯)
+// 進度條計算
 const uploadData = uploadService.uiData;
 const progress = computed(() => {
   if (uploadData.value.current) {
@@ -45,12 +47,18 @@ const progress = computed(() => {
   return 0;
 });
 
+interface DetectedWorld {
+  path: string;
+  isNether: boolean;
+  isEnd: boolean;
+}
+
 const openDialog = () => {
   open.value = true;
 };
 
-// 遞歸尋找 level.dat
-const findWorldDir = async (targetPath: string): Promise<string | null> => {
+// 智慧掃描：找出所有包含 level.dat 的目錄並分析特徵
+const deepScanWorlds = async (targetPath: string, results: DetectedWorld[] = []) => {
   try {
     const res = await fetchFiles({
       params: { 
@@ -59,103 +67,120 @@ const findWorldDir = async (targetPath: string): Promise<string | null> => {
       }
     });
     const items = res.value?.items || [];
-    if (items.some((item: any) => item.name === "level.dat")) return targetPath;
+    
+    if (items.some(i => i.name === "level.dat")) {
+      const lowerPath = targetPath.toLowerCase();
+      results.push({
+        path: targetPath.endsWith("/") ? targetPath : targetPath + "/",
+        isNether: lowerPath.includes("nether") || lowerPath.includes("dim-1"),
+        isEnd: lowerPath.includes("the_end") || lowerPath.includes("dim1") || (lowerPath.includes("end") && !lowerPath.includes("friend"))
+      });
+    }
 
     for (const item of items) {
-      if (item.type === 1) { 
-        const found = await findWorldDir(`${targetPath}${item.name}/`);
-        if (found) return found;
+      if (item.type === 1 && !["logs", "plugins", "cache"].includes(item.name.toLowerCase())) {
+        await deepScanWorlds(`${targetPath}${item.name}/`, results);
       }
     }
-  } catch { return null; }
-  return null;
+  } catch (e) {
+    console.error("Scan failed at " + targetPath, e);
+  }
+  return results;
 };
 
 const handleMapReplace = async (file: File) => {
   const msgKey = "map_replace_task";
   
-  // 1. 預檢
+  // 1. 預檢：確保伺服器已關閉
   const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
   if (info.value?.status !== 0) {
-    return Modal.warning({ title: t("伺服器運行中"), content: t("請先關閉伺服器後再進行操作。") });
+    return Modal.warning({ title: t("伺服器運行中"), content: t("請先關閉伺服器後再進行地圖替換。") });
   }
 
   Modal.confirm({
-    title: t("確認替換地圖？"),
+    title: t("確認智慧替換地圖？"),
     icon: createVNode(WarningOutlined),
-    content: t("上傳後系統會自動解壓並對齊 /world 目錄，請確保已做好備份。"),
+    content: t("系統將自動識別層級並對齊維度目錄，操作不可逆，請確保已有備份。"),
     onOk: async () => {
       try {
         uploading.value = true;
         const tempDirName = `tmp_map_${Date.now()}`;
         
-        // --- 階段 A: 獲取上傳授權 ---
-        message.loading({ content: t("正在準備通道..."), key: msgKey });
+        // --- 階段 A: 獲取授權並執行上傳 ---
+        message.loading({ content: t("正在準備上傳..."), key: msgKey });
         const mission = await getUploadMissionCfg({
           params: { upload_dir: "/", daemonId: props.daemonId, uuid: props.instanceId, file_name: file.name }
         });
-
         const config = mission.value;
-        if (!config || !config.addr || !config.password) throw new Error("授權失敗");
+        if (!config?.addr || !config.password) throw new Error("無法獲取上傳授權");
 
-        // --- 階段 B: 上傳並等待監聽 ---
-        message.loading({ content: t("正在上傳數據..."), key: msgKey });
-        
         await new Promise<void>((resolve) => {
-          uploadService.append(
-            file,
-            parseForwardAddress(config.addr, "http"),
-            config.password,
-            { overwrite: true },
-            (task) => {
-              task.instanceInfo = { instanceId: props.instanceId, daemonId: props.daemonId };
-            }
-          );
-
-          // 核心修復：監聽 uploadService 直到 current 變為 null (完成)
-          const unwatch = watch(
-            () => uploadService.uiData.value.current,
-            (curr) => {
-              if (!curr) {
-                unwatch();
-                resolve();
-              }
-            }
-          );
+          uploadService.append(file, parseForwardAddress(config.addr, "http"), config.password, { overwrite: true }, (task) => {
+            task.instanceInfo = { instanceId: props.instanceId, daemonId: props.daemonId };
+          });
+          const unwatch = watch(() => uploadService.uiData.value.current, (curr) => {
+            if (!curr) { unwatch(); resolve(); }
+          });
         });
 
-        // --- 階段 C: 解壓與分析 ---
-        message.loading({ content: t("正在解壓縮分析中..."), key: msgKey });
+        // --- 階段 B: 解壓到臨時目錄 ---
+        message.loading({ content: t("正在解壓分析結構..."), key: msgKey });
         await executeCompress({
           params: { uuid: props.instanceId, daemonId: props.daemonId },
           data: { type: 2, code: "utf-8", source: "/" + file.name, targets: `/${tempDirName}/` }
         });
 
-        const realWorldPath = await findWorldDir(`/${tempDirName}/`);
-        if (!realWorldPath) throw new Error(t("壓縮包內找不到 level.dat"));
+        // --- 階段 C: 智慧維度識別 ---
+        const allDetected = await deepScanWorlds(`/${tempDirName}/`);
+        
+        // 找到主世界 (最淺層且非地獄末地的)
+        const mainWorld = allDetected
+          .filter(w => !w.isNether && !w.isEnd)
+          .sort((a, b) => a.path.length - b.path.length)[0];
 
-        // --- 階段 D: 執行替換 ---
-        message.loading({ content: t("正在重組地圖目錄..."), key: msgKey });
+        if (!mainWorld) throw new Error(t("壓縮包內找不到有效的主世界存檔 (level.dat)"));
+
+        const moveTargets: [string, string][] = [[mainWorld.path, "/world/"]];
+        const deleteTargets = ["/world", "/world_nether", "/world_the_end"];
+
+        // 檢查地獄 (如果不在主世界目錄內，則獨立對齊)
+        const netherWorld = allDetected.find(w => w.isNether);
+        if (netherWorld && !netherWorld.path.startsWith(mainWorld.path)) {
+          moveTargets.push([netherWorld.path, "/world_nether/"]);
+        }
+
+        // 檢查末地
+        const endWorld = allDetected.find(w => w.isEnd);
+        if (endWorld && !endWorld.path.startsWith(mainWorld.path)) {
+          moveTargets.push([endWorld.path, "/world_the_end/"]);
+        }
+
+        // --- 階段 D: 刪除舊地圖並移動新地圖 ---
+        message.loading({ content: t("正在套用目錄對齊..."), key: msgKey });
+        
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
-          data: { targets: ["/world", "/world_nether", "/world_the_end"] }
+          data: { targets: deleteTargets }
         });
 
-        await executeCompress({
-          params: { uuid: props.instanceId, daemonId: props.daemonId },
-          data: { type: 2, code: "utf-8", source: "/" + file.name, targets: "/world/" }
+        // 批量移動對齊
+        await executeMove({
+          params: { daemonId: props.daemonId, uuid: props.instanceId },
+          data: { targets: moveTargets }
         });
 
-        // --- 階段 E: 清理 ---
+        // --- 階段 E: 清理臨時檔案 ---
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: ["/" + file.name, "/" + tempDirName] }
         });
 
-        message.success({ content: t("地圖快速替換成功！"), key: msgKey });
+        message.success({ content: t("地圖智慧替換成功！"), key: msgKey });
         open.value = false;
+        
       } catch (err: any) {
-        message.error({ content: t("失敗: ") + err.message, key: msgKey });
+        console.error(err);
+        message.error({ content: t("操作失敗: ") + err.message, key: msgKey });
       } finally {
         uploading.value = false;
       }
@@ -169,73 +194,74 @@ defineExpose({ openDialog });
 <template>
   <a-modal
     v-model:open="open"
-    :title="t('地圖存檔快速替換')"
+    :title="t('地圖存檔智慧替換')"
     :footer="null"
     centered
     :mask-closable="!uploading"
-    :width="isPhone ? '95%' : '520px'"
+    :width="isPhone ? '95%' : '500px'"
   >
-    <div class="map-replace-box">
-      <div v-if="!uploading" class="upload-section">
+    <div class="map-replace-container">
+      <div v-if="!uploading" class="upload-area">
         <a-upload-dragger
           :multiple="false"
           :show-upload-list="false"
           :before-upload="(file: any) => { handleMapReplace(file as File); return false; }"
         >
           <p class="ant-upload-drag-icon"><CloudUploadOutlined /></p>
-          <p class="ant-upload-text">{{ t('點擊或拖入地圖壓縮包') }}</p>
-          <p class="ant-upload-hint">{{ t('支援 .zip / .tar.gz 格式') }}</p>
+          <p class="ant-upload-text">{{ t('將地圖壓縮包拖入此處') }}</p>
+          <p class="ant-upload-hint">{{ t('支援 .zip / .tar.gz，自動對齊維度目錄') }}</p>
         </a-upload-dragger>
       </div>
 
-      <div v-else class="processing-section">
-        <div class="status-header">
+      <div v-else class="status-area">
+        <div class="status-title">
           <LoadingOutlined v-if="uploadData.current" spin />
           <InteractionOutlined v-else spin />
-          <span class="ml-2">{{ uploadData.current ? t('正在上傳...') : t('正在處理文件...') }}</span>
+          <span class="ml-2">
+            {{ uploadData.current ? t('正在傳輸數據...') : t('正在分析並重組目錄...') }}
+          </span>
         </div>
 
-        <div v-if="uploadData.current" class="progress-wrapper">
+        <div v-if="uploadData.current" class="progress-box">
           <div class="flex-between mb-1">
-            <small>{{ uploadData.currentFile }}</small>
-            <small>{{ progress }}%</small>
+            <span class="file-name-scroll">{{ uploadData.currentFile }}</span>
+            <span>{{ progress }}%</span>
           </div>
           <a-progress 
             :percent="progress" 
             :show-info="false" 
             status="active"
-            :stroke-color="{ '0%': '#108ee9', '100%': '#87d068' }"
+            :stroke-color="{ '0%': '#1890ff', '100%': '#52c41a' }"
           />
-          <div class="text-right mt-1">
-            <small class="text-gray">
-              {{ convertFileSize(uploadData.current[0].toString()) }} / 
-              {{ convertFileSize(uploadData.current[1].toString()) }}
-            </small>
+          <div class="text-right size-info">
+            {{ convertFileSize(uploadData.current[0].toString()) }} / 
+            {{ convertFileSize(uploadData.current[1].toString()) }}
           </div>
         </div>
-
-        <a-alert v-else type="info" class="mt-4">
-          <template #message>{{ t('正在自動執行解壓與目錄對齊，請勿關閉視窗...') }}</template>
-        </a-alert>
+        
+        <div v-else class="scan-tip">
+          <a-alert :message="t('正在掃描 level.dat 並對齊 /world，請稍候...')" type="info" show-icon />
+        </div>
       </div>
 
-      <div class="bottom-info">
-        <p><small>* {{ t("本功能會自動識別 level.dat 並覆蓋 /world 目錄") }}</small></p>
+      <div class="footer-tips">
+        <p>* {{ t('本功能會自動處理單人存檔 (DIM-1) 與伺服器分離存檔結構。') }}</p>
       </div>
     </div>
   </a-modal>
 </template>
 
 <style scoped>
-.map-replace-box { padding: 12px; }
-.upload-section { margin-bottom: 20px; }
-.processing-section { padding: 20px 0; }
-.progress-wrapper { margin-top: 20px; }
-.flex-between { display: flex; justify-content: space-between; align-items: center; }
-.text-right { text-align: right; }
+.map-replace-container { padding: 10px; }
+.upload-area { margin: 10px 0; }
+.status-area { padding: 30px 0; }
+.status-title { font-size: 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; }
+.progress-box { margin-top: 15px; }
+.flex-between { display: flex; justify-content: space-between; }
+.size-info { font-size: 12px; color: #999; margin-top: 4px; }
+.file-name-scroll { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scan-tip { margin-top: 20px; }
+.footer-tips { margin-top: 24px; text-align: center; color: #bfbfbf; font-size: 12px; }
 .ml-2 { margin-left: 8px; }
-.mt-4 { margin-top: 16px; }
-.text-gray { color: #888; }
-.bottom-info { text-align: center; color: #bbb; margin-top: 10px; }
-:deep(.ant-upload-drag) { border-radius: 12px; }
+:deep(.ant-upload-drag) { border-radius: 12px; background: #fafafa; }
 </style>
