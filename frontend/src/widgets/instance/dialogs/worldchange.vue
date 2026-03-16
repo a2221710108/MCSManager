@@ -41,9 +41,6 @@ const openDialog = () => { open.value = true; };
 const normalizePath = (path: string) => path.replace(/\/+$/, "") + "/";
 
 /**
- * 刪除現有存檔按鈕
- */
-/**
  * 刪除現有存檔按鈕（新增伺服器狀態檢查）
  */
 const handleDeleteCurrentWorld = async () => {
@@ -82,7 +79,7 @@ const handleDeleteCurrentWorld = async () => {
  */
 const handleCancelUpload = () => {
   uploading.value = false;
-  // 觸發 uploadService 內部可能的停止機制或透過狀態攔截
+  // 這裡不直接寫 stop，交給 handleMapReplace 裡的 watch 統一處理 reject 和 stop
   message.warn(t("操作已取消"));
 };
 
@@ -169,7 +166,14 @@ const handleMapReplace = async (file: File) => {
         task.instanceInfo = { instanceId: props.instanceId, daemonId: props.daemonId };
       });
       const unwatch = watch(() => uploadService.uiData.value.current, (curr) => {
-        if (!uploading.value) { unwatch(); reject(new Error("CANCEL")); }
+        // 如果用戶點擊取消，觸發 stop 並 reject
+        if (!uploading.value) { 
+          unwatch(); 
+          uploadService.stop(); 
+          reject(new Error("CANCEL")); 
+          return;
+        }
+        // 如果當前任務已消失（完成），則 resolve
         if (!curr) { unwatch(); resolve(); }
       });
     });
@@ -182,7 +186,7 @@ const handleMapReplace = async (file: File) => {
     });
 
     // 3. 掃描
-    const allDetected = await deepScanWorlds(`/${tempDirName}//`);
+    const allDetected = await deepScanWorlds(`/${tempDirName}/`);
     const nether = allDetected.find(w => w.isNether);
     const end = allDetected.find(w => w.isEnd);
     const mainWorld = allDetected.filter(w => !w.isNether && !w.isEnd).sort((a, b) => a.path.length - b.path.length)[0];
@@ -204,7 +208,7 @@ const handleMapReplace = async (file: File) => {
       data: { targets: moveTasks } 
     });
 
-    // 5. 清理臨時檔案 (完成後刪除臨時資料夾)
+    // 5. 清理臨時檔案
     await executeDelete({ 
       params: { daemonId: props.daemonId, uuid: props.instanceId }, 
       data: { targets: ["/" + file.name, "/" + tempDirName] } 
@@ -213,8 +217,10 @@ const handleMapReplace = async (file: File) => {
     message.success({ content: t("存檔替換完成！"), key: msgKey });
     open.value = false;
   } catch (err: any) {
-    if (err.message !== "CANCEL") message.error({ content: t("失敗: ") + err.message, key: msgKey });
-    // 發生錯誤時也嘗試清理臨時目錄
+    if (err.message !== "CANCEL") {
+      message.error({ content: t("失敗: ") + err.message, key: msgKey });
+    }
+    // 發生錯誤或取消時也嘗試清理臨時目錄
     executeDelete({ params: { daemonId: props.daemonId, uuid: props.instanceId }, data: { targets: ["/" + tempDirName] } });
   } finally {
     uploading.value = false;
@@ -281,7 +287,6 @@ defineExpose({ openDialog });
 :deep(.ant-checkbox-wrapper) {
   align-items: flex-start;
 }
-/* 強制讓進度條內部的文字與條狀物更靠左 */
 :deep(.ant-progress-outer) {
   padding-right: 0 !important;
   margin-right: 0 !important;
