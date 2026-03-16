@@ -14,6 +14,13 @@ import { CloudUploadOutlined, LoadingOutlined, DeleteOutlined } from "@ant-desig
 import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
 
+// 定義掃描結果的類型接口
+interface WorldScanResult {
+  path: string;
+  isNether: boolean;
+  isEnd: boolean;
+}
+
 const open = ref(false);
 const uploading = ref(false);
 const agreeTest = ref(false);
@@ -52,7 +59,7 @@ const handleDeleteCurrentWorld = async () => {
   if (info.value?.status !== 0) {
     return Modal.error({
       title: t("無法刪除存檔"),
-      content: t("這將永久刪除您現有的存檔，除非你建立了備份。刪除後預設情況下，下次啟動伺服器將重新生成地圖。"),
+      content: t("伺服器正在運行或維護中，請先關閉伺服器後再清理檔案。"),
       okText: t("知道了")
     });
   }
@@ -85,14 +92,13 @@ const handleCancelUpload = () => {
 };
 
 /**
- * 智慧掃描器：加入延遲以避開 API 冷卻期
+ * 智慧掃描器：明確指定返回類型為 Promise<WorldScanResult[]>
  */
-const deepScanWorlds = async (targetPath: string, results: any[] = [], depth = 0) => {
+const deepScanWorlds = async (targetPath: string, results: WorldScanResult[] = [], depth = 0): Promise<WorldScanResult[]> => {
   const currentPath = normalizePath(targetPath);
   if (depth > 5) return results;
 
-  // 1. 主動延遲，避免請求過快觸發後端限流
-  await sleep(3000);
+  await sleep(800);
 
   try {
     const res = await fetchFiles({
@@ -116,7 +122,6 @@ const deepScanWorlds = async (targetPath: string, results: any[] = [], depth = 0
       await deepScanWorlds(`${currentPath}${dir.name}/`, results, depth + 1);
     }
   } catch (e: any) {
-    // 2. 被動重試：如果遇到冷卻期報錯，等待後重試當前目錄
     if (e.message?.includes("冷卻期")) {
       await sleep(2500);
       return await deepScanWorlds(targetPath, results, depth);
@@ -145,7 +150,7 @@ const handleMapReplace = async (file: File) => {
 
   const msgKey = "map_replace_task";
   const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
-  if (info.value?.status !== 0) return Modal.error({ title: t("無法開始替換"), content: t("您的伺服器正在運行中或維護中，請先關閉伺服器後再使用該功能。") });
+  if (info.value?.status !== 0) return Modal.warning({ title: t("無法開始替換"), content: t("您的伺服器正在運行中或維護中，請先關閉伺服器。") });
 
   uploading.value = true;
   const tempDirName = `tmp_map_${Date.now()}`;
@@ -177,10 +182,10 @@ const handleMapReplace = async (file: File) => {
       data: { type: 2, code: "utf-8", source: "/" + file.name, targets: `/${tempDirName}/` } 
     });
 
-    const allDetected = await deepScanWorlds(`/${tempDirName}/`);
-    const nether = allDetected.find(w => w.isNether);
-    const end = allDetected.find(w => w.isEnd);
-    const mainWorld = allDetected.filter(w => !w.isNether && !w.isEnd).sort((a, b) => a.path.length - b.path.length)[0];
+    const allDetected: WorldScanResult[] = await deepScanWorlds(`/${tempDirName}/`);
+    const nether = allDetected.find((w: WorldScanResult) => w.isNether);
+    const end = allDetected.find((w: WorldScanResult) => w.isEnd);
+    const mainWorld = allDetected.filter((w: WorldScanResult) => !w.isNether && !w.isEnd).sort((a: WorldScanResult, b: WorldScanResult) => a.path.length - b.path.length)[0];
 
     if (!mainWorld) throw new Error(t("無法定位主世界存檔"));
 
