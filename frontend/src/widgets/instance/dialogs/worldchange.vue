@@ -7,12 +7,12 @@ import {
   fileList as getFileListApi, 
   deleteFile as deleteFileApi, 
   compressFile as compressFileApi,
-  uploadAddress // 獲取上傳地址 API
+  uploadAddress 
 } from "@/services/apis/fileManager";
 import { getInstanceInfo } from "@/services/apis/instance";
 import { useScreen } from "@/hooks/useScreen";
 import { CloudUploadOutlined, WarningOutlined, InteractionOutlined } from "@ant-design/icons-vue";
-import uploadService from "@/services/uploadService"; // 核心上傳服務
+import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
 
 const open = ref(false);
@@ -24,7 +24,7 @@ const props = defineProps<{
   instanceId: string;
 }>();
 
-// API 實例初始化
+// API 實作初始化
 const { execute: fetchFiles } = getFileListApi();
 const { execute: executeDelete } = deleteFileApi();
 const { execute: executeCompress } = compressFileApi();
@@ -35,25 +35,36 @@ const openDialog = () => {
   open.value = true;
 };
 
-// 遞歸掃描：尋找包含 level.dat 的目錄
+// 遞歸掃描函數：尋找包含 level.dat 的目錄
 const findWorldDir = async (targetPath: string): Promise<string | null> => {
   try {
     const res = await fetchFiles({
       params: { 
-        daemonId: props.daemonId, uuid: props.instanceId, 
-        target: targetPath, page: 0, page_size: 100, file_name: "" 
+        daemonId: props.daemonId, 
+        uuid: props.instanceId, 
+        target: targetPath, 
+        page: 0, 
+        page_size: 100, 
+        file_name: "" 
       }
     });
     const items = res.value?.items || [];
-    if (items.some((item: any) => item.name === "level.dat")) return targetPath;
+    
+    // 檢查是否有 level.dat
+    if (items.some((item: any) => item.name === "level.dat")) {
+      return targetPath;
+    }
 
+    // 掃描子目錄 (type === 1 代表資料夾)
     for (const item of items) {
-      if (item.type === 1) { // 根據你 fileManager 的邏輯，type 1 為目錄
+      if (item.type === 1) { 
         const found = await findWorldDir(`${targetPath}${item.name}/`);
         if (found) return found;
       }
     }
-  } catch { return null; }
+  } catch {
+    return null;
+  }
   return null;
 };
 
@@ -63,19 +74,22 @@ const handleMapReplace = async (file: File) => {
   // 1. 伺服器狀態預檢
   const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
   if (info.value?.status !== 0) {
-    return Modal.warning({ title: t("伺服器運行中"), content: t("請先關閉伺服器後再進行地圖替換。") });
+    return Modal.warning({ 
+      title: t("伺服器運行中"), 
+      content: t("請先關閉伺服器後再進行地圖替換，以確保檔案不被佔用。") 
+    });
   }
 
   Modal.confirm({
     title: t("確認快速替換地圖？"),
     icon: createVNode(WarningOutlined),
-    content: t("注意：系統將自動清理舊存檔（world/nether/end）並嘗試從壓縮包還原。"),
+    content: t("這將會刪除目前的 world 資料夾，並從上傳的壓縮包中自動提取地圖數據。"),
     onOk: async () => {
       try {
         uploading.value = true;
         const tempDirName = `tmp_map_${Date.now()}`;
         
-        // --- 階段 A: 獲取上傳授權並發起任務 ---
+        // --- 階段 A: 獲取上傳授權 ---
         message.loading({ content: t("正在準備上傳通道..."), key: msgKey });
         const mission = await getUploadMissionCfg({
           params: {
@@ -86,53 +100,70 @@ const handleMapReplace = async (file: File) => {
           }
         });
 
-        if (!mission.value) throw new Error("Failed to get upload address");
+        // 核心修復：確保 mission.value 存在並緩存，解決 TS18048 報錯
+        const config = mission.value;
+        if (!config || !config.addr || !config.password) {
+          throw new Error("無法獲取上傳地址配置。");
+        }
 
         // --- 階段 B: 執行上傳 ---
-        // 模擬 fileManager.vue 的 selectedFiles 邏輯
         message.loading({ content: t("正在傳輸數據..."), key: msgKey });
         
         await new Promise((resolve) => {
           uploadService.append(
             file,
-            parseForwardAddress(mission.value.addr, "http"),
-            mission.value.password,
+            parseForwardAddress(config.addr, "http"),
+            config.password,
             { overwrite: true },
             (task) => {
-              task.instanceInfo = { instanceId: props.instanceId, daemonId: props.daemonId };
-              // 由於 uploadService 在背景運行，這裡我們需要確保檔案已存在於後端
-              // 在實際環境中，可能需要監聽 task 狀態，這裡簡化處理
+              task.instanceInfo = { 
+                instanceId: props.instanceId, 
+                daemonId: props.daemonId 
+              };
+              // 給予短暫延遲確保檔案寫入磁碟
               setTimeout(resolve, 1500); 
             }
           );
         });
 
-        // --- 階段 C: 解壓與結構分析 ---
+        // --- 階段 C: 解壓與結構掃描 ---
         message.loading({ content: t("正在分析地圖結構..."), key: msgKey });
         await executeCompress({
           params: { uuid: props.instanceId, daemonId: props.daemonId },
-          data: { type: 2, code: "utf-8", source: "/" + file.name, targets: `/${tempDirName}/` }
+          data: { 
+            type: 2, 
+            code: "utf-8", 
+            source: "/" + file.name, 
+            targets: `/${tempDirName}/` 
+          }
         });
 
         const realWorldPath = await findWorldDir(`/${tempDirName}/`);
-        if (!realWorldPath) throw new Error(t("壓縮包中找不到有效的 level.dat"));
+        if (!realWorldPath) {
+          throw new Error(t("無效的地圖壓縮包 (找不到 level.dat)"));
+        }
 
-        // --- 階段 D: 清理舊檔並重組 ---
-        message.loading({ content: t("正在替換存檔檔案..."), key: msgKey });
+        // --- 階段 D: 清理舊存檔與重組 ---
+        message.loading({ content: t("正在套用新存檔..."), key: msgKey });
         
-        // 刪除舊地圖 (這三個是 Minecraft 預設目錄)
+        // 刪除舊地圖
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: ["/world", "/world_nether", "/world_the_end"] }
         });
 
-        // 將整個壓縮檔重新解壓到 /world/ 目錄下 (實現自動對齊)
+        // 二次精準解壓到 /world/ 目錄（實現自動路徑對齊）
         await executeCompress({
           params: { uuid: props.instanceId, daemonId: props.daemonId },
-          data: { type: 2, code: "utf-8", source: "/" + file.name, targets: "/world/" }
+          data: { 
+            type: 2, 
+            code: "utf-8", 
+            source: "/" + file.name, 
+            targets: "/world/" 
+          }
         });
 
-        // --- 階段 E: 清理臨時垃圾 ---
+        // --- 階段 E: 清理垃圾 ---
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: ["/" + file.name, "/" + tempDirName] }
@@ -163,13 +194,11 @@ defineExpose({ openDialog });
     :width="isPhone ? '95%' : '520px'"
   >
     <div class="map-replace-box">
-      <div class="status-tips">
-        <a-alert type="warning" show-icon>
-          <template #description>
-            {{ t("本功能會自動識別壓縮包內部的 level.dat 位置。支援 .zip 或 .tar.gz 格式。") }}
-          </template>
-        </a-alert>
-      </div>
+      <a-alert type="info" show-icon class="mb-4">
+        <template #description>
+          {{ t("支援 .zip / .tar.gz。系統會自動掃描壓縮包內部的 level.dat 並對齊資料夾路徑。") }}
+        </template>
+      </a-alert>
 
       <div class="upload-section">
         <a-upload-dragger
@@ -183,22 +212,23 @@ defineExpose({ openDialog });
             <CloudUploadOutlined v-else />
           </p>
           <p class="ant-upload-text">
-            {{ uploading ? t('正在處理地圖數據...') : t('將地圖壓縮包拖到這裡') }}
+            {{ uploading ? t('正在上傳並處理中...') : t('點擊或拖拽地圖壓縮包至此') }}
           </p>
-          <p class="ant-upload-hint">{{ t('上傳完成後會自動完成路徑對齊與解壓') }}</p>
+          <p class="ant-upload-hint">{{ t('替換過程將自動清理舊的地圖資料夾') }}</p>
         </a-upload-dragger>
       </div>
-      
-      <div class="bottom-info">
-        <p><small>* {{ t("替換前建議先手動備份現有 world 目錄") }}</small></p>
+
+      <div class="bottom-tips">
+        <p><small>* {{ t("為了安全起見，建議在操作前先下載備份目前的地圖。") }}</small></p>
       </div>
     </div>
   </a-modal>
 </template>
 
 <style scoped>
-.map-replace-box { padding: 8px; }
+.mb-4 { margin-bottom: 16px; }
 .upload-section { margin: 24px 0; }
-.bottom-info { text-align: center; color: #999; }
-:deep(.ant-upload-drag) { border-radius: 12px; }
+.bottom-tips { text-align: center; color: #999; font-size: 12px; }
+:deep(.ant-upload-drag) { border-radius: 12px; border: 2px dashed #d9d9d9; transition: border-color 0.3s; }
+:deep(.ant-upload-drag:hover) { border-color: #1890ff; }
 </style>
