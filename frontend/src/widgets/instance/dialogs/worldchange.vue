@@ -229,7 +229,7 @@ defineExpose({ openDialog });
 </script>
 
 <template>
-  <a-modal v-model:open="open" :title="t('存檔替換')" :footer="null" centered :mask-closable="false" width="520px">
+  <a-modal v-model:open="open" :title="t('存檔替換 / 匯入')" :footer="null" centered :mask-closable="false" width="520px">
     <div class="p-4">
       <div v-if="!uploading">
         <div class="mb-4 flex justify-between items-center">
@@ -268,7 +268,7 @@ defineExpose({ openDialog });
         <div class="flex items-center justify-center mb-6">
           <LoadingOutlined spin class="mr-2 text-primary" style="font-size: 1.1em;" />
           <span class="text-base font-medium">
-            {{ uploadData.current ? t('正在上載您的存檔...') : t('正在分析與處理存檔結構...') }}
+            {{ uploadData.current ? t('正在上載您的存檔...') : t('正在分析與處理存檔結構...（過程較長請耐心等待）') }}
           </span>
         </div>
         
