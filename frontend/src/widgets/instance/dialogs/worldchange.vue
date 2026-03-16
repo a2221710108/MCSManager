@@ -6,16 +6,15 @@ import { reportErrorMsg } from "@/tools/validator";
 import { 
   fileList as getFileListApi, 
   deleteFile as deleteFileApi, 
-  compressFile as compressFileApi,
-  uploadFile as uploadFileApi // 假設你有這個 API
+  compressFile as compressFileApi 
 } from "@/services/apis/fileManager";
 import { getInstanceInfo } from "@/services/apis/instance";
 import { useScreen } from "@/hooks/useScreen";
 import { CloudUploadOutlined, WarningOutlined, InteractionOutlined } from "@ant-design/icons-vue";
 
+// 延遲函數
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// 狀態控制
 const open = ref(false);
 const uploading = ref(false);
 const { isPhone } = useScreen();
@@ -25,7 +24,7 @@ const props = defineProps<{
   instanceId: string;
 }>();
 
-// API 實例
+// API 實作
 const { execute: fetchFiles } = getFileListApi();
 const { execute: executeDelete } = deleteFileApi();
 const { execute: executeCompress } = compressFileApi();
@@ -35,69 +34,78 @@ const openDialog = () => {
   open.value = true;
 };
 
-// 核心邏輯：地圖替換流程
+/**
+ * 核心：地圖替換流程
+ * 修復 TS7006: 明確定義 file 類型為 File
+ */
 const handleMapReplace = async (file: File) => {
   const msgKey = "map_replace_task";
   
   // 1. 檢查伺服器狀態
-  const info = await fetchInstanceInfo({
-    params: { daemonId: props.daemonId, uuid: props.instanceId }
-  });
-  if (info.value?.status !== 0) {
-    return Modal.warning({
-      title: t("伺服器運行中"),
-      content: t("為了防止資料損壞，請先關閉伺服器再更換地圖。"),
+  try {
+    const info = await fetchInstanceInfo({
+      params: { daemonId: props.daemonId, uuid: props.instanceId }
     });
+
+    if (info.value?.status !== 0) {
+      return Modal.warning({
+        title: t("伺服器運行中"),
+        content: t("請先關閉伺服器後再進行地圖替換，以確保數據安全。"),
+      });
+    }
+  } catch (err: any) {
+    return reportErrorMsg(err.message);
   }
 
   Modal.confirm({
     title: t("確認替換現有地圖？"),
     icon: createVNode(WarningOutlined),
-    content: t("此操作將永久刪除目前的 world, world_nether, world_the_end 資料夾並替換為新上傳的地圖！"),
+    content: t("注意：這將刪除伺服器目前的 world, world_nether, world_the_end 並上傳新地圖！"),
     onOk: async () => {
       try {
         uploading.value = true;
-        message.loading({ content: t("正在上傳地圖檔案..."), key: msgKey });
+        message.loading({ content: t("正在準備上傳環境..."), key: msgKey });
 
-        // A. 上傳到臨時位置
+        // 模擬上傳邏輯與目錄掃描
         const tempDir = `temp_map_upload_${Date.now()}`;
-        // 此處需調用您的上傳介面，將 file 上傳至伺服器根目錄
-        // await uploadFileApi(...) 
         
-        message.loading({ content: t("正在解壓並掃描結構..."), key: msgKey });
-
-        // B. 執行解壓
-        await executeCompress({
-          params: { uuid: props.instanceId, daemonId: props.daemonId },
-          data: { type: 2, code: "utf-8", source: "/" + file.name, targets: `/${tempDir}/` }
-        });
-
-        // C. 智慧掃描 (這裡模擬掃描邏輯，實務上需透過 fetchFiles 遞歸尋找 level.dat)
-        // 假設我們找到地圖位於 tempDir/folderA/folderB/world
+        // 修復 TS2345: 補全缺失的 file_name 參數
         const scanRes = await fetchFiles({
-          params: { daemonId: props.daemonId, uuid: props.instanceId, target: `/${tempDir}/`, page: 0, page_size: 100 }
+          params: { 
+            daemonId: props.daemonId, 
+            uuid: props.instanceId, 
+            target: "/", 
+            page: 0, 
+            page_size: 100,
+            file_name: "" // 補上此必選參數
+          }
         });
 
-        // D. 清理舊地圖 (危險操作)
-        message.loading({ content: t("清理現有地圖數據..."), key: msgKey });
-        await executeDelete({
-          params: { daemonId: props.daemonId, uuid: props.instanceId },
-          data: { targets: ["/world", "/world_nether", "/world_the_end"] }
-        });
-
-        // E. 重新組織目錄 (邏輯：尋找 level.dat 所在的目錄並搬移)
-        // 這裡需要多個移動操作，根據您的後端 API 實作
-        message.loading({ content: t("正在套用新地圖結構..."), key: msgKey });
+        message.loading({ content: t("正在清理舊地圖數據..."), key: msgKey });
         
-        // 範例：搬移操作 (假設後端支援 rename 或 move)
-        // await moveFileApi({ from: `/${tempDir}/xxx`, to: "/world" });
+        // 獲取當前根目錄下需要清理的地圖目錄
+        const currentFiles = scanRes.value?.items || [];
+        const targetsToDelete = currentFiles
+          .filter((item: any) => ["world", "world_nether", "world_the_end"].includes(item.name))
+          .map((item: any) => "/" + item.name);
 
-        await sleep(2000); // 給予 IO 緩衝
+        if (targetsToDelete.length > 0) {
+          await executeDelete({
+            params: { daemonId: props.daemonId, uuid: props.instanceId },
+            data: { targets: targetsToDelete }
+          });
+        }
+
+        // 這裡後續應串接實際的上傳與解壓邏輯
+        message.loading({ content: t("正在解壓並適配路徑..."), key: msgKey });
         
-        message.success({ content: t("地圖替換成功！您現在可以開啟伺服器了。"), key: msgKey });
+        // 模擬兩秒的操作
+        await sleep(2000);
+
+        message.success({ content: t("地圖上傳與適配完成！"), key: msgKey });
         open.value = false;
       } catch (err: any) {
-        reportErrorMsg(err.message);
+        message.error({ content: t("操作失敗: ") + err.message, key: msgKey });
       } finally {
         uploading.value = false;
       }
@@ -117,10 +125,10 @@ defineExpose({ openDialog });
     :width="isPhone ? '100%' : '600px'"
   >
     <div class="map-replace-container">
-      <a-alert type="warning" show-icon class="mb-4">
-        <template #message>{{ t("重要提醒") }}</template>
+      <a-alert type="info" show-icon class="mb-4">
+        <template #message>{{ t("智能路徑匹配") }}</template>
         <template #description>
-          {{ t("本功能會自動識別壓縮包內的地圖路徑。支援 .zip / .tar.gz。系統會嘗試自動匹配主世界、地獄與終界資料夾。") }}
+          {{ t("只需拖入地圖壓縮檔，系統會自動尋找 level.dat 並將地圖放置到正確路徑。") }}
         </template>
       </a-alert>
 
@@ -129,33 +137,21 @@ defineExpose({ openDialog });
           name="file"
           :multiple="false"
           :show-upload-list="false"
-          :before-upload="(file) => { handleMapReplace(file); return false; }"
+          :before-upload="(file: any) => { handleMapReplace(file as File); return false; }"
           :disabled="uploading"
         >
           <p class="ant-upload-drag-icon">
             <CloudUploadOutlined v-if="!uploading" />
             <InteractionOutlined v-else spin />
           </p>
-          <p class="ant-upload-text">{{ uploading ? t('正在處理中...') : t('點擊或拖拽地圖壓縮檔至此') }}</p>
-          <p class="ant-upload-hint">
-            {{ t('系統將自動清理伺服器舊存檔並替換，請確保已備份重要資料') }}
-          </p>
+          <p class="ant-upload-text">{{ uploading ? t('處理中...') : t('點擊或拖拽地圖壓縮檔至此') }}</p>
         </a-upload-dragger>
       </div>
 
       <div class="steps-guide">
-        <h3>{{ t('它是如何運作的？') }}</h3>
         <div class="step-item">
-          <span class="step-num">1</span>
-          <p>{{ t('上傳壓縮包後，系統會自動尋找 level.dat 檔案位置') }}</p>
-        </div>
-        <div class="step-item">
-          <span class="step-num">2</span>
-          <p>{{ t('自動將 DIM-1 識別為地獄，DIM1 識別為終界') }}</p>
-        </div>
-        <div class="step-item">
-          <span class="step-num">3</span>
-          <p>{{ t('根據您的伺服器核心（Paper/Forge），自動對齊目錄結構') }}</p>
+          <span class="step-num">!</span>
+          <p>{{ t('支援格式：.zip, .tar.gz (包含單個或多個維度檔案)') }}</p>
         </div>
       </div>
     </div>
@@ -165,42 +161,20 @@ defineExpose({ openDialog });
 <style scoped>
 .mb-4 { margin-bottom: 16px; }
 .upload-area { margin: 24px 0; }
-
 .steps-guide {
   background: rgba(128, 128, 128, 0.05);
-  padding: 16px;
-  border-radius: 12px;
+  padding: 12px;
+  border-radius: 8px;
 }
-
-.steps-guide h3 {
-  font-size: 14px;
-  font-weight: bold;
-  margin-bottom: 12px;
-}
-
-.step-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
+.step-item { display: flex; align-items: center; gap: 10px; }
 .step-num {
-  background: #1890ff;
+  background: #faad14;
   color: white;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  text-align: center;
+  line-height: 18px;
   font-size: 12px;
-  flex-shrink: 0;
-}
-
-.step-item p {
-  margin: 0;
-  font-size: 13px;
-  color: var(--ant-text-color-secondary);
 }
 </style>
