@@ -14,11 +14,18 @@ import { CloudUploadOutlined, LoadingOutlined, DeleteOutlined } from "@ant-desig
 import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
 
-// 定義掃描結果的類型接口
+// 定義掃描結果與文件項目的類型接口
 interface WorldScanResult {
   path: string;
   isNether: boolean;
   isEnd: boolean;
+}
+
+interface FileItem {
+  name: string;
+  type: number;
+  size?: number;
+  mtime?: string;
 }
 
 const open = ref(false);
@@ -53,11 +60,11 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const safeExecute = async (fn: () => Promise<any>, retryCount = 0): Promise<any> => {
   try {
-    await sleep(2500); // 每次執行 API 前強行冷靜 1 秒
+    await sleep(2500); // 每次執行 API 前強行等待 1 秒
     return await fn();
   } catch (err: any) {
     if (err.message?.includes("冷卻期") && retryCount < 3) {
-      await sleep(2500); // 遇到冷卻期，等 2.5 秒後重試
+      await sleep(2500); // 遇到冷卻期，等待 2.5 秒後重試
       return safeExecute(fn, retryCount + 1);
     }
     throw err;
@@ -110,8 +117,8 @@ const deepScanWorlds = async (targetPath: string, results: WorldScanResult[] = [
       params: { daemonId: props.daemonId, uuid: props.instanceId, target: currentPath, page: 0, page_size: 100, file_name: "" }
     }));
     
-    const items = res.value?.items || [];
-    const hasLevelDat = items.some(i => i.name.toLowerCase() === "level.dat" && i.type === 1);
+    const items: FileItem[] = res.value?.items || [];
+    const hasLevelDat = items.some((i: FileItem) => i.name.toLowerCase() === "level.dat" && i.type === 1);
     
     if (hasLevelDat) {
       const lowerPath = currentPath.toLowerCase();
@@ -122,7 +129,7 @@ const deepScanWorlds = async (targetPath: string, results: WorldScanResult[] = [
       results.push({ path: currentPath, isNether: isNether, isEnd: isEndRaw && !isNether });
     }
 
-    const subDirs = items.filter(i => i.type === 0 && !["logs", "plugins", "cache", "bin", "libraries", "versions", "config"].includes(i.name.toLowerCase()));
+    const subDirs = items.filter((i: FileItem) => i.type === 0 && !["logs", "plugins", "cache", "bin", "libraries", "versions", "config"].includes(i.name.toLowerCase()));
     for (const dir of subDirs) {
       await deepScanWorlds(`${currentPath}${dir.name}/`, results, depth + 1);
     }
@@ -137,7 +144,7 @@ const resolveFinalPath = async (detectedPath: string, dimFolderName: string) => 
     const res = await safeExecute(() => fetchFiles({
       params: { daemonId: props.daemonId, uuid: props.instanceId, target: detectedPath, page: 0, page_size: 50, file_name: "" }
     }));
-    const subDim = res.value?.items.find(i => i.name.toUpperCase() === dimFolderName && i.type === 0);
+    const subDim = res.value?.items.find((i: FileItem) => i.name.toUpperCase() === dimFolderName && i.type === 0);
     return subDim ? normalizePath(`${detectedPath}${subDim.name}`) : detectedPath;
   } catch {
     return detectedPath;
@@ -173,8 +180,6 @@ const handleMapReplace = async (file: File) => {
       });
     });
 
-    // --- 以下所有步驟都使用 safeExecute 並增加間隔 ---
-    
     message.loading({ content: t("正在解壓存檔..."), key: msgKey });
     await safeExecute(() => executeCompress({ 
       params: { uuid: props.instanceId, daemonId: props.daemonId }, 
@@ -195,19 +200,16 @@ const handleMapReplace = async (file: File) => {
     if (nether) moveTasks.push([await resolveFinalPath(nether.path, "DIM-1"), "/world/DIM-1/"]);
     if (end) moveTasks.push([await resolveFinalPath(end.path, "DIM1"), "/world/DIM1/"]);
 
-    // 刪除舊的
     await safeExecute(() => executeDelete({ 
       params: { daemonId: props.daemonId, uuid: props.instanceId }, 
       data: { targets: ["/world", "/world_nether", "/world_the_end"] } 
     }));
 
-    // 移動新的
     await safeExecute(() => executeMove({ 
       params: { daemonId: props.daemonId, uuid: props.instanceId }, 
       data: { targets: moveTasks } 
     }));
 
-    // 清理臨時
     await safeExecute(() => executeDelete({ 
       params: { daemonId: props.daemonId, uuid: props.instanceId }, 
       data: { targets: ["/" + file.name, "/" + tempDirName] } 
