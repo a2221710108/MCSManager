@@ -23,7 +23,8 @@ import {
   UsergroupDeleteOutlined,
   CoffeeOutlined,
   HistoryOutlined,
-  GlobalOutlined
+  GlobalOutlined,
+  SaveOutlined
 } from "@ant-design/icons-vue";
 
 import { computed, ref, watch } from "vue";
@@ -209,7 +210,7 @@ const btns = computed(() => {
 },
     {
   title: t("存檔替換"),
-  icon: CoffeeOutlined,
+  icon: SaveOutlined,
   click: () => {
     worldchangeDialog.value?.openDialog();
   },
