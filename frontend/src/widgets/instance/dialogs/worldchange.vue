@@ -79,14 +79,14 @@ const handleDeleteCurrentWorld = async () => {
   if (info.value?.status !== 0) {
     return Modal.error({
       title: t("無法刪除存檔"),
-      content: t("這將永久刪除您現有的存檔，除非你建立了備份。刪除後預設情況下，下次啟動伺服器將重新生成地圖。"),
+      content: t("您的伺服器正在運行中或維護中，請先關閉伺服器後再刪除現有存檔。"),
       okText: t("知道了")
     });
   }
 
   Modal.confirm({
     title: t("確認刪除現有存檔？"),
-    content: t("這將永久刪除您現有的存檔，除非你建立了備份"),
+    content: t("這將永久刪除您現有的存檔，除非你建立了備份。刪除後預設情況下，下次啟動伺服器將重新生成地圖。"),
     okText: t("確定刪除"),
     okType: "danger",
     onOk: async () => {
