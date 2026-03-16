@@ -43,10 +43,24 @@ const normalizePath = (path: string) => path.replace(/\/+$/, "") + "/";
 /**
  * 刪除現有存檔按鈕
  */
-const handleDeleteCurrentWorld = () => {
+/**
+ * 刪除現有存檔按鈕（新增伺服器狀態檢查）
+ */
+const handleDeleteCurrentWorld = async () => {
+  // 1. 檢查伺服器狀態
+  const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
+  if (info.value?.status !== 0) {
+    return Modal.error({
+      title: t("無法刪除存檔"),
+      content: t("伺服器正在運行或維護中，請先關閉伺服器後再清理檔案。"),
+      okText: t("知道了")
+    });
+  }
+
+  // 2. 狀態檢查通過後彈出確認框
   Modal.confirm({
     title: t("確認刪除現有存檔？"),
-    content: t("這將永久刪除根目錄下的 world、world_nether 與 world_the_end。"),
+    content: t("這將永久刪除您現有的存檔，除非你建立了備份"),
     okText: t("確定刪除"),
     okType: "danger",
     onOk: async () => {
@@ -55,9 +69,9 @@ const handleDeleteCurrentWorld = () => {
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: ["/world", "/world_nether", "/world_the_end"] }
         });
-        message.success(t("現有存檔已清理"));
+        message.success(t("現有存檔已刪除"));
       } catch (err: any) {
-        message.error(t("清理失敗: ") + err.message);
+        message.error(t("刪除失敗: ") + err.message);
       }
     }
   });
@@ -138,14 +152,14 @@ const handleMapReplace = async (file: File) => {
 
   const msgKey = "map_replace_task";
   const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
-  if (info.value?.status !== 0) return Modal.warning({ title: t("伺服器運行中"), content: t("請先關閉伺服器。") });
+  if (info.value?.status !== 0) return Modal.warning({ title: t("無法開始替換"), content: t("您的伺服器正在運行中或維護中，請先關閉伺服器。") });
 
   uploading.value = true;
   const tempDirName = `tmp_map_${Date.now()}`;
 
   try {
     // 1. 上傳
-    message.loading({ content: t("正在啟動傳輸..."), key: msgKey });
+    message.loading({ content: t("開始上載..."), key: msgKey });
     const mission = await getUploadMissionCfg({ params: { upload_dir: "/", daemonId: props.daemonId, uuid: props.instanceId, file_name: file.name } });
     const config = mission.value;
     if (!config?.addr) throw new Error("授權失敗");
@@ -196,7 +210,7 @@ const handleMapReplace = async (file: File) => {
       data: { targets: ["/" + file.name, "/" + tempDirName] } 
     });
 
-    message.success({ content: t("地圖智慧替換完成！"), key: msgKey });
+    message.success({ content: t("存檔替換完成！"), key: msgKey });
     open.value = false;
   } catch (err: any) {
     if (err.message !== "CANCEL") message.error({ content: t("失敗: ") + err.message, key: msgKey });
@@ -211,24 +225,24 @@ defineExpose({ openDialog });
 </script>
 
 <template>
-  <a-modal v-model:open="open" :title="t('地圖智慧替換')" :footer="null" centered :mask-closable="false" width="520px">
+  <a-modal v-model:open="open" :title="t('存檔替換')" :footer="null" centered :mask-closable="false" width="520px">
     <div class="p-4">
       <div v-if="!uploading">
         <div class="mb-4 flex justify-between items-center">
           <span class="text-gray-400 text-xs">{{ t('存檔管理') }}</span>
           <a-button danger size="small" type="text" @click="handleDeleteCurrentWorld">
             <template #icon><DeleteOutlined /></template>
-            {{ t('清理現有存檔') }}
+            {{ t('刪除現有存檔') }}
           </a-button>
         </div>
 
         <div class="mb-4 p-3 bg-orange-50 rounded border border-orange-100">
           <div class="flex flex-col gap-2">
             <a-checkbox v-model:checked="agreeTest">
-              <span class="text-xs text-orange-700">{{ t('目前該功能處於測試階段，可能導致替換失敗') }}</span>
+              <span class="text-xs text-orange-700">{{ t('我已知曉使用該功能將刪除現有的存檔') }}</span>
             </a-checkbox>
             <a-checkbox v-model:checked="agreeBackup">
-              <span class="text-xs text-orange-700">{{ t('開始替換後您現有的存檔將被刪除，請確保已進行備份') }}</span>
+              <span class="text-xs text-orange-700">{{ t('我已備份現有存檔，或我確認無需備份現有存檔') }}</span>
             </a-checkbox>
           </div>
         </div>
@@ -242,20 +256,20 @@ defineExpose({ openDialog });
             <CloudUploadOutlined :style="{ color: (agreeTest && agreeBackup) ? '#1890ff' : '#d9d9d9' }" />
           </p>
           <p class="ant-upload-text">點擊或拖拽地圖壓縮包至此</p>
-          <p class="ant-upload-hint">需勾選上方同意事項以解鎖上傳</p>
+          <p class="ant-upload-hint">需勾選上方同意事項以解鎖上載</p>
         </a-upload-dragger>
       </div>
 
       <div v-else class="py-8 text-center">
         <LoadingOutlined spin style="font-size: 32px; color: #1890ff" />
         <div class="mt-6 text-base font-medium">
-          {{ uploadData.current ? t('正在傳輸存檔文件...') : t('正在處理地圖結構...') }}
+          {{ uploadData.current ? t('正在上載您的存檔...') : t('正在分析與處理存檔結構...') }}
         </div>
         
         <div v-if="uploadData.current" class="mt-6 px-8">
           <a-progress :percent="progress" status="active" />
           <div class="mt-6">
-            <a-button @click="handleCancelUpload">{{ t('取消上傳') }}</a-button>
+            <a-button @click="handleCancelUpload">{{ t('取消上載') }}</a-button>
           </div>
         </div>
       </div>
@@ -266,5 +280,10 @@ defineExpose({ openDialog });
 <style scoped>
 :deep(.ant-checkbox-wrapper) {
   align-items: flex-start;
+}
+/* 強制讓進度條內部的文字與條狀物更靠左 */
+:deep(.ant-progress-outer) {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
 }
 </style>
