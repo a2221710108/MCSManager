@@ -63,6 +63,7 @@ const findWorldDir = async (targetPath: string): Promise<string | null> => {
 const handleMapReplace = async (file: File) => {
   const msgKey = "map_replace_task";
   
+  // 獲取實例信息
   const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
   if (info.value?.status !== 0) {
     return Modal.warning({ title: t("無法替換"), content: t("請先關閉伺服器。") });
@@ -75,25 +76,30 @@ const handleMapReplace = async (file: File) => {
     onOk: async () => {
       try {
         uploading.value = true;
-        const tempDirName = `map_extract_${Date.now()}`;
         
-        // --- 階段 1: 上傳檔案 ---
-        // 修復 TS2345: 根據報錯補全 upload 必填參數
+        // --- 修正後的上傳階段 ---
         message.loading({ content: t("正在上傳..."), key: msgKey });
+        
         await executeUpload({
+          // 這裡合併了所有可能的參數：
+          // 1. 你的 API 可能需要 daemonId/uuid 來構建 URL (解決 url is empty)
+          // 2. 你的 TS 檢查需要 filename/size 等
           params: { 
+            daemonId: props.daemonId, // 嘗試補回這兩個，通常是拼接 URL 用的
+            uuid: props.instanceId,
             overwrite: true,
             filename: file.name,
             size: file.size,
-            sum: "", // 如果後端不需要校驗，傳空字串，否則需計算 MD5
+            sum: "", 
             unzip: false,
             code: "utf-8"
           },
           data: file 
         });
 
-        // --- 階段 2: 解壓到臨時目錄 ---
-        message.loading({ content: t("正在解壓分析..."), key: msgKey });
+        // --- 階段 2: 解壓分析 ---
+        message.loading({ content: t("正在解壓分析結構..."), key: msgKey });
+        const tempDirName = `map_extract_${Date.now()}`;
         await executeCompress({
           params: { uuid: props.instanceId, daemonId: props.daemonId },
           data: { 
@@ -104,20 +110,21 @@ const handleMapReplace = async (file: File) => {
           }
         });
 
+        // 遞歸尋找 level.dat
         const realWorldPath = await findWorldDir(`/${tempDirName}/`);
         if (!realWorldPath) throw new Error(t("無效的地圖檔案 (找不到 level.dat)"));
 
         // --- 階段 3: 清理並套用 ---
-        message.loading({ content: t("正在重組目錄結構..."), key: msgKey });
+        message.loading({ content: t("正在套用新存檔路徑..."), key: msgKey });
         
-        // 刪除舊的
+        // 刪除舊地圖資料夾
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: ["/world", "/world_nether", "/world_the_end"] }
         });
 
-        // 這裡的邏輯：再次解壓到 /world/ 是最保險的自動對齊方式
-        // 因為你的後端 API 可能沒有 rename 功能
+        // 核心邏輯：將上傳的壓縮包直接解壓到 /world/ 目錄
+        // 這能確保無論原壓縮包結構如何，解壓後都能在 /world/ 下找到 level.dat
         await executeCompress({
           params: { uuid: props.instanceId, daemonId: props.daemonId },
           data: { 
@@ -128,7 +135,7 @@ const handleMapReplace = async (file: File) => {
           }
         });
 
-        // --- 階段 4: 清理垃圾 ---
+        // --- 階段 4: 清理臨時檔案 ---
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets: ["/" + file.name, "/" + tempDirName] }
@@ -137,7 +144,9 @@ const handleMapReplace = async (file: File) => {
         message.success({ content: t("地圖替換成功！"), key: msgKey });
         open.value = false;
       } catch (err: any) {
-        reportErrorMsg(err.message);
+        // 詳細捕獲錯誤，看看是不是 url 依舊為空
+        console.error("Upload Error Details:", err);
+        reportErrorMsg(err.message || "Upload Failed");
       } finally {
         uploading.value = false;
       }
