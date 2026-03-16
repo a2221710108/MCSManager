@@ -208,7 +208,7 @@ const btns = computed(() => {
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
 },
     {
-  title: t("替換存檔"),
+  title: t("存檔替換"),
   icon: CoffeeOutlined,
   click: () => {
     worldchangeDialog.value?.openDialog();
