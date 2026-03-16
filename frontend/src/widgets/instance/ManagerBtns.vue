@@ -44,6 +44,7 @@ import srv from "./dialogs/srv.vue";
 import playermanagement from "./dialogs/playermanagement.vue";
 import { useTerminal } from "@/hooks/useTerminal";
 import oftencommand from "./dialogs/oftencommand.vue";
+import worldchange from "./dialogs/worldchange.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -57,6 +58,7 @@ const javaDialog = ref<InstanceType<typeof java>>();
 const srvDialog = ref<InstanceType<typeof srv>>();
 const playermanagementDialog = ref<InstanceType<typeof playermanagement>>();
 const oftencommandDialog = ref<InstanceType<typeof oftencommand>>();
+const worldchangeDialog = ref<InstanceType<typeof worldchange>>();
 
 const terminalHook = useTerminal();
   
@@ -201,6 +203,15 @@ const btns = computed(() => {
   icon: CoffeeOutlined,
   click: () => {
     javaDialog.value?.openDialog();
+  },
+  // 僅限 Minecraft Java 版顯示
+  condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+},
+    {
+  title: t("替換存檔"),
+  icon: CoffeeOutlined,
+  click: () => {
+    worldchangeDialog.value?.openDialog();
   },
   // 僅限 Minecraft Java 版顯示
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
@@ -404,6 +415,14 @@ watch(instanceInfo, (cfg, oldCfg) => {
    :use-terminal-hook="terminalHook"
    @update="refreshInstanceInfo"
  /> 
+
+  <worldchange
+    ref="worldchangeDialog"
+    :instance-info="instanceInfo"
+    :instance-id="instanceId"
+    :daemon-id="daemonId"
+    @update="refreshInstanceInfo"
+  />
   
 </template> 
 
