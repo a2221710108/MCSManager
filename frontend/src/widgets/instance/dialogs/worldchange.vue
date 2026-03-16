@@ -266,14 +266,18 @@ defineExpose({ openDialog });
         </a-upload-dragger>
       </div>
 
-      <div v-else class="py-8 text-center">
-        <LoadingOutlined spin style="font-size: 32px; color: #1890ff" />
-        <div class="mt-6 text-base font-medium">
-          {{ uploadData.current ? t('正在上載您的存檔...') : t('正在分析與處理存檔結構...') }}
+      <div v-else class="upload-status-container py-8">
+        <div class="flex items-center justify-center mb-6">
+          <LoadingOutlined spin class="mr-2 text-primary" style="font-size: 1.1em;" />
+          <span class="text-base font-medium">
+            {{ uploadData.current ? t('正在上載您的存檔...') : t('正在分析與處理存檔結構...') }}
+          </span>
         </div>
         
-        <div v-if="uploadData.current" class="mt-6 px-8">
-          <a-progress :percent="progress" status="active" />
+        <div v-if="uploadData.current" class="px-8 flex flex-col items-center">
+          <div class="w-full">
+             <a-progress :percent="progress" status="active" />
+          </div>
           <div class="mt-6">
             <a-button @click="handleCancelUpload">{{ t('取消上載') }}</a-button>
           </div>
@@ -290,5 +294,13 @@ defineExpose({ openDialog });
 :deep(.ant-progress-outer) {
   padding-right: 0 !important;
   margin-right: 0 !important;
+}
+.text-primary {
+  color: #1890ff;
+}
+.upload-status-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 </style>
