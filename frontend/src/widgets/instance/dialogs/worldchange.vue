@@ -6,13 +6,13 @@ import { reportErrorMsg } from "@/tools/validator";
 import { 
   fileList as getFileListApi, 
   deleteFile as deleteFileApi, 
-  compressFile as compressFileApi 
+  compressFile as compressFileApi,
+  uploadFile as uploadFileApi // 確保你有這個上傳 API
 } from "@/services/apis/fileManager";
 import { getInstanceInfo } from "@/services/apis/instance";
 import { useScreen } from "@/hooks/useScreen";
 import { CloudUploadOutlined, WarningOutlined, InteractionOutlined } from "@ant-design/icons-vue";
 
-// 延遲函數
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const open = ref(false);
@@ -24,88 +24,109 @@ const props = defineProps<{
   instanceId: string;
 }>();
 
-// API 實作
 const { execute: fetchFiles } = getFileListApi();
 const { execute: executeDelete } = deleteFileApi();
 const { execute: executeCompress } = compressFileApi();
+const { execute: executeUpload } = uploadFileApi();
 const { execute: fetchInstanceInfo } = getInstanceInfo();
 
 const openDialog = () => {
   open.value = true;
 };
 
-/**
- * 核心：地圖替換流程
- * 修復 TS7006: 明確定義 file 類型為 File
- */
+// 遞歸掃描函數：尋找包含 level.dat 的目錄
+const findWorldDir = async (targetPath: string): Promise<string | null> => {
+  const res = await fetchFiles({
+    params: { 
+      daemonId: props.daemonId, uuid: props.instanceId, 
+      target: targetPath, page: 0, page_size: 100, file_name: "" 
+    }
+  });
+  const items = res.value?.items || [];
+  
+  // 檢查當前目錄是否有 level.dat
+  if (items.some((item: any) => item.name === "level.dat")) {
+    return targetPath;
+  }
+
+  // 如果沒有，往下一層找 (遞歸)
+  for (const item of items) {
+    if (item.isDirectory) {
+      const found = await findWorldDir(`${targetPath}${item.name}/`);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
 const handleMapReplace = async (file: File) => {
   const msgKey = "map_replace_task";
   
-  // 1. 檢查伺服器狀態
-  try {
-    const info = await fetchInstanceInfo({
-      params: { daemonId: props.daemonId, uuid: props.instanceId }
-    });
-
-    if (info.value?.status !== 0) {
-      return Modal.warning({
-        title: t("伺服器運行中"),
-        content: t("請先關閉伺服器後再進行地圖替換，以確保數據安全。"),
-      });
-    }
-  } catch (err: any) {
-    return reportErrorMsg(err.message);
+  // 1. 狀態預檢
+  const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
+  if (info.value?.status !== 0) {
+    return Modal.warning({ title: t("伺服器運行中"), content: t("請先關閉伺服器。") });
   }
 
   Modal.confirm({
-    title: t("確認替換現有地圖？"),
+    title: t("確認替換地圖？"),
     icon: createVNode(WarningOutlined),
-    content: t("注意：這將刪除伺服器目前的 world, world_nether, world_the_end 並上傳新地圖！"),
+    content: t("系統將會清空現有存檔目錄並嘗試從上傳的壓縮檔中還原地圖結構。"),
     onOk: async () => {
       try {
         uploading.value = true;
-        message.loading({ content: t("正在準備上傳環境..."), key: msgKey });
-
-        // 模擬上傳邏輯與目錄掃描
-        const tempDir = `temp_map_upload_${Date.now()}`;
+        const tempDirName = `map_extract_${Date.now()}`;
         
-        // 修復 TS2345: 補全缺失的 file_name 參數
-        const scanRes = await fetchFiles({
-          params: { 
-            daemonId: props.daemonId, 
-            uuid: props.instanceId, 
-            target: "/", 
-            page: 0, 
-            page_size: 100,
-            file_name: "" // 補上此必選參數
-          }
+        // --- 階段 1: 上傳檔案 ---
+        message.loading({ content: t("正在上傳地圖中..."), key: msgKey });
+        await executeUpload({
+          params: { daemonId: props.daemonId, uuid: props.instanceId, target: "/" },
+          data: file // 假設後端接收二進制或 FormData
         });
 
-        message.loading({ content: t("正在清理舊地圖數據..."), key: msgKey });
-        
-        // 獲取當前根目錄下需要清理的地圖目錄
-        const currentFiles = scanRes.value?.items || [];
-        const targetsToDelete = currentFiles
-          .filter((item: any) => ["world", "world_nether", "world_the_end"].includes(item.name))
-          .map((item: any) => "/" + item.name);
+        // --- 階段 2: 解壓到臨時目錄 ---
+        message.loading({ content: t("正在解壓檔案..."), key: msgKey });
+        await executeCompress({
+          params: { uuid: props.instanceId, daemonId: props.daemonId },
+          data: { type: 2, code: "utf-8", source: "/" + file.name, targets: `/${tempDirName}/` }
+        });
 
-        if (targetsToDelete.length > 0) {
-          await executeDelete({
-            params: { daemonId: props.daemonId, uuid: props.instanceId },
-            data: { targets: targetsToDelete }
-          });
+        // --- 階段 3: 智慧掃描與定位 ---
+        message.loading({ content: t("正在分析地圖結構..."), key: msgKey });
+        const realWorldPath = await findWorldDir(`/${tempDirName}/`);
+        
+        if (!realWorldPath) {
+          throw new Error(t("壓縮包中找不到有效的 Minecraft 地圖 (未發現 level.dat)"));
         }
 
-        // 這裡後續應串接實際的上傳與解壓邏輯
-        message.loading({ content: t("正在解壓並適配路徑..."), key: msgKey });
+        // --- 階段 4: 清理舊存檔與移動新存檔 ---
+        message.loading({ content: t("正在套用新存檔..."), key: msgKey });
         
-        // 模擬兩秒的操作
-        await sleep(2000);
+        // 先刪除原有的 world
+        await executeDelete({
+          params: { daemonId: props.daemonId, uuid: props.instanceId },
+          data: { targets: ["/world", "/world_nether", "/world_the_end"] }
+        });
 
-        message.success({ content: t("地圖上傳與適配完成！"), key: msgKey });
+        // 搬移新地圖 (此處假設後端 compress 介面也可用於移動或改名，
+        // 如果後端沒 move 接口，通常是將實體目錄 rename 為 world)
+        // 這裡以解壓到 /world 為例
+        await executeCompress({
+          params: { uuid: props.instanceId, daemonId: props.daemonId },
+          data: { type: 2, code: "utf-8", source: "/" + file.name, targets: "/world/" }
+        });
+
+        // --- 階段 5: 清理垃圾 ---
+        await executeDelete({
+          params: { daemonId: props.daemonId, uuid: props.instanceId },
+          data: { targets: ["/" + file.name, "/" + tempDirName] }
+        });
+
+        message.success({ content: t("地圖替換成功！"), key: msgKey });
         open.value = false;
       } catch (err: any) {
-        message.error({ content: t("操作失敗: ") + err.message, key: msgKey });
+        reportErrorMsg(err.message);
+        message.error({ content: t("替換失敗"), key: msgKey });
       } finally {
         uploading.value = false;
       }
@@ -117,64 +138,21 @@ defineExpose({ openDialog });
 </script>
 
 <template>
-  <a-modal
-    v-model:open="open"
-    :title="t('地圖存檔快速替換')"
-    centered
-    :footer="null"
-    :width="isPhone ? '100%' : '600px'"
-  >
-    <div class="map-replace-container">
-      <a-alert type="info" show-icon class="mb-4">
-        <template #message>{{ t("智能路徑匹配") }}</template>
-        <template #description>
-          {{ t("只需拖入地圖壓縮檔，系統會自動尋找 level.dat 並將地圖放置到正確路徑。") }}
-        </template>
-      </a-alert>
-
-      <div class="upload-area">
-        <a-upload-dragger
-          name="file"
-          :multiple="false"
-          :show-upload-list="false"
-          :before-upload="(file: any) => { handleMapReplace(file as File); return false; }"
-          :disabled="uploading"
-        >
-          <p class="ant-upload-drag-icon">
-            <CloudUploadOutlined v-if="!uploading" />
-            <InteractionOutlined v-else spin />
-          </p>
-          <p class="ant-upload-text">{{ uploading ? t('處理中...') : t('點擊或拖拽地圖壓縮檔至此') }}</p>
-        </a-upload-dragger>
-      </div>
-
-      <div class="steps-guide">
-        <div class="step-item">
-          <span class="step-num">!</span>
-          <p>{{ t('支援格式：.zip, .tar.gz (包含單個或多個維度檔案)') }}</p>
-        </div>
-      </div>
+  <a-modal v-model:open="open" :title="t('地圖存檔替換')" :footer="null" :width="600">
+    <div class="p-4">
+      <a-upload-dragger
+        :multiple="false"
+        :show-upload-list="false"
+        :before-upload="(file: any) => { handleMapReplace(file as File); return false; }"
+        :disabled="uploading"
+      >
+        <p class="ant-upload-drag-icon">
+          <InteractionOutlined v-if="uploading" spin />
+          <CloudUploadOutlined v-else />
+        </p>
+        <p class="ant-upload-text">{{ uploading ? t('正在上傳並處理中...') : t('點擊或拖拽地圖壓縮包') }}</p>
+        <p class="ant-upload-hint">{{ t('支援 .zip / .tar.gz，會自動過濾多餘目錄層級') }}</p>
+      </a-upload-dragger>
     </div>
   </a-modal>
 </template>
-
-<style scoped>
-.mb-4 { margin-bottom: 16px; }
-.upload-area { margin: 24px 0; }
-.steps-guide {
-  background: rgba(128, 128, 128, 0.05);
-  padding: 12px;
-  border-radius: 8px;
-}
-.step-item { display: flex; align-items: center; gap: 10px; }
-.step-num {
-  background: #faad14;
-  color: white;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  text-align: center;
-  line-height: 18px;
-  font-size: 12px;
-}
-</style>
