@@ -209,7 +209,7 @@ const btns = computed(() => {
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
 },
     {
-  title: t("存檔替換"),
+  title: t("存檔替換 / 匯入"),
   icon: SaveOutlined,
   click: () => {
     worldchangeDialog.value?.openDialog();
