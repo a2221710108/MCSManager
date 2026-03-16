@@ -60,7 +60,7 @@ const handleDeleteCurrentWorld = async () => {
 
   Modal.confirm({
     title: t("確認刪除現有存檔？"),
-    content: t("這將永久刪除您現有的存檔，除非你建立了備份"),
+    content: t("這將永久刪除您現有的存檔，除非你建立了備份。刪除後預設情況下，下次啟動伺服器將重新生成地圖。"),
     okText: t("確定刪除"),
     okType: "danger",
     onOk: async () => {
@@ -86,7 +86,7 @@ const deepScanWorlds = async (targetPath: string, results: WorldScanResult[] = [
   const currentPath = normalizePath(targetPath);
   if (depth > 5) return results;
 
-  await sleep(800);
+  await sleep(2500);
 
   try {
     const res = await fetchFiles({
@@ -141,7 +141,7 @@ const handleMapReplace = async (file: File) => {
 
   const msgKey = "map_replace_task";
   const info = await fetchInstanceInfo({ params: { daemonId: props.daemonId, uuid: props.instanceId } });
-  if (info.value?.status !== 0) return Modal.warning({ title: t("無法開始替換"), content: t("您的伺服器正在運行中或維護中，請先關閉伺服器。") });
+  if (info.value?.status !== 0) return Modal.error({ title: t("無法開始替換"), content: t("您的伺服器正在運行中或維護中，請先關閉伺服器後再使用該功能。") });
 
   uploading.value = true;
   const tempDirName = `tmp_map_${Date.now()}`;
