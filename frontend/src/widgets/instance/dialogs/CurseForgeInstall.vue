@@ -51,11 +51,13 @@ const handleInstall = async () => {
       try {
         confirmLoading.value = true;
         
-        await installCurseForgePack().execute({
-          params: {
-            daemonId: props.daemonId,
-            uuid: props.instanceId
-          },
+await installCurseForgePack().execute({
+  params: {
+    daemonId: props.daemonId,
+    uuid: props.instanceId,
+    task_name: "curseforge_install" // 傳入任務名稱
+  },
+
           data: {
             projectId: form.projectId,
             versionId: form.versionId,
