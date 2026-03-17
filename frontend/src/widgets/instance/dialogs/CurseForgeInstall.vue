@@ -52,7 +52,7 @@ const handleCleanServer = async () => {
   Modal.confirm({
     title: t("確定要清空伺服器嗎？"),
     icon: createVNode(ExclamationCircleOutlined, { style: 'color: #ff4d4f' }),
-    content: t("這將刪除當前實例目錄下的所有檔案（LazyCloud_backup 除外），此操作不可撤銷！"),
+    content: t("這將刪除您的所有檔案，此操作不可撤銷！"),
     okText: t("確定清空"),
     okType: "danger",
     onOk: async () => {
@@ -84,7 +84,7 @@ const handleCleanServer = async () => {
           });
         }
         
-        message.success(t("伺服器已清空（備份資料夾已保留）"));
+        message.success(t("伺服器已清空"));
         hasCleaned.value = true;
       } catch (err: any) {
         message.error(t("清空失敗: ") + (err.message || "Unknown Error"));
@@ -125,7 +125,7 @@ const handleInstall = async () => {
         isVisible.value = false;
       } catch (err: any) {
         props.instanceInfo.status = 0;
-        Modal.error({ title: t("啟動失敗"), content: err.message });
+        Modal.error({ title: t("安裝任務啟動失敗"), content: err.message });
       } finally {
         confirmLoading.value = false;
       }
@@ -151,10 +151,10 @@ defineExpose({ openDialog });
         <div class="card-header">
           <div class="header-content">
             <h4 class="step-title danger">
-              <delete-outlined /> {{ t('第一步：環境清算') }}
+              <delete-outlined /> {{ t('第一步：環境清理') }}
             </h4>
             <p class="step-desc">
-              {{ t('安裝前建議清空舊檔案以防止衝突。') }}
+              {{ t('請注意：為防止錯誤，僅支持安裝有官方 ServerPack 的 ModPack！') }}
             </p>
           </div>
           <transition name="fade">
@@ -166,7 +166,7 @@ defineExpose({ openDialog });
 
         <div class="card-action">
           <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned" class="custom-checkbox">
-            <span class="checkbox-text">{{ t('我同意清空所有檔案（排除 LazyCloud_backup）') }}</span>
+            <span class="checkbox-text">{{ t('我同意清空所有檔案') }}</span>
           </a-checkbox>
           <a-button 
             danger 
@@ -185,6 +185,9 @@ defineExpose({ openDialog });
         <h4 class="step-title">
           <setting-outlined /> {{ t('第二步：ModPack 配置') }}
         </h4>
+        <p class="step-desc">
+              {{ t('請注意：為防止錯誤，僅支持安裝有官方 ServerPack 的 ModPack！') }}
+            </p>
         
         <a-form layout="vertical" class="mt-4">
           <a-form-item :label="t('CurseForge API Key')">
