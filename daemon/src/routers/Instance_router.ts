@@ -421,6 +421,24 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
     return protocol.response(ctx, task.toObject());
   }
 
+// 【新增內容】：在下面加入 CurseForge 安裝邏輯
+  if (taskName === "curseforge_install" && instance) {
+    if (instance.status() !== 0) return protocol.error(ctx, "instance/asynchronous", { err: "請先關閉伺服器" });
+    if (instance.asynchronousTask) return protocol.error(ctx, "instance/asynchronous", { err: "該實例已有任務正在運行" });
+    
+    try {
+      const task = createCurseForgeTask(instance, {
+        projectId: String(parameter.projectId),
+        versionId: parameter.versionId ? String(parameter.versionId) : "latest",
+        apiKey: String(parameter.apiKey)
+      });
+      instance.asynchronousTask = task;
+      return protocol.response(ctx, task.toObject());
+    } catch (err: any) {
+      return protocol.error(ctx, "instance/asynchronous", { err: err.message });
+    }
+  }
+  
   protocol.response(ctx, true);
 });
 
@@ -554,34 +572,5 @@ routerApp.on("instance/outputlog", async (ctx, data) => {
     });
   } catch (err: any) {
     protocol.responseError(ctx, err);
-  }
-});
-
-
-
-
-// --- 檔案最末尾：只保留一份 CurseForge 安裝監聽 ---
-routerApp.on("instance/curseforge_install", (ctx, data) => {
-  const instanceUuid = data.instanceUuid;
-  const parameter = data.parameter;
-  const instance = InstanceSubsystem.getInstance(instanceUuid);
-
-  logger.info(`收到 CurseForge 安裝請求: 實例 ${instanceUuid}, 專案 ${parameter.projectId}`);
-
-  if (!instance) return protocol.error(ctx, "instance/curseforge_install", { err: "實例不存在" });
-  if (instance.status() !== 0) return protocol.error(ctx, "instance/curseforge_install", { err: "請先關閉伺服器" });
-  if (instance.asynchronousTask) return protocol.error(ctx, "instance/curseforge_install", { err: "已有任務正在運行" });
-
-  try {
-    const task = createCurseForgeTask(instance, {
-      projectId: String(parameter.projectId),
-      versionId: parameter.versionId ? String(parameter.versionId) : "latest",
-      apiKey: String(parameter.apiKey)
-    });
-
-    instance.asynchronousTask = task;
-    protocol.response(ctx, task.toObject());
-  } catch (err: any) {
-    protocol.error(ctx, "instance/curseforge_install", { err: err.message });
   }
 });
