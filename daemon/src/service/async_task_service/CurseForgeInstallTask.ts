@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs-extra";
 import Instance from "../../entity/instance/instance";
 import { $t } from "../../i18n";
-import { Task } from "./index"; // 修改這裡：通常任務基類在 index 裡導出
+import { IExecutable } from "../interfaces"; // 確保從正確的路徑導入介面
 
 interface ICurseForgeConfig {
   projectId: string;
@@ -11,33 +11,36 @@ interface ICurseForgeConfig {
   apiKey: string;
 }
 
-// 確保繼承 Task 類以獲得 status 等屬性
-export class CurseForgeInstallTask extends Task {
+// 實作 IExecutable 介面，解決 Property 'exec' is missing 的錯誤
+export class CurseForgeInstallTask implements IExecutable<any> {
   public static readonly TYPE = "CurseForgeInstallTask";
-  private process: any = null;
+  
   public taskId: string;
+  private process: any = null;
 
   constructor(
     public readonly instance: Instance,
     public readonly config: ICurseForgeConfig
   ) {
-    super();
-    // 生成一個唯一的任務 ID
+    // 生成唯一 Task ID
     this.taskId = `${CurseForgeInstallTask.TYPE}-${instance.instanceUuid}-${Date.now()}`;
   }
 
-  // MCSManager 核心會調用這個方法啟動任務
-  async onExecute(): Promise<any> {
+  /**
+   * 實作 IExecutable 要求的 exec 方法
+   * 這是任務的啟動入口
+   */
+  async exec(): Promise<any> {
     const scriptPath = path.join(process.cwd(), "scripts", "curseforge_install.sh");
 
     if (!fs.existsSync(scriptPath)) {
       this.instance.print(`[ERROR] 找不到安裝腳本: ${scriptPath}\n`);
-      this.stop();
-      return;
+      return this.stop();
     }
 
     this.instance.print("--------------------------------------------------\n");
     this.instance.print($t("正在啟動 CurseForge 自動化部署腳本...\n"));
+    this.instance.print(`Project ID: ${this.config.projectId}\n`);
     this.instance.print("--------------------------------------------------\n");
 
     this.process = spawn("bash", [scriptPath], {
@@ -62,22 +65,36 @@ export class CurseForgeInstallTask extends Task {
       }
       this.stop();
     });
+
+    return this;
   }
 
-  // 實現系統要求的停止介面
-  async onStop(): Promise<any> {
+  /**
+   * 實作 IExecutable 要求的 stop 方法
+   */
+  async stop(): Promise<any> {
     if (this.process) {
-      this.process.kill();
+      try {
+        this.process.kill();
+      } catch (err) {}
       this.process = null;
     }
-    this.instance.asynchronousTask = null;
+    // 釋放實例上的異步任務佔位
+    if (this.instance.asynchronousTask === this) {
+      this.instance.asynchronousTask = null;
+    }
   }
 
-  // 獲取當前狀態數字
+  /**
+   * 返回當前狀態 (1 為運行中, 0 為停止)
+   */
   status(): number {
     return this.process ? 1 : 0;
   }
 
+  /**
+   * 返回給前端的狀態資訊
+   */
   toObject() {
     return {
       taskId: this.taskId,
@@ -88,10 +105,13 @@ export class CurseForgeInstallTask extends Task {
   }
 }
 
+/**
+ * 工廠函數，用於在 Router 中調用
+ */
 export function createCurseForgeTask(instance: Instance, config: ICurseForgeConfig) {
   const task = new CurseForgeInstallTask(instance, config);
-  // 在 MCSManager 中，通常是將任務交給實例物件，由實例負責調用執行
   instance.asynchronousTask = task;
-  task.onExecute(); 
+  // 直接執行啟動
+  task.exec();
   return task;
 }
