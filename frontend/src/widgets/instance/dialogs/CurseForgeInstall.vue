@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, createVNode, computed } from "vue";
+import { ref, reactive, createVNode } from "vue";
 import { t } from "@/lang/i18n";
 import { message, Modal } from "ant-design-vue";
 import { 
@@ -24,7 +24,6 @@ const isVisible = ref(false);
 const confirmLoading = ref(false);
 const isCleaning = ref(false);
 
-// 新增狀態控制
 const agreeClean = ref(false);
 const hasCleaned = ref(false);
 
@@ -41,7 +40,6 @@ const openDialog = () => {
   if (props.instanceInfo.status !== 0) {
     return message.error(t("請先關閉伺服器"));
   }
-  // 每次打開重置清空狀態
   hasCleaned.value = false;
   agreeClean.value = false;
   isVisible.value = true;
@@ -60,13 +58,21 @@ const handleCleanServer = async () => {
     onOk: async () => {
       try {
         isCleaning.value = true;
-        // 1. 獲取檔案列表
+        
+        // 修正 TS2345: 補齊所有必需的 params
         const res = await fetchFileList({
-          params: { daemonId: props.daemonId, uuid: props.instanceId, target: "/" }
+          params: { 
+            daemonId: props.daemonId, 
+            uuid: props.instanceId, 
+            target: "/",
+            page: 0,           // 補齊參數
+            page_size: 100,   // 補齊參數，設置較大以確保獲取所有檔案
+            file_name: ""      // 補齊參數
+          }
         });
         
         const allItems = res.value?.items || [];
-        // 2. 篩選掉 LazyCloud_backup
+        // 篩選掉備份資料夾
         const targets = allItems
           .filter((item: any) => item.name !== "LazyCloud_backup")
           .map((item: any) => "/" + item.name);
@@ -81,7 +87,7 @@ const handleCleanServer = async () => {
         message.success(t("伺服器已清空（備份資料夾已保留）"));
         hasCleaned.value = true;
       } catch (err: any) {
-        message.error(t("清空失敗: ") + err.message);
+        message.error(t("清空失敗: ") + (err.message || "Unknown Error"));
       } finally {
         isCleaning.value = false;
       }
@@ -210,12 +216,24 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
+.cf-install-content { padding: 8px 0; }
 .bg-red-50 { background-color: #fff1f0; }
 .border-red-100 { border-color: #ffa39e; }
 .mb-6 { margin-bottom: 1.5rem; }
 .opacity-40 { opacity: 0.4; transition: opacity 0.3s; }
 .pointer-events-none { pointer-events: none; }
-/* 其餘樣式保持... */
+.mb-4 { margin-bottom: 1rem; }
+.mt-6 { margin-top: 1.5rem; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+.items-start { align-items: flex-start; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.text-xs { font-size: 0.75rem; }
+.text-red-500 { color: #ff4d4f; }
+.text-red-600 { color: #cf1322; }
+.text-gray-400 { color: #9ca3af; }
 .install-btn { background-color: #1890ff; border-radius: 4px; color: white; }
-.install-btn[disabled] { background-color: #f5f5f5; color: rgba(0, 0, 0, 0.25); border-color: #d9d9d9; }
 </style>
