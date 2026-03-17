@@ -11,61 +11,68 @@ import {
 } from "@ant-design/icons-vue";
 import { installCurseForgePack } from "@/services/apis/instance";
 
-// 修正 1: 增加 instance 對象的傳入，以便直接修改其狀態
+// 接收來自父組件 ManagerBtns.vue 的數據
 const props = defineProps<{
   daemonId: string;
   instanceId: string;
-  instance: any; // 傳入完整的 instance 實體
+  // 必須傳入 instanceInfo 以便修改實例狀態
+  instanceInfo: any; 
 }>();
 
 const isVisible = ref(false);
 const confirmLoading = ref(false);
 
+// 表單數據模型
 const form = reactive({
   projectId: "",
   versionId: "latest",
   apiKey: localStorage.getItem("mcs_cf_api_key") || ""
 });
 
-// 修正 2: 開啟彈窗時檢查狀態，非停止狀態（0）不准打開
+/**
+ * [核心功能 1]：開啟彈窗前檢查狀態
+ * 只有「停止中」才能開啟 UI，解決你提到的「點擊開啟仍是停止中」的誤操作問題
+ */
 const openDialog = () => {
-  if (props.instance.status !== 0) {
-    return message.error(t("實例必須處於『停止』狀態才能進行安裝操作！"));
+  if (props.instanceInfo.status !== 0) {
+    return message.error(t("實例必須處於『停止』狀態才能進入安裝面板！"));
   }
   isVisible.value = true;
 };
 
+/**
+ * [核心功能 2]：執行安裝並切換狀態
+ */
 const handleInstall = async () => {
+  // 基礎驗證
   if (!form.projectId || !form.apiKey) {
     return message.warning(t("請完整填寫 Project ID 與 API Key"));
   }
 
-  // 再次檢查，防止 UI 滯後
-  if (props.instance.status !== 0) {
-    return message.error(t("實例目前並非停止狀態，無法啟動任務。"));
-  }
-
+  // 記住 API Key 方便下次使用
   localStorage.setItem("mcs_cf_api_key", form.apiKey);
 
   Modal.confirm({
     title: t("確認部署此整合包？"),
     icon: createVNode(QuestionCircleOutlined, { style: 'color: #1890ff' }),
-    content: t("系統將會下載、解壓縮並覆蓋實例檔案。執行期間實例將進入維護狀態。"),
+    content: t("系統將會下載並覆蓋實例檔案。點擊後實例將進入「維護中」狀態。"),
     okText: t("立即開始"),
     cancelText: t("取消"),
     onOk: async () => {
       try {
         confirmLoading.value = true;
         
-        // 修正 3: 點擊確認後，立刻在前端將狀態設為「忙碌/維護中」(2)
-        // 這會讓 MCSM 的控制台按鈕立刻變灰，防止用戶點擊「開啟」
-        props.instance.status = 2; 
+        /**
+         * [關鍵修正]：點擊後立即切換狀態為「維護中」(2)
+         * 這會同步讓側邊欄和主面板的「開啟」按鈕變灰，防止連點和重複啟動
+         */
+        props.instanceInfo.status = 2; 
 
         await installCurseForgePack().execute({
           params: {
             daemonId: props.daemonId,
             uuid: props.instanceId,
-            task_name: "curseforge_install"
+            task_name: "curseforge_install" // 確保 TS 檢查通過
           },
           data: {
             projectId: form.projectId,
@@ -74,14 +81,16 @@ const handleInstall = async () => {
           }
         });
 
-        message.success(t("安裝任務已在後端啟動，實例已進入維護模式"));
+        message.success(t("安裝任務已啟動，實例已進入維護模式"));
         isVisible.value = false;
       } catch (err: any) {
-        // 如果啟動失敗，將狀態撥回「停止」(0)
-        props.instance.status = 0;
+        /**
+         * [關鍵修正]：如果 API 請求失敗，將狀態撥回「停止中」(0)
+         */
+        props.instanceInfo.status = 0;
         Modal.error({
           title: t("啟動失敗"),
-          content: err.message || t("請檢查 API Key 是否有效或網絡連接。")
+          content: err.message || t("請檢查 API Key 是否有效或網路連接。")
         });
       } finally {
         confirmLoading.value = false;
@@ -104,12 +113,12 @@ defineExpose({ openDialog });
     width="550px"
   >
     <div class="cf-install-content">
-      <a-alert type="warning" show-icon class="mb-4">
+      <a-alert type="info" show-icon class="mb-4">
         <template #message>
-          {{ t('注意') }}
+          {{ t('自動化流程說明') }}
         </template>
         <template #description>
-          {{ t('點擊開始後，實例狀態將變更為「維護中」，在任務完成前無法啟動伺服器。') }}
+          1. 解析 Manifest 檔案 2. 下載所有相依 Mod 3. 處理 Overrides 覆蓋。
         </template>
       </a-alert>
 
@@ -159,8 +168,9 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 樣式保持不變 */
-.cf-install-content { padding: 8px 0; }
+.cf-install-content {
+  padding: 8px 0;
+}
 .mb-4 { margin-bottom: 1rem; }
 .mt-4 { margin-top: 1rem; }
 .flex { display: flex; }
