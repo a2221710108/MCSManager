@@ -453,23 +453,23 @@ export const scheduleCreate = useDefineApi<
   method: "POST"
 });
 
-export const installCurseForgePack = useDefineApi<
-  {
-    params: {
-      daemonId: string;
-      uuid: string;
-    };
-    data: {
-      projectId: string;
-      versionId: string;
-      apiKey: string;
-    };
-  },
-  boolean
->({
-  url: "/api/protected_instance/curseforge_install",
+export const installCurseForgePack = useDefineApi<{
+  params: {
+    daemonId: string;
+    uuid: string;
+    task_name: string; // 新增這行
+  };
+  data: {
+    projectId: string;
+    versionId: string;
+    apiKey: string;
+  };
+}, any>({
+  url: "/api/protected_instance/asynchronous", // 使用通用介面
   method: "POST"
 });
+
+
 
 export const reinstallInstance = useDefineApi<
   {
