@@ -453,6 +453,24 @@ export const scheduleCreate = useDefineApi<
   method: "POST"
 });
 
+export const installCurseForgePack = useDefineApi<
+  {
+    params: {
+      daemonId: string;
+      uuid: string;
+    };
+    data: {
+      projectId: string;
+      versionId: string;
+      apiKey: string;
+    };
+  },
+  boolean
+>({
+  url: "/api/protected_instance/curseforge_install",
+  method: "POST"
+});
+
 export const reinstallInstance = useDefineApi<
   {
     params: {
