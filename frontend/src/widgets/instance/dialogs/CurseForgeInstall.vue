@@ -140,7 +140,7 @@ defineExpose({ openDialog });
   <a-modal
     v-model:open="isVisible"
     centered
-    :title="t('CurseForge ModPack 自動安裝')"
+    :title="t('CurseForge Modpack 自動安裝')"
     :footer="null"
     :mask-closable="false"
     destroy-on-close
@@ -154,7 +154,7 @@ defineExpose({ openDialog });
               <delete-outlined /> {{ t('第一步：環境清理') }}
             </h4>
             <p class="step-desc">
-              {{ t('請注意：為防止錯誤，僅支持安裝有官方 ServerPack 的 ModPack！') }}
+              {{ t('請注意：為防止錯誤，僅支持安裝有官方 Server Pack 的 Modpack！') }}
             </p>
           </div>
           <transition name="fade">
@@ -186,8 +186,8 @@ defineExpose({ openDialog });
           <setting-outlined /> {{ t('第二步：ModPack 配置') }}
         </h4>
         <p class="step-desc">
-              {{ t('請注意：為防止錯誤，僅支持安裝有官方 ServerPack 的 ModPack！') }}
-            </p>
+  {{ t('請注意：為防止錯誤，僅支持安裝有官方 Server Pack 的 Modpack！ 如有疑問請閱讀 <a href="你的網址" target="_blank">知識庫</a> 內容') }}
+</p>
         
         <a-form layout="vertical" class="mt-4">
           <a-form-item :label="t('CurseForge API Key')">
