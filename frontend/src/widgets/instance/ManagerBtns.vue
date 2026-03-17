@@ -46,6 +46,7 @@ import playermanagement from "./dialogs/playermanagement.vue";
 import { useTerminal } from "@/hooks/useTerminal";
 import oftencommand from "./dialogs/oftencommand.vue";
 import worldchange from "./dialogs/worldchange.vue";
+import CurseForgeInstall from "./dialogs/CurseForgeInstall.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -60,6 +61,8 @@ const srvDialog = ref<InstanceType<typeof srv>>();
 const playermanagementDialog = ref<InstanceType<typeof playermanagement>>();
 const oftencommandDialog = ref<InstanceType<typeof oftencommand>>();
 const worldchangeDialog = ref<InstanceType<typeof worldchange>>();
+// 在其他 Dialog ref 附近加入
+const cfInstallDialog = ref<InstanceType<typeof CurseForgeInstall>>();
 
 const terminalHook = useTerminal();
   
@@ -207,6 +210,15 @@ const btns = computed(() => {
   },
   // 僅限 Minecraft Java 版顯示
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+},
+    {
+  title: t("CurseForge 安裝"),
+  icon: CloudDownloadOutlined,
+  click: () => {
+    cfInstallDialog.value?.openDialog();
+  },
+  // 僅限 Minecraft Java 版且只有管理員可以看到
+  condition: () => isAdmin.value && (instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false)
 },
     {
   title: t("存檔替換 / 匯入"),
@@ -423,6 +435,12 @@ watch(instanceInfo, (cfg, oldCfg) => {
     :daemon-id="daemonId ?? ''"
     @save="refreshInstanceInfo"
   />
+
+  <CurseForgeInstall
+  ref="cfInstallDialog"
+  :instance-id="instanceId ?? ''"
+  :daemon-id="daemonId ?? ''"
+/>
   
 </template> 
 
