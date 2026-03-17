@@ -213,7 +213,7 @@ const btns = computed(() => {
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
 },
     {
-  title: t("CurseForge 安裝"),
+  title: t("CurseForge ModPack 安裝"),
   icon: CloudDownloadOutlined,
   click: () => {
     cfInstallDialog.value?.openDialog();
