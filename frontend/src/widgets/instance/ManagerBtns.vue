@@ -441,6 +441,7 @@ watch(instanceInfo, (cfg, oldCfg) => {
   ref="cfInstallDialog"
   :instance-id="instanceId ?? ''"
   :daemon-id="daemonId ?? ''"
+  :instance-info="instanceInfo" 
 />
   
 </template> 
