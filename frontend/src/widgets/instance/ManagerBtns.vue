@@ -24,7 +24,8 @@ import {
   CoffeeOutlined,
   HistoryOutlined,
   GlobalOutlined,
-  SaveOutlined
+  SaveOutlined,
+  loudDownloadOutlined
 } from "@ant-design/icons-vue";
 
 import { computed, ref, watch } from "vue";
