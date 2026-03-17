@@ -6,6 +6,8 @@ import logger from "../service/log";
 import * as protocol from "../service/protocol";
 import { routerApp } from "../service/router";
 import InstanceSubsystem from "../service/system_instance";
+// 在 Instance_router.ts 的頂部加入這行
+// 注意：如果你的檔案名稱是 CurseForgeInstallTask.ts，這裡結尾不要加 .ts
 import { createCurseForgeTask, CurseForgeInstallTask } from "../service/async_task_service/CurseForgeInstallTask";
 
 import { arrayUnique, toNumber } from "mcsmanager-common";
@@ -459,7 +461,8 @@ routerApp.on("instance/query_asynchronous", (ctx, data) => {
   const taskId = data.parameter.taskId as string | undefined;
   const taskName = data.taskName as string;
   const taskNameTypeMap: IJson<string> = {
-    quick_install: QuickInstallTask.TYPE
+    quick_install: QuickInstallTask.TYPE,
+    curseforge_install: CurseForgeInstallTask.TYPE // <--- 新增這行
   };
   const type = String(taskNameTypeMap[taskName] || QuickInstallTask.TYPE);
   if (!taskId) {
@@ -554,10 +557,13 @@ routerApp.on("instance/outputlog", async (ctx, data) => {
   }
 });
 
-// 啟動 CurseForge 整合包自動安裝任務
+
+
+
+// --- 檔案最末尾：只保留一份 CurseForge 安裝監聽 ---
 routerApp.on("instance/curseforge_install", (ctx, data) => {
   const instanceUuid = data.instanceUuid;
-  const parameter = data.parameter; // 包含 projectId, versionId, apiKey
+  const parameter = data.parameter;
   const instance = InstanceSubsystem.getInstance(instanceUuid);
 
   logger.info(`收到 CurseForge 安裝請求: 實例 ${instanceUuid}, 專案 ${parameter.projectId}`);
@@ -573,19 +579,9 @@ routerApp.on("instance/curseforge_install", (ctx, data) => {
       apiKey: String(parameter.apiKey)
     });
 
-    // 將任務掛載到實例，這樣前端才能抓到狀態
     instance.asynchronousTask = task;
-
-    // 回傳任務資訊
     protocol.response(ctx, task.toObject());
   } catch (err: any) {
     protocol.error(ctx, "instance/curseforge_install", { err: err.message });
   }
 });
-
-// 在 query_asynchronous 映射表中加入 CurseForge 類型
-// 找到原本的 "const taskNameTypeMap"，修改如下：
-const taskNameTypeMap: IJson<string> = {
-  quick_install: QuickInstallTask.TYPE,
-  curseforge_install: CurseForgeInstallTask.TYPE // <--- 加入這一行
-};
