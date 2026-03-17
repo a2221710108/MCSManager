@@ -3,8 +3,7 @@ import path from "path";
 import fs from "fs-extra";
 import Instance from "../../entity/instance/instance";
 import { $t } from "../../i18n";
-import logger from "../../service/log";
-import { Task } from "./task";
+import { Task } from "./index"; // 修改這裡：通常任務基類在 index 裡導出
 
 interface ICurseForgeConfig {
   projectId: string;
@@ -12,102 +11,76 @@ interface ICurseForgeConfig {
   apiKey: string;
 }
 
+// 確保繼承 Task 類以獲得 status 等屬性
 export class CurseForgeInstallTask extends Task {
   public static readonly TYPE = "CurseForgeInstallTask";
   private process: any = null;
+  public taskId: string;
 
   constructor(
     public readonly instance: Instance,
     public readonly config: ICurseForgeConfig
   ) {
     super();
+    // 生成一個唯一的任務 ID
+    this.taskId = `${CurseForgeInstallTask.TYPE}-${instance.instanceUuid}-${Date.now()}`;
   }
 
-  /**
-   * 任務執行入口
-   */
-  async run() {
-    // 1. 定義腳本絕對路徑 (假設放在 daemon/scripts 下)
+  // MCSManager 核心會調用這個方法啟動任務
+  async onExecute(): Promise<any> {
     const scriptPath = path.join(process.cwd(), "scripts", "curseforge_install.sh");
 
-    // 檢查腳本是否存在
     if (!fs.existsSync(scriptPath)) {
       this.instance.print(`[ERROR] 找不到安裝腳本: ${scriptPath}\n`);
-      return this.stop();
+      this.stop();
+      return;
     }
 
     this.instance.print("--------------------------------------------------\n");
     this.instance.print($t("正在啟動 CurseForge 自動化部署腳本...\n"));
-    this.instance.print(`專案 ID: ${this.config.projectId}\n`);
-    this.instance.print(`文件 ID: ${this.config.versionId}\n`);
     this.instance.print("--------------------------------------------------\n");
 
-    try {
-      // 2. 調用 Spawn 執行 Bash
-      // 注意：將 SERVER_DIR 指向實例的當前工作目錄
-      this.process = spawn("bash", [scriptPath], {
-        env: {
-          ...process.env,
-          SERVER_DIR: this.instance.config.cwd,
-          PROJECT_ID: this.config.projectId,
-          VERSION_ID: this.config.versionId,
-          API_KEY: this.config.apiKey,
-          // 確保路徑中包含 java 等必要命令
-          PATH: process.env.PATH
-        }
-      });
+    this.process = spawn("bash", [scriptPath], {
+      env: {
+        ...process.env,
+        SERVER_DIR: this.instance.config.cwd,
+        PROJECT_ID: this.config.projectId,
+        VERSION_ID: this.config.versionId,
+        API_KEY: this.config.apiKey,
+        PATH: process.env.PATH
+      }
+    });
 
-      // 3. 實時將腳本輸出推送到實例控制台
-      this.process.stdout.on("data", (data: any) => {
-        this.instance.print(data.toString());
-      });
+    this.process.stdout.on("data", (data: any) => this.instance.print(data.toString()));
+    this.process.stderr.on("data", (data: any) => this.instance.print(data.toString()));
 
-      this.process.stderr.on("data", (data: any) => {
-        // 部分 wget 輸出可能在 stderr，這裡統一顯示
-        this.instance.print(data.toString());
-      });
-
-      // 4. 監聽結束事件
-      this.process.on("close", (code: number) => {
-        if (code === 0) {
-          this.instance.print("\n[SUCCESS] CurseForge 部署任務順利完成！\n");
-          this.instance.print("提示：請確認控制台顯示的核心檔案（如 forge.jar）是否存在後再啟動。\n");
-        } else {
-          this.instance.print(`\n[ERROR] 腳本執行異常退出，錯誤代碼: ${code}\n`);
-        }
-        this.stop();
-      });
-
-      this.process.on("error", (err: Error) => {
-        this.instance.print(`\n[ERROR] 無法啟動安裝進程: ${err.message}\n`);
-        this.stop();
-      });
-
-    } catch (err: any) {
-      this.instance.print(`\n[ERROR] 任務發生未預期錯誤: ${err.message}\n`);
+    this.process.on("close", (code: number) => {
+      if (code === 0) {
+        this.instance.print("\n[SUCCESS] CurseForge 部署成功！\n");
+      } else {
+        this.instance.print(`\n[ERROR] 腳本失敗，退出代碼: ${code}\n`);
+      }
       this.stop();
-    }
+    });
   }
 
-  /**
-   * 終止任務 (當用戶在網頁點擊「停止任務」時調用)
-   */
-  async stop() {
+  // 實現系統要求的停止介面
+  async onStop(): Promise<any> {
     if (this.process) {
-      try {
-        this.process.kill();
-      } catch (err) {}
+      this.process.kill();
       this.process = null;
     }
     this.instance.asynchronousTask = null;
-    this.instance.print("\n[SYSTEM] CurseForge 安裝任務已結束。\n");
   }
 
-  /**
-   * 返回給前端的狀態資訊
-   */
+  // 獲取當前狀態數字
+  status(): number {
+    return this.process ? 1 : 0;
+  }
+
   toObject() {
     return {
+      taskId: this.taskId,
       type: CurseForgeInstallTask.TYPE,
       projectId: this.config.projectId,
       status: this.status()
@@ -115,11 +88,10 @@ export class CurseForgeInstallTask extends Task {
   }
 }
 
-/**
- * 工廠函數，用於在 Router 中創建任務
- */
 export function createCurseForgeTask(instance: Instance, config: ICurseForgeConfig) {
   const task = new CurseForgeInstallTask(instance, config);
-  task.run();
+  // 在 MCSManager 中，通常是將任務交給實例物件，由實例負責調用執行
+  instance.asynchronousTask = task;
+  task.onExecute(); 
   return task;
 }
