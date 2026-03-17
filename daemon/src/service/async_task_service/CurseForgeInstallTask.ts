@@ -1,162 +1,125 @@
-import axios from "axios";
-import fs from "fs-extra";
+import { spawn } from "child_process";
 import path from "path";
-import { v4 } from "uuid";
-import { pipeline, Readable } from "stream";
+import fs from "fs-extra";
 import Instance from "../../entity/instance/instance";
-import { getFileManager } from "../file_router_service";
-import logger from "../log";
-import { AsyncTask, IAsyncTaskJSON, TaskCenter } from "./index";
 import { $t } from "../../i18n";
+import logger from "../../service/log";
+import { Task } from "./task";
 
-export interface CurseForgeOptions {
+interface ICurseForgeConfig {
   projectId: string;
-  versionId?: string;
+  versionId: string;
   apiKey: string;
 }
 
-export class CurseForgeInstallTask extends AsyncTask {
-  public static TYPE = "CurseForgeInstallTask";
-  public readonly TMP_ZIP_NAME = "curseforge_pack.zip";
-  private abortController?: AbortController;
+export class CurseForgeInstallTask extends Task {
+  public static readonly TYPE = "CurseForgeInstallTask";
+  private process: any = null;
 
   constructor(
-    public instance: Instance,
-    public options: CurseForgeOptions
+    public readonly instance: Instance,
+    public readonly config: ICurseForgeConfig
   ) {
     super();
-    this.taskId = `${CurseForgeInstallTask.TYPE}-${this.instance.instanceUuid}-${v4()}`;
-    this.type = CurseForgeInstallTask.TYPE;
   }
 
-  private async cfApi(endpoint: string) {
-    const url = `https://api.curseforge.com/v1${endpoint}`;
-    return await axios.get(url, {
-      headers: { "x-api-key": this.options.apiKey, Accept: "application/json" },
-      signal: this.abortController?.signal
-    });
-  }
+  /**
+   * 任務執行入口
+   */
+  async run() {
+    // 1. 定義腳本絕對路徑 (假設放在 daemon/scripts 下)
+    const scriptPath = path.join(process.cwd(), "scripts", "curseforge_install.sh");
 
-  private async download(url: string, destName: string, label: string) {
-    const cwd = this.instance.absoluteCwdPath();
-    const savePath = path.normalize(path.join(cwd, destName));
-    
-    // 確保父目錄存在 (針對 mods/xxx.jar)
-    await fs.ensureDir(path.dirname(savePath));
-    const writer = fs.createWriteStream(savePath);
-    
-    this.instance.println("INFO", `正在下載 ${label}...`);
+    // 檢查腳本是否存在
+    if (!fs.existsSync(scriptPath)) {
+      this.instance.print(`[ERROR] 找不到安裝腳本: ${scriptPath}\n`);
+      return this.stop();
+    }
 
-    const response = await axios<Readable>({
-      url,
-      responseType: "stream",
-      signal: this.abortController?.signal
-    });
-
-    await new Promise((resolve, reject) => {
-      pipeline(response.data, writer, (err) => {
-        if (err) reject(err);
-        else resolve(true);
-      });
-    });
-    return savePath;
-  }
-
-  async onStart() {
-    this.abortController = new AbortController();
-    const fileManager = getFileManager(this.instance.instanceUuid);
-    const cwd = this.instance.absoluteCwdPath();
+    this.instance.print("--------------------------------------------------\n");
+    this.instance.print($t("正在啟動 CurseForge 自動化部署腳本...\n"));
+    this.instance.print(`專案 ID: ${this.config.projectId}\n`);
+    this.instance.print(`文件 ID: ${this.config.versionId}\n`);
+    this.instance.print("--------------------------------------------------\n");
 
     try {
-      this.instance.status(Instance.STATUS_BUSY);
-      this.instance.println("INFO", "========== 開始 CurseForge 自動安裝程序 ==========");
-
-      const { projectId, versionId } = this.options;
-      const projectRes = await this.cfApi(`/mods/${projectId}`);
-      const projectTitle = projectRes.data.data.name;
-      
-      let targetFileId = versionId;
-      if (!targetFileId || targetFileId === "latest") {
-        targetFileId = projectRes.data.data.mainFileId;
-      }
-
-      this.instance.println("INFO", `專案名稱: ${projectTitle} (ID: ${projectId})`);
-      
-      const fileRes = await this.cfApi(`/mods/${projectId}/files/${targetFileId}/download-url`);
-      const downloadUrl = fileRes.data.data;
-      await this.download(downloadUrl, this.TMP_ZIP_NAME, "整合包主檔案");
-
-      this.instance.println("INFO", "正在解壓整合包...");
-      const isOk = await fileManager.unzip(this.TMP_ZIP_NAME, ".", "UTF-8");
-      if (!isOk) throw new Error("解壓失敗，請檢查壓縮包格式。");
-
-      const manifestPath = path.join(cwd, "manifest.json");
-      if (!fs.existsSync(manifestPath)) throw new Error("找不到 manifest.json");
-      
-      const manifest = await fs.readJson(manifestPath);
-      this.instance.println("INFO", `遊戲版本: ${manifest.minecraft.version}`);
-
-      // 下載 Mods
-      for (const [index, modFile] of manifest.files.entries()) {
-        try {
-          const modDownloadRes = await this.cfApi(`/mods/${modFile.projectID}/files/${modFile.fileID}/download-url`);
-          const modUrl = modDownloadRes.data.data;
-          const fileName = path.basename(new URL(modUrl).pathname);
-          await this.download(modUrl, path.join("mods", fileName), `[${index + 1}/${manifest.files.length}] ${fileName}`);
-        } catch (e) {
-          this.instance.println("ERROR", `Mod ID ${modFile.projectID} 下載跳過`);
+      // 2. 調用 Spawn 執行 Bash
+      // 注意：將 SERVER_DIR 指向實例的當前工作目錄
+      this.process = spawn("bash", [scriptPath], {
+        env: {
+          ...process.env,
+          SERVER_DIR: this.instance.config.cwd,
+          PROJECT_ID: this.config.projectId,
+          VERSION_ID: this.config.versionId,
+          API_KEY: this.config.apiKey,
+          // 確保路徑中包含 java 等必要命令
+          PATH: process.env.PATH
         }
-      }
+      });
 
-      // Overrides
-      const overridesDir = path.join(cwd, "overrides");
-      if (fs.existsSync(overridesDir)) {
-        this.instance.println("INFO", "正在處理 Overrides...");
-        await fs.copy(overridesDir, cwd);
-        await fs.remove(overridesDir);
-      }
+      // 3. 實時將腳本輸出推送到實例控制台
+      this.process.stdout.on("data", (data: any) => {
+        this.instance.print(data.toString());
+      });
 
-      await fs.remove(fileManager.toAbsolutePath(this.TMP_ZIP_NAME));
-      this.instance.println("INFO", "★ CurseForge 安裝完成！");
-      this.stop();
+      this.process.stderr.on("data", (data: any) => {
+        // 部分 wget 輸出可能在 stderr，這裡統一顯示
+        this.instance.print(data.toString());
+      });
+
+      // 4. 監聽結束事件
+      this.process.on("close", (code: number) => {
+        if (code === 0) {
+          this.instance.print("\n[SUCCESS] CurseForge 部署任務順利完成！\n");
+          this.instance.print("提示：請確認控制台顯示的核心檔案（如 forge.jar）是否存在後再啟動。\n");
+        } else {
+          this.instance.print(`\n[ERROR] 腳本執行異常退出，錯誤代碼: ${code}\n`);
+        }
+        this.stop();
+      });
+
+      this.process.on("error", (err: Error) => {
+        this.instance.print(`\n[ERROR] 無法啟動安裝進程: ${err.message}\n`);
+        this.stop();
+      });
+
     } catch (err: any) {
-      this.error(err);
-    } finally {
-      this.instance.status(Instance.STATUS_STOP);
+      this.instance.print(`\n[ERROR] 任務發生未預期錯誤: ${err.message}\n`);
+      this.stop();
     }
   }
 
-  async onStop() {
-    this.abortController?.abort();
-    this.instance.println("WARN", "任務已停止。");
+  /**
+   * 終止任務 (當用戶在網頁點擊「停止任務」時調用)
+   */
+  async stop() {
+    if (this.process) {
+      try {
+        this.process.kill();
+      } catch (err) {}
+      this.process = null;
+    }
+    this.instance.asynchronousTask = null;
+    this.instance.print("\n[SYSTEM] CurseForge 安裝任務已結束。\n");
   }
 
   /**
-   * 實作抽象成員 onError
+   * 返回給前端的狀態資訊
    */
-  async onError(err: Error) {
-    this.instance.println("ERROR", `[CurseForge Error] ${err?.message}`);
-    logger.error(`CurseForge 任務失敗:`, err);
-  }
-
-  /**
-   * 實作狀態序列化
-   */
-  toObject(): IAsyncTaskJSON {
-    return JSON.parse(
-      JSON.stringify({
-        taskId: this.taskId,
-        status: this.status(),
-        instanceUuid: this.instance.instanceUuid,
-        instanceStatus: this.instance.status(),
-        type: this.type
-      })
-    );
+  toObject() {
+    return {
+      type: CurseForgeInstallTask.TYPE,
+      projectId: this.config.projectId,
+      status: this.status()
+    };
   }
 }
 
-export function createCurseForgeTask(instance: Instance, options: CurseForgeOptions) {
-  const task = new CurseForgeInstallTask(instance, options);
-  TaskCenter.addTask(task);
+/**
+ * 工廠函數，用於在 Router 中創建任務
+ */
+export function createCurseForgeTask(instance: Instance, config: ICurseForgeConfig) {
+  const task = new CurseForgeInstallTask(instance, config);
+  task.run();
   return task;
 }
