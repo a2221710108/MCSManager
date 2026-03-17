@@ -6,6 +6,7 @@ import logger from "../service/log";
 import * as protocol from "../service/protocol";
 import { routerApp } from "../service/router";
 import InstanceSubsystem from "../service/system_instance";
+import { createCurseForgeTask, CurseForgeInstallTask } from "../service/async_task_service/CurseForgeInstallTask";
 
 import { arrayUnique, toNumber } from "mcsmanager-common";
 import ProcessInfoCommand from "../entity/commands/process_info";
@@ -552,3 +553,39 @@ routerApp.on("instance/outputlog", async (ctx, data) => {
     protocol.responseError(ctx, err);
   }
 });
+
+// 啟動 CurseForge 整合包自動安裝任務
+routerApp.on("instance/curseforge_install", (ctx, data) => {
+  const instanceUuid = data.instanceUuid;
+  const parameter = data.parameter; // 包含 projectId, versionId, apiKey
+  const instance = InstanceSubsystem.getInstance(instanceUuid);
+
+  logger.info(`收到 CurseForge 安裝請求: 實例 ${instanceUuid}, 專案 ${parameter.projectId}`);
+
+  if (!instance) return protocol.error(ctx, "instance/curseforge_install", { err: "實例不存在" });
+  if (instance.status() !== 0) return protocol.error(ctx, "instance/curseforge_install", { err: "請先關閉伺服器" });
+  if (instance.asynchronousTask) return protocol.error(ctx, "instance/curseforge_install", { err: "已有任務正在運行" });
+
+  try {
+    const task = createCurseForgeTask(instance, {
+      projectId: String(parameter.projectId),
+      versionId: parameter.versionId ? String(parameter.versionId) : "latest",
+      apiKey: String(parameter.apiKey)
+    });
+
+    // 將任務掛載到實例，這樣前端才能抓到狀態
+    instance.asynchronousTask = task;
+
+    // 回傳任務資訊
+    protocol.response(ctx, task.toObject());
+  } catch (err: any) {
+    protocol.error(ctx, "instance/curseforge_install", { err: err.message });
+  }
+});
+
+// 在 query_asynchronous 映射表中加入 CurseForge 類型
+// 找到原本的 "const taskNameTypeMap"，修改如下：
+const taskNameTypeMap: IJson<string> = {
+  quick_install: QuickInstallTask.TYPE,
+  curseforge_install: CurseForgeInstallTask.TYPE // <--- 加入這一行
+};
