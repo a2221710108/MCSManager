@@ -60,17 +60,27 @@ export class CurseForgeInstallTask extends AsyncTask {
     this.process.stdout.on("data", (data: any) => this.instance.print(data.toString()));
     this.process.stderr.on("data", (data: any) => this.instance.print(data.toString()));
 
-    this.process.on("close", (code: number) => {
-      if (code === 0) {
-        this.instance.print("\n[SUCCESS] ModPack 順利完成安裝！\n");
-        // 任務完成，調用 stop 進行清理
-        this.stop(); 
-      } else {
-        const error = new Error(`安裝出現異常退出，代碼: ${code}`);
-        this.instance.print(`\n[ERROR] ${error.message}\n`);
-        this.error(error);
-      }
-    });
+// CurseForgeInstallTask.ts
+
+this.process.on("close", (code: number) => {
+  if (code === 0) {
+    this.instance.print("\n[SUCCESS] 安裝順利完成！\n");
+    this.stop(); // 正常結束，會觸發 onStop 並清空引用
+  } else {
+    // 關鍵：即使代碼不是 0，也要調用 error 或 stop
+    const error = new Error(`安裝異常退出，代碼: ${code}`);
+    this.instance.print(`\n[ERROR] ${error.message}\n`);
+    
+    // 這裡建議直接調用 stop() 以確保觸發實例狀態恢復和引用清除
+    this.stop(); 
+  }
+});
+
+// 增加對 spawn 本身啟動失敗的監聽
+this.process.on("error", (err: Error) => {
+  this.instance.print(`\n[SYSTEM ERROR] 無法啟動安裝: ${err.message}\n`);
+  this.stop();
+});
   }
 
   async onStop(): Promise<void> {
