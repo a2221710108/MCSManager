@@ -32,18 +32,19 @@ export class CurseForgeInstallTask extends AsyncTask {
     const scriptPath = path.join(process.cwd(), "scripts", "curseforge_install.sh");
 
     if (!fs.existsSync(scriptPath)) {
-      const errMessage = `[ERROR] 找不到安裝腳本: ${scriptPath}`;
+      const errMessage = `[ERROR] 找不到安裝安裝程式，請聯絡客戶服務: ${scriptPath}`;
       this.instance.print(`${errMessage}\n`);
       this.instance.status(Instance.STATUS_STOP); // 出錯恢復狀態
       throw new Error(errMessage);
     }
 
     this.instance.print("--------------------------------------------------\n");
-    this.instance.print($t("正在啟動 CurseForge 自動化部署腳本...\n"));
+    this.instance.print($t("正在進行 CurseForge ModPack 安裝...\n"));
     this.instance.print(`Project ID: ${this.config.projectId}\n`);
     this.instance.print("--------------------------------------------------\n");
 
     this.process = spawn("bash", [scriptPath], {
+      detached: true, // 核心修改：開啟脫離模式，創建新進程組
       env: {
         ...process.env,
         SERVER_DIR: this.instance.config.cwd,
@@ -53,17 +54,19 @@ export class CurseForgeInstallTask extends AsyncTask {
         PATH: process.env.PATH
       }
     });
+    // 讓父進程不要等待這個子進程（可選，但在 detached 模式下建議加上）
+    this.process.unref();
 
     this.process.stdout.on("data", (data: any) => this.instance.print(data.toString()));
     this.process.stderr.on("data", (data: any) => this.instance.print(data.toString()));
 
     this.process.on("close", (code: number) => {
       if (code === 0) {
-        this.instance.print("\n[SUCCESS] CurseForge 部署任務順利完成！\n");
+        this.instance.print("\n[SUCCESS] ModPack 順利完成安裝！\n");
         // 任務完成，調用 stop 進行清理
         this.stop(); 
       } else {
-        const error = new Error(`腳本異常退出，代碼: ${code}`);
+        const error = new Error(`安裝出現異常退出，代碼: ${code}`);
         this.instance.print(`\n[ERROR] ${error.message}\n`);
         this.error(error);
       }
@@ -108,7 +111,7 @@ export function createCurseForgeTask(instance: Instance, config: ICurseForgeConf
   // 3. 【關鍵修正】防止重複啟動任務
   // 如果實例當前不是停止狀態，或者已經有異步任務在跑，直接攔截
   if (instance.status() !== Instance.STATUS_STOP) {
-    throw new Error("實例必須處於停止狀態才能開始安裝任務！");
+    throw new Error("清先關閉伺服器再使用該功能！");
   }
   if (instance.asynchronousTask) {
     throw new Error("該實例當前已有其他異步任務正在運行！");
