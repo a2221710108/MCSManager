@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs-extra";
 import Instance from "../../entity/instance/instance";
 import { $t } from "../../i18n";
-import { IExecutable } from "../interfaces"; // 確保從正確的路徑導入介面
+import { AsyncTask } from "./index"; // 確保導入當前目錄下的 AsyncTask
 
 interface ICurseForgeConfig {
   projectId: string;
@@ -11,31 +11,30 @@ interface ICurseForgeConfig {
   apiKey: string;
 }
 
-// 實作 IExecutable 介面，解決 Property 'exec' is missing 的錯誤
-export class CurseForgeInstallTask implements IExecutable<any> {
+export class CurseForgeInstallTask extends AsyncTask {
   public static readonly TYPE = "CurseForgeInstallTask";
-  
-  public taskId: string;
   private process: any = null;
 
   constructor(
     public readonly instance: Instance,
     public readonly config: ICurseForgeConfig
   ) {
-    // 生成唯一 Task ID
-    this.taskId = `${CurseForgeInstallTask.TYPE}-${instance.instanceUuid}-${Date.now()}`;
+    super();
+    this.type = CurseForgeInstallTask.TYPE;
+    // 按照基類注釋：taskId 必須夠複雜
+    this.taskId = `${this.type}-${instance.instanceUuid}-${Date.now()}`;
   }
 
   /**
-   * 實作 IExecutable 要求的 exec 方法
-   * 這是任務的啟動入口
+   * 實現基類的抽象方法：任務啟動邏輯
    */
-  async exec(): Promise<any> {
+  async onStart(): Promise<void> {
     const scriptPath = path.join(process.cwd(), "scripts", "curseforge_install.sh");
 
     if (!fs.existsSync(scriptPath)) {
-      this.instance.print(`[ERROR] 找不到安裝腳本: ${scriptPath}\n`);
-      return this.stop();
+      const errMessage = `[ERROR] 找不到安裝腳本: ${scriptPath}`;
+      this.instance.print(`${errMessage}\n`);
+      throw new Error(errMessage);
     }
 
     this.instance.print("--------------------------------------------------\n");
@@ -57,61 +56,64 @@ export class CurseForgeInstallTask implements IExecutable<any> {
     this.process.stdout.on("data", (data: any) => this.instance.print(data.toString()));
     this.process.stderr.on("data", (data: any) => this.instance.print(data.toString()));
 
+    // 監聽結束
     this.process.on("close", (code: number) => {
       if (code === 0) {
-        this.instance.print("\n[SUCCESS] CurseForge 部署成功！\n");
+        this.instance.print("\n[SUCCESS] CurseForge 部署任務順利完成！\n");
+        this.stop(); // 觸發基類的停止邏輯
       } else {
-        this.instance.print(`\n[ERROR] 腳本失敗，退出代碼: ${code}\n`);
+        const error = new Error(`腳本異常退出，代碼: ${code}`);
+        this.instance.print(`\n[ERROR] ${error.message}\n`);
+        this.error(error); // 觸發基類的錯誤處理邏輯
       }
-      this.stop();
     });
-
-    return this;
   }
 
   /**
-   * 實作 IExecutable 要求的 stop 方法
+   * 實現基類的抽象方法：任務停止邏輯
    */
-  async stop(): Promise<any> {
+  async onStop(): Promise<void> {
     if (this.process) {
       try {
         this.process.kill();
       } catch (err) {}
       this.process = null;
     }
-    // 釋放實例上的異步任務佔位
+    // 清理實例引用
     if (this.instance.asynchronousTask === this) {
       this.instance.asynchronousTask = null;
     }
   }
 
   /**
-   * 返回當前狀態 (1 為運行中, 0 為停止)
+   * 實現基類的抽象方法：錯誤處理邏輯
    */
-  status(): number {
-    return this.process ? 1 : 0;
+  async onError(err: Error): Promise<void> {
+    this.instance.print(`\n[SYSTEM ERROR] 任務發生故障: ${err.message}\n`);
   }
 
   /**
-   * 返回給前端的狀態資訊
+   * 實現基類的抽象方法：轉換為 JSON 物件
    */
   toObject() {
     return {
       taskId: this.taskId,
-      type: CurseForgeInstallTask.TYPE,
+      type: this.type,
+      status: this.status(),
       projectId: this.config.projectId,
-      status: this.status()
+      instanceUuid: this.instance.instanceUuid
     };
   }
 }
 
 /**
- * 工廠函數，用於在 Router 中調用
+ * 工廠函數：用於在 Router 中調用
  */
 export function createCurseForgeTask(instance: Instance, config: ICurseForgeConfig) {
   const task = new CurseForgeInstallTask(instance, config);
+  // 將任務掛載到實例上
   instance.asynchronousTask = task;
-  // 直接執行啟動
-  task.exec();
+  // 調用基類的 start，它會自動觸發 onStart
+  task.start();
   return task;
 }
