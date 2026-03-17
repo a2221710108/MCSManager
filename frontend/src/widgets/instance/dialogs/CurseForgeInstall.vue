@@ -139,53 +139,65 @@ defineExpose({ openDialog });
 <template>
   <a-modal
     v-model:open="isVisible"
+    centered
     :title="t('CurseForge ModPack 自動安裝')"
     :footer="null"
     :mask-closable="false"
     destroy-on-close
-    width="550px"
+    :width="520"
   >
-    <div class="cf-install-content">
-      <div class="clean-section mb-6 p-4 bg-red-50 rounded-lg border border-red-100">
-        <div class="flex justify-between items-start mb-3">
-          <div>
-            <h4 class="text-red-600 font-bold mb-1"><DeleteOutlined /> {{ t('第一步：環境清算') }}</h4>
-            <p class="text-xs text-red-500">{{ t('安裝 ModPack 前建議清空舊檔案以防止衝突。') }}</p>
+    <div class="install-container">
+      <div class="step-card danger-zone">
+        <div class="card-header">
+          <div class="header-content">
+            <h4 class="step-title danger">
+              <delete-outlined /> {{ t('第一步：環境清算') }}
+            </h4>
+            <p class="step-desc">
+              {{ t('安裝前建議清空舊檔案以防止衝突。') }}
+            </p>
           </div>
-          <a-tag v-if="hasCleaned" color="success">{{ t('已完成清空') }}</a-tag>
+          <transition name="fade">
+            <a-tag v-if="hasCleaned" color="success" class="status-tag">
+              <check-circle-outlined /> {{ t('已完成') }}
+            </a-tag>
+          </transition>
         </div>
-        
-        <div class="flex flex-col gap-3">
-          <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned">
-            <span class="text-xs">{{ t('我同意清空所有檔案（排除 LazyCloud_backup）') }}</span>
+
+        <div class="card-action">
+          <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned" class="custom-checkbox">
+            <span class="checkbox-text">{{ t('我同意清空所有檔案（排除 LazyCloud_backup）') }}</span>
           </a-checkbox>
           <a-button 
             danger 
-            ghost 
-            size="small" 
-            :disabled="!agreeClean || hasCleaned" 
+            :block="true"
             :loading="isCleaning"
+            :disabled="!agreeClean || hasCleaned"
+            class="action-btn"
             @click="handleCleanServer"
           >
-            {{ hasCleaned ? t('伺服器已處於乾淨狀態') : t('立即執行清空伺服器') }}
+            {{ hasCleaned ? t('伺服器已處於乾淨狀態') : t('立即執行環境清空') }}
           </a-button>
         </div>
       </div>
 
-      <div :class="{ 'opacity-40 pointer-events-none': !hasCleaned }">
-        <h4 class="font-bold mb-4 ml-1"><SettingOutlined /> {{ t('第二步：ModPack 配置') }}</h4>
-        <a-form layout="vertical">
+      <div class="step-card config-zone" :class="{ 'is-locked': !hasCleaned }">
+        <h4 class="step-title">
+          <setting-outlined /> {{ t('第二步：ModPack 配置') }}
+        </h4>
+        
+        <a-form layout="vertical" class="mt-4">
           <a-form-item :label="t('CurseForge API Key')">
-            <a-input-password v-model:value="form.apiKey" placeholder="Eternal API Key">
-              <template #prefix><SettingOutlined style="color: rgba(0,0,0,.25)" /></template>
+            <a-input-password v-model:value="form.apiKey" placeholder="Your API Key">
+              <template #prefix><key-outlined class="input-icon" /></template>
             </a-input-password>
           </a-form-item>
 
-          <a-row :gutter="16">
+          <a-row :gutter="12">
             <a-col :span="14">
               <a-form-item :label="t('Project ID')">
                 <a-input v-model:value="form.projectId" placeholder="285682">
-                  <template #prefix><CodeOutlined style="color: rgba(0,0,0,.25)" /></template>
+                  <template #prefix><code-outlined class="input-icon" /></template>
                 </a-input>
               </a-form-item>
             </a-col>
@@ -196,17 +208,17 @@ defineExpose({ openDialog });
             </a-col>
           </a-row>
 
-          <div class="mt-6 flex justify-end gap-2">
+          <div class="footer-actions">
             <a-button @click="isVisible = false">{{ t('取消') }}</a-button>
             <a-button 
               type="primary" 
               :loading="confirmLoading" 
               :disabled="!hasCleaned"
+              class="submit-btn"
               @click="handleInstall"
-              class="install-btn"
             >
-              <template #icon><CloudDownloadOutlined /></template>
-              {{ hasCleaned ? t('開始安裝任務') : t('請先執行環境清算') }}
+              <template #icon><cloud-download-outlined /></template>
+              {{ hasCleaned ? t('開始安裝任務') : t('請先完成第一步') }}
             </a-button>
           </div>
         </a-form>
@@ -216,24 +228,114 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-.cf-install-content { padding: 8px 0; }
-.bg-red-50 { background-color: #fff1f0; }
-.border-red-100 { border-color: #ffa39e; }
-.mb-6 { margin-bottom: 1.5rem; }
-.opacity-40 { opacity: 0.4; transition: opacity 0.3s; }
-.pointer-events-none { pointer-events: none; }
-.mb-4 { margin-bottom: 1rem; }
-.mt-6 { margin-top: 1.5rem; }
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.justify-between { justify-content: space-between; }
-.justify-end { justify-content: flex-end; }
-.items-start { align-items: flex-start; }
-.gap-2 { gap: 0.5rem; }
-.gap-3 { gap: 0.75rem; }
-.text-xs { font-size: 0.75rem; }
-.text-red-500 { color: #ff4d4f; }
-.text-red-600 { color: #cf1322; }
-.text-gray-400 { color: #9ca3af; }
-.install-btn { background-color: #1890ff; border-radius: 4px; color: white; }
+/* --- 基礎容器 --- */
+.install-container {
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- 通用卡片樣式 --- */
+.step-card {
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(140, 140, 140, 0.15);
+  transition: all 0.3s ease;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.step-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+}
+
+.step-desc {
+  font-size: 12px;
+  opacity: 0.6;
+  margin: 0;
+}
+
+/* --- 危險區域 (清空伺服器) --- */
+.danger-zone {
+  background: rgba(255, 77, 79, 0.04);
+  border-color: rgba(255, 77, 79, 0.15);
+}
+
+.danger-zone .danger {
+  color: #ff4d4f;
+}
+
+.card-action {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.checkbox-text {
+  font-size: 12px;
+}
+
+/* --- 配置區域 --- */
+.config-zone {
+  background: rgba(22, 119, 255, 0.04);
+  border-color: rgba(22, 119, 255, 0.15);
+}
+
+.config-zone.is-locked {
+  opacity: 0.4;
+  filter: grayscale(0.5);
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* --- 表單控制 --- */
+.input-icon {
+  color: rgba(140, 140, 140, 0.45);
+}
+
+.footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.submit-btn {
+  min-width: 140px;
+  font-weight: 500;
+}
+
+.status-tag {
+  border-radius: 6px;
+  padding: 0 8px;
+}
+
+/* --- 動畫 --- */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+/* 適配微小調整 */
+:deep(.ant-form-item) {
+  margin-bottom: 12px;
+}
+
+:deep(.ant-input-affix-wrapper), :deep(.ant-input) {
+  border-radius: 6px;
+}
 </style>
