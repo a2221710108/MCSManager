@@ -39,7 +39,7 @@ export class CurseForgeInstallTask extends AsyncTask {
     }
 
     this.instance.print("--------------------------------------------------\n");
-    this.instance.print($t("正在進行 CurseForge ModPack 安裝...\n"));
+    this.instance.print($t("正在進行 CurseForge Modpack 安裝...\n"));
     this.instance.print(`Project ID: ${this.config.projectId}\n`);
     this.instance.print("--------------------------------------------------\n");
 
