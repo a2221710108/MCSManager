@@ -25,7 +25,7 @@ import {
   HistoryOutlined,
   GlobalOutlined,
   SaveOutlined,
-  loudDownloadOutlined
+  CloudDownloadOutlined
 } from "@ant-design/icons-vue";
 
 import { computed, ref, watch } from "vue";
