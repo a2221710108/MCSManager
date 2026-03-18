@@ -64,7 +64,7 @@ export class CurseForgeInstallTask extends AsyncTask {
 
 this.process.on("close", (code: number) => {
   if (code === 0) {
-    this.instance.print("\n[SUCCESS] 安裝順利完成！請手動選擇合適的 Java 版本。\n");
+    this.instance.print("\n[SUCCESS] 安裝完成！請手動選擇合適的 Java 版本。請注意：首次啟動需要同意 Minecraft EULA 協議。\n");
     this.stop(); // 正常結束，會觸發 onStop 並清空引用
   } else {
     // 關鍵：即使代碼不是 0，也要調用 error 或 stop
