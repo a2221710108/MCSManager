@@ -32,7 +32,7 @@ export class CurseForgeInstallTask extends AsyncTask {
     const scriptPath = path.join(process.cwd(), "scripts", "curseforge_install.sh");
 
     if (!fs.existsSync(scriptPath)) {
-      const errMessage = `[ERROR] 找不到安裝安裝程式，請聯絡客戶服務: ${scriptPath}`;
+      const errMessage = `[ERROR] 找不到安裝程式，請聯絡客戶服務: ${scriptPath}`;
       this.instance.print(`${errMessage}\n`);
       this.instance.status(Instance.STATUS_STOP); // 出錯恢復狀態
       throw new Error(errMessage);
@@ -121,7 +121,7 @@ export function createCurseForgeTask(instance: Instance, config: ICurseForgeConf
   // 3. 【關鍵修正】防止重複啟動任務
   // 如果實例當前不是停止狀態，或者已經有異步任務在跑，直接攔截
   if (instance.status() !== Instance.STATUS_STOP) {
-    throw new Error("清先關閉伺服器再使用該功能！");
+    throw new Error("請先關閉伺服器再使用該功能！");
   }
   if (instance.asynchronousTask) {
     throw new Error("該實例當前已有其他異步任務正在運行！");
