@@ -213,13 +213,13 @@ const btns = computed(() => {
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
 },
     {
-  title: t("CurseForge ModPack 安裝"),
+  title: t("CurseForge Modpack 自動化安裝"),
   icon: CloudDownloadOutlined,
   click: () => {
     cfInstallDialog.value?.openDialog();
   },
-  // 僅限 Minecraft Java 版且只有管理員可以看到
-  condition: () => isAdmin.value && (instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false)
+  // 僅限 Minecraft Java 版可以看到
+  condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
 },
     {
   title: t("存檔替換 / 匯入"),
