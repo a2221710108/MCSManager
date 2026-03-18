@@ -154,8 +154,17 @@ defineExpose({ openDialog });
               <delete-outlined /> {{ t('第一步：環境清理') }}
             </h4>
             <p class="step-desc">
-              {{ t('請注意：為防止錯誤，僅支持安裝有官方 Server Pack 的 Modpack！') }}
-            </p>
+  {{ t('請注意：為防止錯誤，建議安裝有 Server Pack 的 Modpack！ 如有疑問請閱讀') }}
+  <a 
+    href="https://wiki.lazycloud.one/zh-tw/install-modpack/curseforge" 
+    target="_blank" 
+    rel="noopener noreferrer"
+    class="wiki-link"
+  >
+    {{ t('知識庫') }}
+  </a>
+  {{ t('內容') }}
+</p>
           </div>
           <transition name="fade">
             <a-tag v-if="hasCleaned" color="success" class="status-tag">
@@ -186,7 +195,16 @@ defineExpose({ openDialog });
           <setting-outlined /> {{ t('第二步：ModPack 配置') }}
         </h4>
         <p class="step-desc">
-  {{ t('請注意：為防止錯誤，僅支持安裝有官方 Server Pack 的 Modpack！ 如有疑問請閱讀 <a href="你的網址" target="_blank">知識庫</a> 內容') }}
+  {{ t('請注意：為防止錯誤，建議安裝有 Server Pack 的 Modpack！ 如有疑問請閱讀') }}
+  <a 
+    href="https://wiki.lazycloud.one/zh-tw/install-modpack/curseforge" 
+    target="_blank" 
+    rel="noopener noreferrer"
+    class="wiki-link"
+  >
+    {{ t('知識庫') }}
+  </a>
+  {{ t('內容') }}
 </p>
         
         <a-form layout="vertical" class="mt-4">
