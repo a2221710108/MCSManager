@@ -123,11 +123,16 @@ const handleInstall = async () => {
         confirmLoading.value = true;
         // 呼叫 API 傳遞給後端，後端再執行你那段 Bash
         await installModLoader().execute({
-          params: { daemonId: props.daemonId, uuid: props.instanceId },
+          params: {
+            daemonId: props.daemonId,
+            uuid: props.instanceId,
+            task_name: "modloader_install" // 修正：補上缺失的 task_name
+          },
           data: {
-            MINECRAFT_VERSION: form.mcVersion,
-            LOADER_TYPE: form.loaderType,
-            LOADER_VERSION: form.loaderVersion
+            // 修正：欄位名稱必須與 instance.ts 中的定義完全一致（小寫）
+            minecraft_version: form.mcVersion,
+            loader_type: form.loaderType,
+            loader_version: form.loaderVersion
           }
         });
         message.success(t("安裝任務已發送到後端執行"));
