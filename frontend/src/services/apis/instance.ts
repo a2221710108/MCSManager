@@ -453,19 +453,20 @@ export const scheduleCreate = useDefineApi<
   method: "POST"
 });
 
-export const installCurseForgePack = useDefineApi<{
+export const installModLoader = useDefineApi<{
   params: {
     daemonId: string;
     uuid: string;
-    task_name: string; // 新增這行
+    task_name: string; 
   };
   data: {
-    projectId: string;
-    versionId: string;
-    apiKey: string;
+    // 改為通用的版本參數，對應你的 Bash 腳本
+    minecraft_version: string;
+    loader_type: string;
+    loader_version: string;
   };
 }, any>({
-  url: "/api/protected_instance/asynchronous", // 使用通用介面
+  url: "/api/protected_instance/asynchronous",
   method: "POST"
 });
 
