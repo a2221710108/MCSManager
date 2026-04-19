@@ -470,7 +470,7 @@ export const installModLoader = useDefineApi<{
   method: "POST"
 });
 
-export const installModLoader = useDefineApi<{
+export const installCurseForgePack = useDefineApi<{
   params: {
     daemonId: string;
     uuid: string;
