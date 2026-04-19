@@ -48,6 +48,7 @@ import { useTerminal } from "@/hooks/useTerminal";
 import oftencommand from "./dialogs/oftencommand.vue";
 import worldchange from "./dialogs/worldchange.vue";
 import CurseForgeInstall from "./dialogs/CurseForgeInstall.vue";
+import modloaderinstall from "./dialogs/modloaderinstall.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -64,6 +65,7 @@ const oftencommandDialog = ref<InstanceType<typeof oftencommand>>();
 const worldchangeDialog = ref<InstanceType<typeof worldchange>>();
 // 在其他 Dialog ref 附近加入
 const cfInstallDialog = ref<InstanceType<typeof CurseForgeInstall>>();
+const modloaderinstallDialog = ref<InstanceType<typeof modloaderinstall>>();
 
 const terminalHook = useTerminal();
   
@@ -217,6 +219,15 @@ const btns = computed(() => {
   icon: CloudDownloadOutlined,
   click: () => {
     cfInstallDialog.value?.openDialog();
+  },
+  // 僅限 Minecraft Java 版可以看到
+  condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+},
+    {
+  title: t("Modloader 自動化安裝"),
+  icon: CloudDownloadOutlined,
+  click: () => {
+    modloaderinstallDialog.value?.openDialog();
   },
   // 僅限 Minecraft Java 版可以看到
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
@@ -439,6 +450,13 @@ watch(instanceInfo, (cfg, oldCfg) => {
 
   <CurseForgeInstall
   ref="cfInstallDialog"
+  :instance-id="instanceId ?? ''"
+  :daemon-id="daemonId ?? ''"
+  :instance-info="instanceInfo" 
+/>
+
+  <modloaderinstall
+  ref="modloaderinstallDialog"
   :instance-id="instanceId ?? ''"
   :daemon-id="daemonId ?? ''"
   :instance-info="instanceInfo" 
