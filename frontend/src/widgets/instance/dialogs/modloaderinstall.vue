@@ -52,10 +52,13 @@ const openDialog = async () => {
 const fetchMCVersions = async () => {
   try {
     const res = await axios.get("https://meta.fabricmc.net/v2/versions/game");
-    // 只取穩定的發行版，過濾掉快照版
-    mcVersions.value = res.data.filter((v: any) => v.stable).map((v: any) => v.version);
+    // 過濾穩定版並排序
+    mcVersions.value = res.data
+      .filter((v: any) => v.stable)
+      .sort((a: any, b: any) => new Date(b.releaseTime) - new Date(a.releaseTime))
+      .map((v: any) => v.version);
   } catch (err) {
-    message.error("獲取版本清單失敗");
+    message.error("獲取版本清單失敗：" + (err as Error).message);
   }
 };
 
@@ -71,35 +74,46 @@ const fetchLoaderVersions = async () => {
 
   try {
     let url = "";
-    if (form.loaderType === "fabric") {
-      url = `https://meta.fabricmc.net/v2/versions/loader/${form.mcVersion}`;
-      const res = await axios.get(url);
-      loaderVersions.value = res.data.map((v: any) => v.loader.version);
-    } 
-    else if (form.loaderType === "quilt") {
-      url = `https://meta.quiltmc.org/v3/versions/loader/${form.mcVersion}`;
-      const res = await axios.get(url);
-      loaderVersions.value = res.data.map((v: any) => v.loader.version);
+    let response: any;
+
+    switch (form.loaderType) {
+      case "fabric":
+        url = `https://meta.fabricmc.net/v2/versions/loader/${form.mcVersion}`;
+        response = await axios.get(url);
+        loaderVersions.value = response.data
+          .filter((v: any) => v.stable)
+          .map((v: any) => `${v.loader.version} (${v.game.version})`);
+        break;
+
+      case "quilt":
+        url = `https://meta.quiltmc.org/v3/versions/loader/${form.mcVersion}`;
+        response = await axios.get(url);
+        loaderVersions.value = response.data
+          .filter((v: any) => v.stable)
+          .map((v: any) => `${v.loader.version} (${v.game.version})`);
+        break;
+
+      case "forge":
+        // 使用 BMCLAPI 的 Forge 版本列表
+        url = `https://bmclapi2.bangbang93.com/forge/minecraft/${form.mcVersion.replace("-", "_")}`;
+        response = await axios.get(url);
+        loaderVersions.value = response.data
+          .map((v: any) => `${v.version} ${v.branch ? `(${v.branch})` : ""}`);
+        break;
+
+      case "neoforge":
+        // 使用 NeoForge 官方 Maven API
+        url = `https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge`;
+        response = await axios.get(url);
+        loaderVersions.value = response.data
+          .filter((v: string) => v.includes(form.mcVersion))
+          .map((v: string) => v);
+        break;
     }
-    else if (form.loaderType === "forge") {
-      // Forge 比較特殊，通常從檔案伺服器抓，這裡使用常用的清單 API
-      url = `https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json`;
-      const res = await axios.get(url);
-      // 這裡簡單處理：獲取該 MC 版本的所有版本，或使用推廣版本
-      // 注意：Forge API 結構較複雜，實務上建議由後端處理後回傳
-      loaderVersions.value = Object.keys(res.data.promos)
-        .filter(k => k.includes(form.mcVersion))
-        .map(k => res.data.promos[k]);
-    }
-    else if (form.loaderType === "neoforge") {
-      url = `https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge`;
-      // NeoForge 建議直接抓 Maven 數據，這裡示範邏輯
-      loaderVersions.value = ["latest"]; // 簡化處理
-    }
-    
+
     if (loaderVersions.value.length > 0) form.loaderVersion = loaderVersions.value[0];
   } catch (err) {
-    message.error("無法載入對應的 ModLoader 版本");
+    message.error("無法載入對應的 ModLoader 版本：" + (err as Error).message);
   } finally {
     loadingVersions.value = false;
   }
@@ -112,7 +126,6 @@ watch(() => [form.mcVersion, form.loaderType], () => {
 
 /**
  * 3. 提交安裝任務
- * 這裡會對接你提供的 Bash 腳本所需要的參數
  */
 const handleInstall = async () => {
   Modal.confirm({
@@ -121,20 +134,22 @@ const handleInstall = async () => {
     onOk: async () => {
       try {
         confirmLoading.value = true;
-        // 呼叫 API 傳遞給後端，後端再執行你那段 Bash
-        await installModLoader().execute({
-          params: {
-            daemonId: props.daemonId,
-            uuid: props.instanceId,
-            task_name: "modloader_install" // 修正：補上缺失的 task_name
-          },
-          data: {
-            // 修正：欄位名稱必須與 instance.ts 中的定義完全一致（小寫）
-            minecraft_version: form.mcVersion,
-            loader_type: form.loaderType,
-            loader_version: form.loaderVersion
-          }
-        });
+        
+        // 構建請求參數
+        const params = {
+          daemonId: props.daemonId,
+          uuid: props.instanceId,
+          task_name: "modloader_install"
+        };
+        
+        const data = {
+          minecraft_version: form.mcVersion,
+          loader_type: form.loaderType,
+          loader_version: form.loaderVersion.split(' ')[0] // 只取版本號
+        };
+
+        // 發送請求
+        await installModLoader().execute({ params, data });
         message.success(t("安裝任務已發送到後端執行"));
         isVisible.value = false;
       } catch (err: any) {
@@ -155,7 +170,7 @@ defineExpose({ openDialog });
     centered
     :title="t('自定義 ModLoader 安裝器')"
     :footer="null"
-    :width="550"
+    :width="600"
   >
     <div class="install-container">
       <div class="step-card" :class="hasCleaned ? 'success-zone' : 'danger-zone'">
