@@ -55,7 +55,12 @@ const fetchMCVersions = async () => {
     // 過濾穩定版並排序
     mcVersions.value = res.data
       .filter((v: any) => v.stable)
-      .sort((a: any, b: any) => new Date(b.releaseTime) - new Date(a.releaseTime))
+      .sort((a: any, b: any) => {
+        // 將日期轉換為時間戳進行比較
+        const aTime = new Date(a.releaseTime).getTime();
+        const bTime = new Date(b.releaseTime).getTime();
+        return bTime - aTime;
+      })
       .map((v: any) => v.version);
   } catch (err) {
     message.error("獲取版本清單失敗：" + (err as Error).message);
