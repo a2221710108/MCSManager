@@ -5,9 +5,11 @@ import { message, Modal } from "ant-design-vue";
 import { 
   CloudDownloadOutlined, 
   SettingOutlined, 
+  CodeOutlined,
   DeleteOutlined,
   ExclamationCircleOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  KeyOutlined
 } from "@ant-design/icons-vue";
 import axios from "axios";
 import { fileList, deleteFile } from "@/services/apis/fileManager";
@@ -24,9 +26,9 @@ const isCleaning = ref(false);
 const agreeClean = ref(false);
 const hasCleaned = ref(false);
 
-// 數據列表
+// 數據存儲
 const mcVersions = ref<string[]>([]);
-const loaderVersions = ref<any[]>([]);
+const loaderVersions = ref<{version: string, tag?: string}[]>([]);
 const loadingLoaders = ref(false);
 
 const form = reactive({
@@ -38,60 +40,83 @@ const form = reactive({
 const { execute: fetchFileList } = fileList();
 const { execute: executeDelete } = deleteFile();
 
-// 打開對話框並初始化 MC 版本
+/**
+ * 打開彈窗並初始化 Minecraft 版本列表
+ */
 const openDialog = async () => {
   if (props.instanceInfo.status !== 0) {
     return message.error(t("請先關閉伺服器"));
   }
   isVisible.value = true;
   hasCleaned.value = false;
+  agreeClean.value = false;
+  
   try {
-    const res = await axios.get(`/api/protected/daemon/modloader/mc_versions`, {
-      params: { daemonId: props.daemonId }
+    // 調用後端獲取 MC 版本
+    const res = await axios.post(`/api/protected/daemon/instance/asynchronous`, {
+      daemonId: props.daemonId,
+      instanceUuid: props.instanceId,
+      taskName: "modloader/mc_versions",
+      parameter: {}
     });
-    mcVersions.value = res.data;
+    mcVersions.value = res.data.data || res.data;
   } catch (err) {
-    message.error(t("獲取 MC 版本失敗"));
+    message.error(t("獲取 Minecraft 版本列表失敗"));
   }
 };
 
-// 監聽 MC 版本或 Loader 類型變化，獲取對應的 Loader 版本
+/**
+ * 監聽選擇變化，自動獲取 Loader 版本
+ */
 watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) => {
   if (!newMc || !newType) return;
   
   loadingLoaders.value = true;
   form.loaderVersion = ""; 
   try {
-    const res = await axios.get(`/api/protected/daemon/modloader/loader_versions`, {
-      params: { 
-        daemonId: props.daemonId,
+    const res = await axios.post(`/api/protected/daemon/instance/asynchronous`, {
+      daemonId: props.daemonId,
+      instanceUuid: props.instanceId,
+      taskName: "modloader/loader_versions",
+      parameter: {
         mcVersion: newMc,
         type: newType
       }
     });
-    // 統一化處理不同來源的數據格式
-    loaderVersions.value = res.data;
+    loaderVersions.value = res.data.data || res.data;
   } catch (err) {
-    message.error(t("獲取 Loader 版本失敗"));
+    message.error(t("獲取 ModLoader 版本失敗"));
   } finally {
     loadingLoaders.value = false;
   }
 });
 
-// 清空伺服器邏輯 (保留您原始邏輯)
+/**
+ * 執行清空伺服器邏輯
+ */
 const handleCleanServer = async () => {
   Modal.confirm({
     title: t("確定要清空伺服器嗎？"),
     icon: createVNode(ExclamationCircleOutlined, { style: 'color: #ff4d4f' }),
-    content: t("這將刪除您的所有檔案，此操作不可撤銷！"),
+    content: t("這將刪除您的所有檔案（不含備份夾），此操作不可撤銷！"),
     okText: t("確定清空"),
+    okType: "danger",
     onOk: async () => {
       try {
         isCleaning.value = true;
         const res = await fetchFileList({
-          params: { daemonId: props.daemonId, uuid: props.instanceId, target: "/", page: 0, page_size: 500 }
+          params: { 
+            daemonId: props.daemonId, 
+            uuid: props.instanceId, 
+            target: "/",
+            page: 0,
+            page_size: 500,
+            file_name: ""
+          }
         });
-        const targets = (res.value?.items || [])
+        
+        const allItems = res.value?.items || [];
+        const targets = allItems
           .filter((item: any) => item.name !== "LazyCloud_backup")
           .map((item: any) => "/" + item.name);
 
@@ -101,6 +126,7 @@ const handleCleanServer = async () => {
             data: { targets }
           });
         }
+        
         message.success(t("伺服器已清空"));
         hasCleaned.value = true;
       } catch (err: any) {
@@ -112,25 +138,32 @@ const handleCleanServer = async () => {
   });
 };
 
+/**
+ * 提交安裝任務
+ */
 const handleInstall = async () => {
-  if (!form.mcVersion || !form.loaderVersion) return message.warning(t("請選擇版本"));
+  if (!form.mcVersion || !form.loaderVersion) {
+    return message.warning(t("請選擇完整的版本資訊"));
+  }
 
   Modal.confirm({
-    title: t("確認安裝"),
-    content: `${t('即將安裝')} ${form.loaderType} - ${form.loaderVersion}`,
+    title: t("確認自動安裝"),
+    content: `${t('即將安裝')} ${form.loaderType} (${form.loaderVersion}) ${t('至 Minecraft')} ${form.mcVersion}`,
     onOk: async () => {
       try {
         confirmLoading.value = true;
-        // 調用後端安裝介面 (需在後端實作 install 邏輯)
-        await axios.post(`/api/protected/daemon/modloader/install`, {
-            daemonId: props.daemonId,
-            uuid: props.instanceId,
-            ...form
+        // 這裡調用你後續要在後端實作的 install 任務
+        await axios.post(`/api/protected/daemon/instance/asynchronous`, {
+          daemonId: props.daemonId,
+          instanceUuid: props.instanceId,
+          taskName: "modloader/install_task", 
+          parameter: { ...form }
         });
-        message.success(t("安裝任務已啟動"));
+
+        message.success(t("安裝任務已在後端啟動"));
         isVisible.value = false;
       } catch (err: any) {
-        message.error(t("安裝失敗"));
+        Modal.error({ title: t("任務啟動失敗"), content: err.message });
       } finally {
         confirmLoading.value = false;
       }
@@ -142,29 +175,63 @@ defineExpose({ openDialog });
 </script>
 
 <template>
-  <a-modal v-model:open="isVisible" centered :title="t('Mod Loader 自動安裝')" :footer="null" :width="520">
+  <a-modal
+    v-model:open="isVisible"
+    centered
+    :title="t('自動化 ModLoader 安裝')"
+    :footer="null"
+    :mask-closable="false"
+    destroy-on-close
+    :width="560"
+  >
     <div class="install-container">
       <div class="step-card danger-zone">
         <div class="card-header">
-          <h4 class="step-title danger"><delete-outlined /> {{ t('第一步：環境清理') }}</h4>
-          <a-tag v-if="hasCleaned" color="success"><check-circle-outlined /> {{ t('已完成') }}</a-tag>
+          <div class="header-content">
+            <h4 class="step-title danger">
+              <delete-outlined /> {{ t('第一步：環境清理') }}
+            </h4>
+            <p class="step-desc">{{ t('為了確保安裝成功，必須先清空現有核心與插件檔案。') }}</p>
+          </div>
+          <transition name="fade">
+            <a-tag v-if="hasCleaned" color="success" class="status-tag">
+              <check-circle-outlined /> {{ t('已就緒') }}
+            </a-tag>
+          </transition>
         </div>
+
         <div class="card-action">
-          <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned">
-            <span class="checkbox-text">{{ t('我同意清空所有檔案（排除備份夾）') }}</span>
+          <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned" class="custom-checkbox">
+            <span class="checkbox-text">{{ t('我已知曉此操作會刪除伺服器目錄下的所有檔案') }}</span>
           </a-checkbox>
-          <a-button danger block :loading="isCleaning" :disabled="!agreeClean || hasCleaned" @click="handleCleanServer">
-            {{ hasCleaned ? t('伺服器已就緒') : t('立即執行環境清空') }}
+          <a-button 
+            danger 
+            block
+            :loading="isCleaning"
+            :disabled="!agreeClean || hasCleaned"
+            class="action-btn"
+            @click="handleCleanServer"
+          >
+            {{ hasCleaned ? t('伺服器環境已清空') : t('立即執行環境清理') }}
           </a-button>
         </div>
       </div>
 
       <div class="step-card config-zone" :class="{ 'is-locked': !hasCleaned }">
-        <h4 class="step-title"><setting-outlined /> {{ t('第二步：選擇版本') }}</h4>
+        <h4 class="step-title">
+          <setting-outlined /> {{ t('第二步：版本與類型配置') }}
+        </h4>
+        
         <a-form layout="vertical" class="mt-4">
           <a-form-item :label="t('Minecraft 版本')">
-            <a-select v-model:value="form.mcVersion" show-search placeholder="例如: 1.20.1">
-              <a-select-option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</a-select-option>
+            <a-select 
+              v-model:value="form.mcVersion" 
+              show-search 
+              :placeholder="t('請選擇或搜尋版本號')"
+            >
+              <a-select-option v-for="v in mcVersions" :key="v" :value="v">
+                {{ v }}
+              </a-select-option>
             </a-select>
           </a-form-item>
 
@@ -180,9 +247,14 @@ defineExpose({ openDialog });
             </a-col>
             <a-col :span="14">
               <a-form-item :label="t('Loader 版本')">
-                <a-select v-model:value="form.loaderVersion" :loading="loadingLoaders" placeholder="選擇 Loader 版本">
+                <a-select 
+                  v-model:value="form.loaderVersion" 
+                  :loading="loadingLoaders"
+                  :disabled="!form.mcVersion"
+                  placeholder="請選擇 Loader 版本"
+                >
                   <a-select-option v-for="item in loaderVersions" :key="item.version" :value="item.version">
-                    {{ item.version }} {{ item.tag || '' }}
+                    {{ item.version }} <span style="opacity: 0.5; font-size: 12px;">{{ item.tag }}</span>
                   </a-select-option>
                 </a-select>
               </a-form-item>
@@ -191,9 +263,15 @@ defineExpose({ openDialog });
 
           <div class="footer-actions">
             <a-button @click="isVisible = false">{{ t('取消') }}</a-button>
-            <a-button type="primary" :loading="confirmLoading" :disabled="!hasCleaned || !form.loaderVersion" @click="handleInstall">
+            <a-button 
+              type="primary" 
+              :loading="confirmLoading" 
+              :disabled="!hasCleaned || !form.loaderVersion"
+              class="submit-btn"
+              @click="handleInstall"
+            >
               <template #icon><cloud-download-outlined /></template>
-              {{ t('開始自動安裝') }}
+              {{ hasCleaned ? t('開始自動安裝任務') : t('請先完成第一步') }}
             </a-button>
           </div>
         </a-form>
@@ -203,9 +281,76 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 延用您原本的 CSS 樣式... */
-.is-locked { opacity: 0.5; pointer-events: none; }
-.step-card { border: 1px solid #eee; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
-.danger-zone { background: #fff1f0; }
-.config-zone { background: #f0f5ff; }
+.install-container {
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.step-card {
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(140, 140, 140, 0.15);
+  transition: all 0.3s ease;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.step-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-desc {
+  font-size: 12px;
+  opacity: 0.6;
+  margin: 0;
+}
+
+.danger-zone {
+  background: rgba(255, 77, 79, 0.04);
+  border-color: rgba(255, 77, 79, 0.15);
+}
+.danger { color: #ff4d4f; }
+
+.config-zone {
+  background: rgba(22, 119, 255, 0.04);
+  border-color: rgba(22, 119, 255, 0.15);
+}
+
+.config-zone.is-locked {
+  opacity: 0.4;
+  filter: grayscale(0.8);
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.submit-btn {
+  min-width: 160px;
+  font-weight: 500;
+}
+
+/* 適配微調 */
+:deep(.ant-form-item) { margin-bottom: 12px; }
+:deep(.ant-select) { width: 100%; }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
