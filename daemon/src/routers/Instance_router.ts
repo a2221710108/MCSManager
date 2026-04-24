@@ -18,7 +18,6 @@ import { createQuickInstallTask, QuickInstallTask } from "../service/async_task_
 import { IInstanceDetail, IJson } from "../service/interfaces";
 import FileManager from "../service/system_file";
 
-import axios from "axios";
 
 // Some instances operate router authentication middleware
 routerApp.use((event, ctx, data, next) => {
@@ -364,7 +363,7 @@ routerApp.on("instance/delete", (ctx, data) => {
 });
 
 // perform complex asynchronous tasks
-routerApp.on("instance/asynchronous", async (ctx, data) => {
+routerApp.on("instance/asynchronous", (ctx, data) => {
   const instanceUuid = data.instanceUuid;
   const taskName = data.taskName;
   const parameter = data.parameter;
@@ -437,27 +436,6 @@ if (taskName === "modloader/mc_versions") {
     return protocol.response(ctx, versions);
   } catch (err: any) {
     return protocol.error(ctx, "instance/asynchronous", { err: "獲取 MC 版本失敗" });
-  }
-}
-
-// 【新增】：獲取 Loader 版本列表
-if (taskName === "modloader/loader_versions") {
-  const { mcVersion, type } = parameter;
-  try {
-    let result = [];
-    if (type === "forge") {
-      const resp = await axios.get(`https://bmclapi2.bangbang93.com/forge/minecraft/${mcVersion}`);
-      result = resp.data.map((v: any) => ({ version: v.version, tag: v.category === "recommended" ? "⭐" : "" }));
-    } else if (type === "neoforge") {
-      const resp = await axios.get(`https://bmclapi2.bangbang93.com/neoforge/list/${mcVersion}`);
-      result = resp.data.map((v: string) => ({ version: v }));
-    } else if (type === "fabric") {
-      const resp = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${mcVersion}`);
-      result = resp.data.map((v: any) => ({ version: v.loader.version, tag: v.loader.stable ? "" : "[Exp]" }));
-    }
-    return protocol.response(ctx, result.reverse().slice(0, 40));
-  } catch (err: any) {
-    return protocol.error(ctx, "instance/asynchronous", { err: "獲取 Loader 版本失敗" });
   }
 }
 
