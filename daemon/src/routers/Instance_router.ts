@@ -18,7 +18,6 @@ import { createQuickInstallTask, QuickInstallTask } from "../service/async_task_
 import { IInstanceDetail, IJson } from "../service/interfaces";
 import FileManager from "../service/system_file";
 
-
 // Some instances operate router authentication middleware
 routerApp.use((event, ctx, data, next) => {
   if (event === "instance/new" && data) return next();
@@ -421,23 +420,6 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
     const task = createQuickInstallTask(targetLink, newInstanceName, parameter.setupInfo);
     return protocol.response(ctx, task.toObject());
   }
-
-  // 在 routerApp.on("instance/asynchronous", (ctx, data) => { ... }) 內部
-
-// 【新增】：獲取 Minecraft 版本列表
-if (taskName === "modloader/mc_versions") {
-  try {
-    // 這裡我們直接去抓取常用的 MC 版本列表
-    const resp = await axios.get("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
-    // 過濾出 release 版本
-    const versions = resp.data.versions
-      .filter((v: any) => v.type === "release")
-      .map((v: any) => v.id);
-    return protocol.response(ctx, versions);
-  } catch (err: any) {
-    return protocol.error(ctx, "instance/asynchronous", { err: "獲取 MC 版本失敗" });
-  }
-}
 
 // 【新增內容】：在下面加入 CurseForge 安裝邏輯
   if (taskName === "curseforge_install" && instance) {
