@@ -421,6 +421,44 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
     return protocol.response(ctx, task.toObject());
   }
 
+  // 在 routerApp.on("instance/asynchronous", (ctx, data) => { ... }) 內部
+
+// 【新增】：獲取 Minecraft 版本列表
+if (taskName === "modloader/mc_versions") {
+  try {
+    // 這裡我們直接去抓取常用的 MC 版本列表
+    const resp = await axios.get("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
+    // 過濾出 release 版本
+    const versions = resp.data.versions
+      .filter((v: any) => v.type === "release")
+      .map((v: any) => v.id);
+    return protocol.response(ctx, versions);
+  } catch (err: any) {
+    return protocol.error(ctx, "instance/asynchronous", { err: "獲取 MC 版本失敗" });
+  }
+}
+
+// 【新增】：獲取 Loader 版本列表
+if (taskName === "modloader/loader_versions") {
+  const { mcVersion, type } = parameter;
+  try {
+    let result = [];
+    if (type === "forge") {
+      const resp = await axios.get(`https://bmclapi2.bangbang93.com/forge/minecraft/${mcVersion}`);
+      result = resp.data.map((v: any) => ({ version: v.version, tag: v.category === "recommended" ? "⭐" : "" }));
+    } else if (type === "neoforge") {
+      const resp = await axios.get(`https://bmclapi2.bangbang93.com/neoforge/list/${mcVersion}`);
+      result = resp.data.map((v: string) => ({ version: v }));
+    } else if (type === "fabric") {
+      const resp = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${mcVersion}`);
+      result = resp.data.map((v: any) => ({ version: v.loader.version, tag: v.loader.stable ? "" : "[Exp]" }));
+    }
+    return protocol.response(ctx, result.reverse().slice(0, 40));
+  } catch (err: any) {
+    return protocol.error(ctx, "instance/asynchronous", { err: "獲取 Loader 版本失敗" });
+  }
+}
+
 // 【新增內容】：在下面加入 CurseForge 安裝邏輯
   if (taskName === "curseforge_install" && instance) {
     if (instance.status() !== 0) return protocol.error(ctx, "instance/asynchronous", { err: "請先關閉伺服器" });
