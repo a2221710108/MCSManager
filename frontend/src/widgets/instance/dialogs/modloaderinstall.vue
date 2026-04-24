@@ -266,9 +266,10 @@ defineExpose({ openDialog });
             <div class="f-item">
               <label>類型</label>
               <a-select v-model:value="form.loaderType">
-                <a-select-option value="forge">Forge</a-select-option>
-                <a-select-option value="fabric">Fabric</a-select-option>
-              </a-select>
+  <a-select-option value="forge">Forge</a-select-option>
+  <a-select-option value="neoforge">NeoForge</a-select-option>
+  <a-select-option value="fabric">Fabric</a-select-option>
+</a-select>
             </div>
             <div class="f-item" style="flex: 2">
               <label>Loader 版本</label>
