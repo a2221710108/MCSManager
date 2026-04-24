@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { ref, reactive, watch, createVNode } from "vue";
-import { t } from "@/lang/i18n";
+import { ref, reactive, watch, onMounted } from "vue";
 import { message, Modal } from "ant-design-vue";
 import { 
   CloudDownloadOutlined, 
   SettingOutlined, 
-  CodeOutlined,
   DeleteOutlined,
   ExclamationCircleOutlined,
-  CheckCircleOutlined,
-  KeyOutlined
+  CheckCircleOutlined
 } from "@ant-design/icons-vue";
 import axios from "axios";
 import { fileList, deleteFile } from "@/services/apis/fileManager";
+
+// --- 配置區 ---
+// 請替換成你部署的 Cloudflare Worker 地址（記得保留最後的 ?url=）
+const PROXY = "https://get-modloader-version.leolu55165088.workers.dev/?url=";
 
 const props = defineProps<{
   daemonId: string;
@@ -37,36 +38,39 @@ const form = reactive({
   loaderVersion: ""
 });
 
+// MCSManager 內建的文件操作 API
 const { execute: fetchFileList } = fileList();
 const { execute: executeDelete } = deleteFile();
+
+/**
+ * 封裝代理請求工具
+ */
+const proxyGet = async (targetUrl: string) => {
+  const res = await axios.get(PROXY + encodeURIComponent(targetUrl));
+  return res.data;
+};
 
 /**
  * 打開彈窗並初始化 Minecraft 版本列表
  */
 const openDialog = async () => {
   if (props.instanceInfo.status !== 0) {
-    return message.error(t("請先關閉伺服器"));
+    return message.error("請先關閉伺服器再進行安裝");
   }
   isVisible.value = true;
-  hasCleaned.value = false;
-  agreeClean.value = false;
   
   try {
-    // 調用後端獲取 MC 版本
-    const res = await axios.post(`/api/protected/daemon/instance/asynchronous`, {
-      daemonId: props.daemonId,
-      instanceUuid: props.instanceId,
-      taskName: "modloader/mc_versions",
-      parameter: {}
-    });
-    mcVersions.value = res.data.data || res.data;
+    const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
+    mcVersions.value = data.versions
+      .filter((v: any) => v.type === "release")
+      .map((v: any) => v.id);
   } catch (err) {
-    message.error(t("獲取 Minecraft 版本列表失敗"));
+    message.error("獲取 Minecraft 版本清單失敗，請檢查 Worker 配置");
   }
 };
 
 /**
- * 監聽選擇變化，自動獲取 Loader 版本
+ * 監聽選擇變化，自動獲取對應的 Loader 版本
  */
 watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) => {
   if (!newMc || !newType) return;
@@ -74,18 +78,27 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
   loadingLoaders.value = true;
   form.loaderVersion = ""; 
   try {
-    const res = await axios.post(`/api/protected/daemon/instance/asynchronous`, {
-      daemonId: props.daemonId,
-      instanceUuid: props.instanceId,
-      taskName: "modloader/loader_versions",
-      parameter: {
-        mcVersion: newMc,
-        type: newType
-      }
-    });
-    loaderVersions.value = res.data.data || res.data;
+    let target = "";
+    if (newType === "forge") {
+      target = `https://bmclapi2.bangbang93.com/forge/minecraft/${newMc}`;
+      const data = await proxyGet(target);
+      loaderVersions.value = data.map((v: any) => ({ 
+        version: v.version, 
+        tag: v.category === "recommended" ? "⭐ 推薦" : "" 
+      }));
+    } else if (newType === "fabric") {
+      target = `https://meta.fabricmc.net/v2/versions/loader/${newMc}`;
+      const data = await proxyGet(target);
+      loaderVersions.value = data.map((v: any) => ({ 
+        version: v.loader.version, 
+        tag: v.loader.stable ? "" : "測試版" 
+      }));
+    }
+    // 只取最新的 40 個版本，避免選單過長
+    loaderVersions.value = loaderVersions.value.reverse().slice(0, 40);
   } catch (err) {
-    message.error(t("獲取 ModLoader 版本失敗"));
+    loaderVersions.value = [];
+    message.warning("該 MC 版本下暫無可用的 Loader");
   } finally {
     loadingLoaders.value = false;
   }
@@ -96,10 +109,9 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
  */
 const handleCleanServer = async () => {
   Modal.confirm({
-    title: t("確定要清空伺服器嗎？"),
-    icon: createVNode(ExclamationCircleOutlined, { style: 'color: #ff4d4f' }),
-    content: t("這將刪除您的所有檔案（不含備份夾），此操作不可撤銷！"),
-    okText: t("確定清空"),
+    title: "確定要清空伺服器嗎？",
+    content: "這將刪除實例目錄下的所有檔案（LazyCloud_backup 除外），請務必確認已備份重要地圖！",
+    okText: "確認刪除",
     okType: "danger",
     onOk: async () => {
       try {
@@ -109,16 +121,14 @@ const handleCleanServer = async () => {
             daemonId: props.daemonId, 
             uuid: props.instanceId, 
             target: "/",
-            page: 0,
-            page_size: 500,
-            file_name: ""
+            page: 0, page_size: 500
           }
         });
         
-        const allItems = res.value?.items || [];
-        const targets = allItems
-          .filter((item: any) => item.name !== "LazyCloud_backup")
-          .map((item: any) => "/" + item.name);
+        const items = res.value?.items || [];
+        const targets = items
+          .filter((i: any) => i.name !== "LazyCloud_backup")
+          .map((i: any) => "/" + i.name);
 
         if (targets.length > 0) {
           await executeDelete({
@@ -127,10 +137,10 @@ const handleCleanServer = async () => {
           });
         }
         
-        message.success(t("伺服器已清空"));
+        message.success("環境清理完成");
         hasCleaned.value = true;
-      } catch (err: any) {
-        message.error(t("清空失敗"));
+      } catch (err) {
+        message.error("清理失敗，請檢查權限");
       } finally {
         isCleaning.value = false;
       }
@@ -139,36 +149,32 @@ const handleCleanServer = async () => {
 };
 
 /**
- * 提交安裝任務
+ * 提交安裝任務給 MCSM 後端
  */
 const handleInstall = async () => {
-  if (!form.mcVersion || !form.loaderVersion) {
-    return message.warning(t("請選擇完整的版本資訊"));
-  }
+  if (!form.loaderVersion) return message.warning("請先選擇版本");
 
-  Modal.confirm({
-    title: t("確認自動安裝"),
-    content: `${t('即將安裝')} ${form.loaderType} (${form.loaderVersion}) ${t('至 Minecraft')} ${form.mcVersion}`,
-    onOk: async () => {
-      try {
-        confirmLoading.value = true;
-        // 這裡調用你後續要在後端實作的 install 任務
-        await axios.post(`/api/protected/daemon/instance/asynchronous`, {
-          daemonId: props.daemonId,
-          instanceUuid: props.instanceId,
-          taskName: "modloader/install_task", 
-          parameter: { ...form }
-        });
-
-        message.success(t("安裝任務已在後端啟動"));
-        isVisible.value = false;
-      } catch (err: any) {
-        Modal.error({ title: t("任務啟動失敗"), content: err.message });
-      } finally {
-        confirmLoading.value = false;
+  confirmLoading.value = true;
+  try {
+    // 這裡調用 MCSM 原有的異步任務接口
+    await axios.post(`/api/protected/daemon/instance/asynchronous`, {
+      daemonId: props.daemonId,
+      instanceUuid: props.instanceId,
+      taskName: "modloader_install", // 這裡對應你未來在 Daemon 寫的安裝邏輯
+      parameter: {
+        mcVersion: form.mcVersion,
+        loaderType: form.loaderType,
+        loaderVersion: form.loaderVersion
       }
-    }
-  });
+    });
+
+    message.success("安裝指令已發送至伺服器");
+    isVisible.value = false;
+  } catch (err: any) {
+    message.error("啟動安裝失敗：" + err.message);
+  } finally {
+    confirmLoading.value = false;
+  }
 };
 
 defineExpose({ openDialog });
@@ -177,180 +183,128 @@ defineExpose({ openDialog });
 <template>
   <a-modal
     v-model:open="isVisible"
-    centered
-    :title="t('自動化 ModLoader 安裝')"
+    :title="null"
     :footer="null"
-    :mask-closable="false"
+    :width="500"
+    centered
     destroy-on-close
-    :width="560"
   >
-    <div class="install-container">
-      <div class="step-card danger-zone">
-        <div class="card-header">
-          <div class="header-content">
-            <h4 class="step-title danger">
-              <delete-outlined /> {{ t('第一步：環境清理') }}
-            </h4>
-            <p class="step-desc">{{ t('為了確保安裝成功，必須先清空現有核心與插件檔案。') }}</p>
-          </div>
-          <transition name="fade">
-            <a-tag v-if="hasCleaned" color="success" class="status-tag">
-              <check-circle-outlined /> {{ t('已就緒') }}
-            </a-tag>
-          </transition>
-        </div>
+    <div class="install-wrapper">
+      <div class="header-section">
+        <cloud-download-outlined class="main-icon" />
+        <h3>自動化核心安裝</h3>
+        <p>為您的 LazyCloud 實例一鍵部署運行環境</p>
+      </div>
 
-        <div class="card-action">
-          <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned" class="custom-checkbox">
-            <span class="checkbox-text">{{ t('我已知曉此操作會刪除伺服器目錄下的所有檔案') }}</span>
-          </a-checkbox>
+      <div class="step-box danger-box">
+        <div class="step-info">
+          <span class="step-num">1</span>
+          <div class="text">
+            <div class="t">環境初始化</div>
+            <div class="d">刪除現有檔案以避免衝突</div>
+          </div>
+          <a-tag v-if="hasCleaned" color="success"><check-circle-outlined /> 已完成</a-tag>
+        </div>
+        <div class="step-ctrl">
+          <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned">我已備份地圖等重要數據</a-checkbox>
           <a-button 
             danger 
-            block
+            block 
             :loading="isCleaning"
             :disabled="!agreeClean || hasCleaned"
-            class="action-btn"
             @click="handleCleanServer"
           >
-            {{ hasCleaned ? t('伺服器環境已清空') : t('立即執行環境清理') }}
+            {{ hasCleaned ? '清理成功' : '立即清空伺服器' }}
           </a-button>
         </div>
       </div>
 
-      <div class="step-card config-zone" :class="{ 'is-locked': !hasCleaned }">
-        <h4 class="step-title">
-          <setting-outlined /> {{ t('第二步：版本與類型配置') }}
-        </h4>
-        
-        <a-form layout="vertical" class="mt-4">
-          <a-form-item :label="t('Minecraft 版本')">
-            <a-select 
-              v-model:value="form.mcVersion" 
-              show-search 
-              :placeholder="t('請選擇或搜尋版本號')"
-            >
-              <a-select-option v-for="v in mcVersions" :key="v" :value="v">
-                {{ v }}
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-
-          <a-row :gutter="12">
-            <a-col :span="10">
-              <a-form-item :label="t('Loader 類型')">
-                <a-select v-model:value="form.loaderType">
-                  <a-select-option value="forge">Forge</a-select-option>
-                  <a-select-option value="neoforge">NeoForge</a-select-option>
-                  <a-select-option value="fabric">Fabric</a-select-option>
-                </a-select>
-              </a-form-item>
-            </a-col>
-            <a-col :span="14">
-              <a-form-item :label="t('Loader 版本')">
-                <a-select 
-                  v-model:value="form.loaderVersion" 
-                  :loading="loadingLoaders"
-                  :disabled="!form.mcVersion"
-                  placeholder="請選擇 Loader 版本"
-                >
-                  <a-select-option v-for="item in loaderVersions" :key="item.version" :value="item.version">
-                    {{ item.version }} <span style="opacity: 0.5; font-size: 12px;">{{ item.tag }}</span>
-                  </a-select-option>
-                </a-select>
-              </a-form-item>
-            </a-col>
-          </a-row>
-
-          <div class="footer-actions">
-            <a-button @click="isVisible = false">{{ t('取消') }}</a-button>
-            <a-button 
-              type="primary" 
-              :loading="confirmLoading" 
-              :disabled="!hasCleaned || !form.loaderVersion"
-              class="submit-btn"
-              @click="handleInstall"
-            >
-              <template #icon><cloud-download-outlined /></template>
-              {{ hasCleaned ? t('開始自動安裝任務') : t('請先完成第一步') }}
-            </a-button>
+      <div class="step-box" :class="{ 'is-locked': !hasCleaned }">
+        <div class="step-info">
+          <span class="step-num">2</span>
+          <div class="text">
+            <div class="t">版本配置</div>
+            <div class="d">選擇您想要的 MC 版本與加載器</div>
           </div>
-        </a-form>
+        </div>
+        
+        <div class="form-content">
+          <div class="f-item">
+            <label>Minecraft 版本</label>
+            <a-select v-model:value="form.mcVersion" show-search placeholder="請選擇版本">
+              <a-select-option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</a-select-option>
+            </a-select>
+          </div>
+
+          <div class="f-group">
+            <div class="f-item">
+              <label>類型</label>
+              <a-select v-model:value="form.loaderType">
+                <a-select-option value="forge">Forge</a-select-option>
+                <a-select-option value="fabric">Fabric</a-select-option>
+              </a-select>
+            </div>
+            <div class="f-item" style="flex: 2">
+              <label>Loader 版本</label>
+              <a-select v-model:value="form.loaderVersion" :loading="loadingLoaders" placeholder="選擇版本">
+                <a-select-option v-for="l in loaderVersions" :key="l.version" :value="l.version">
+                  {{ l.version }} <small style="color: #888">{{ l.tag }}</small>
+                </a-select-option>
+              </a-select>
+            </div>
+          </div>
+        </div>
+
+        <a-button 
+          type="primary" 
+          block 
+          size="large"
+          class="install-btn"
+          :loading="confirmLoading"
+          :disabled="!form.loaderVersion"
+          @click="handleInstall"
+        >
+          開始安裝
+        </a-button>
       </div>
     </div>
   </a-modal>
 </template>
 
 <style scoped>
-.install-container {
-  padding: 4px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
+.install-wrapper { padding: 10px; }
+.header-section { text-align: center; margin-bottom: 24px; }
+.main-icon { font-size: 48px; color: #1890ff; margin-bottom: 12px; }
+.header-section h3 { margin: 0; font-size: 20px; font-weight: 600; }
+.header-section p { color: #8c8c8c; font-size: 13px; }
 
-.step-card {
+.step-box {
+  background: #fbfbfb;
+  border: 1px solid #eee;
   border-radius: 12px;
   padding: 16px;
-  border: 1px solid rgba(140, 140, 140, 0.15);
-  transition: all 0.3s ease;
+  margin-bottom: 16px;
+  transition: all 0.3s;
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
+.danger-box { border-left: 4px solid #ff4d4f; background: #fffcfc; }
+.is-locked { opacity: 0.4; pointer-events: none; filter: grayscale(1); }
+
+.step-info { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.step-num { 
+  width: 24px; height: 24px; background: #1890ff; color: #fff; 
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-weight: bold; font-size: 12px;
 }
+.step-info .text .t { font-weight: 600; font-size: 14px; }
+.step-info .text .d { font-size: 12px; color: #8c8c8c; }
 
-.step-title {
-  font-weight: 600;
-  font-size: 15px;
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.step-ctrl { display: flex; flex-direction: column; gap: 10px; }
 
-.step-desc {
-  font-size: 12px;
-  opacity: 0.6;
-  margin: 0;
-}
+.form-content { display: flex; flex-direction: column; gap: 12px; }
+.f-group { display: flex; gap: 10px; }
+.f-item { display: flex; flex-direction: column; gap: 4px; }
+.f-item label { font-size: 12px; color: #555; }
 
-.danger-zone {
-  background: rgba(255, 77, 79, 0.04);
-  border-color: rgba(255, 77, 79, 0.15);
-}
-.danger { color: #ff4d4f; }
-
-.config-zone {
-  background: rgba(22, 119, 255, 0.04);
-  border-color: rgba(22, 119, 255, 0.15);
-}
-
-.config-zone.is-locked {
-  opacity: 0.4;
-  filter: grayscale(0.8);
-  pointer-events: none;
-  cursor: not-allowed;
-}
-
-.footer-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-.submit-btn {
-  min-width: 160px;
-  font-weight: 500;
-}
-
-/* 適配微調 */
-:deep(.ant-form-item) { margin-bottom: 12px; }
-:deep(.ant-select) { width: 100%; }
-
-.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.install-btn { margin-top: 20px; border-radius: 8px; font-weight: 600; }
 </style>
