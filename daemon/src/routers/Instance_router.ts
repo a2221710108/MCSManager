@@ -18,6 +18,8 @@ import { createQuickInstallTask, QuickInstallTask } from "../service/async_task_
 import { IInstanceDetail, IJson } from "../service/interfaces";
 import FileManager from "../service/system_file";
 
+import axios from "axios";
+
 // Some instances operate router authentication middleware
 routerApp.use((event, ctx, data, next) => {
   if (event === "instance/new" && data) return next();
@@ -362,7 +364,7 @@ routerApp.on("instance/delete", (ctx, data) => {
 });
 
 // perform complex asynchronous tasks
-routerApp.on("instance/asynchronous", (ctx, data) => {
+routerApp.on("instance/asynchronous", async (ctx, data) => {
   const instanceUuid = data.instanceUuid;
   const taskName = data.taskName;
   const parameter = data.parameter;
