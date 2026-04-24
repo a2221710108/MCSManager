@@ -117,13 +117,16 @@ const handleCleanServer = async () => {
       try {
         isCleaning.value = true;
         const res = await fetchFileList({
-          params: { 
-            daemonId: props.daemonId, 
-            uuid: props.instanceId, 
-            target: "/",
-            page: 0, page_size: 500
-          }
-        });
+  params: { 
+    daemonId: props.daemonId, 
+    uuid: props.instanceId, 
+    target: "/",
+    page: 0, 
+    page_size: 100,
+    // 加上下面這一行，解決 TS2345 錯誤
+    file_name: "" 
+  }
+});
         
         const items = res.value?.items || [];
         const targets = items
