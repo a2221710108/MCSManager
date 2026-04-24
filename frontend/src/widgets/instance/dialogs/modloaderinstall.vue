@@ -76,53 +76,67 @@ const openDialog = async () => {
  * 監聽選擇變化，自動獲取對應的 Loader 版本
  */
 watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) => {
-  if (!newMc || !newType) return;
+  // 1. 如果必填資訊不全，清空列表並退出
+  if (!newMc || !newType) {
+    loaderVersions.value = [];
+    form.loaderVersion = "";
+    return;
+  }
   
   loadingLoaders.value = true;
-  form.loaderVersion = ""; 
-  loaderVersions.value = [];
+  // 這裡不要立刻清空 loaderVersions.value，等數據拿到了再覆蓋，
+  // 這樣可以防止 a-select 因為數據瞬間消失而產生的 emitsOptions 報錯
+  const tempVersions: {version: string, tag?: string}[] = [];
 
   try {
     let target = "";
     if (newType === "forge") {
-      // Forge 邏輯
       target = `https://bmclapi2.bangbang93.com/forge/minecraft/${newMc}`;
       const data = await proxyGet(target);
-      // Forge API 返回的是列表，我們將其倒序排列
-      loaderVersions.value = data
-        .map((v: any) => ({ 
-          version: v.version, 
-          tag: v.category === "recommended" ? "⭐ 推薦" : "" 
-        }))
-        .reverse() // 最新在前
-        .slice(0, 40); // Forge 版本較多，可以保留稍微多一點
-
-    } else if (newType === "neoforge") {
-      // NeoForge 邏輯
+      if (Array.isArray(data)) {
+        data.reverse().slice(0, 15).forEach((v: any) => {
+          tempVersions.push({ 
+            version: v.version, 
+            tag: v.category === "recommended" ? "⭐" : "" 
+          });
+        });
+      }
+    } 
+    else if (newType === "neoforge") {
       target = `https://bmclapi2.bangbang93.com/neoforge/list/${newMc}`;
       const data = await proxyGet(target);
-      // NeoForge 返回的是字符串數組 ["20.1.1", "20.1.2"]
-      loaderVersions.value = data
-        .map((v: string) => ({ version: v, tag: "" }))
-        .reverse() // 最新在前
-        .slice(0, 40);
-
-    } else if (newType === "fabric") {
-      // Fabric 邏輯
+      if (Array.isArray(data)) {
+        // NeoForge 有時返回對象，有時返回字串，這裡做個兼容處理
+        data.reverse().slice(0, 15).forEach((v: any) => {
+          const vStr = typeof v === 'string' ? v : (v.version || JSON.stringify(v));
+          tempVersions.push({ version: vStr, tag: "" });
+        });
+      }
+    } 
+    else if (newType === "fabric") {
       target = `https://meta.fabricmc.net/v2/versions/loader/${newMc}`;
       const data = await proxyGet(target);
-      // 根據你的需求：取最後 10 個版本，最新的排最前面
-      // Fabric API 通常已經是按時間排序，我們確保它是倒序後取前 10
-      loaderVersions.value = data
-        .map((v: any) => ({ 
-          version: v.loader.version, 
-          tag: v.loader.stable ? "" : "測試版" 
-        }))
-        .slice(0, 40); // 取前 10 個（最新）
+      if (Array.isArray(data)) {
+        data.slice(0, 10).forEach((v: any) => {
+          tempVersions.push({ 
+            version: v.loader.version, 
+            tag: v.loader.stable ? "" : "[舊版]" 
+          });
+        });
+      }
+    }
+
+    // 最後一次性更新響應式數據
+    form.loaderVersion = ""; 
+    loaderVersions.value = tempVersions;
+
+    if (tempVersions.length === 0) {
+      message.info("該版本下暫無可用加載器");
     }
   } catch (err) {
-    console.error("獲取 Loader 失敗:", err);
-    message.warning("該版本下暫無可用的 ModLoader");
+    console.error("Loader Fetch Error:", err);
+    loaderVersions.value = [];
+    message.error("獲取版本失敗，請確認網絡或 Worker 狀態");
   } finally {
     loadingLoaders.value = false;
   }
