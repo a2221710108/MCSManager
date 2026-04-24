@@ -72,38 +72,61 @@ const openDialog = async () => {
 /**
  * 監聽選擇變化，自動獲取對應的 Loader 版本
  */
+/**
+ * 監聽選擇變化，自動獲取對應的 Loader 版本
+ */
 watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) => {
   if (!newMc || !newType) return;
   
   loadingLoaders.value = true;
   form.loaderVersion = ""; 
+  loaderVersions.value = [];
+
   try {
     let target = "";
     if (newType === "forge") {
+      // Forge 邏輯
       target = `https://bmclapi2.bangbang93.com/forge/minecraft/${newMc}`;
       const data = await proxyGet(target);
-      loaderVersions.value = data.map((v: any) => ({ 
-        version: v.version, 
-        tag: v.category === "recommended" ? "⭐ 推薦" : "" 
-      }));
+      // Forge API 返回的是列表，我們將其倒序排列
+      loaderVersions.value = data
+        .map((v: any) => ({ 
+          version: v.version, 
+          tag: v.category === "recommended" ? "⭐ 推薦" : "" 
+        }))
+        .reverse() // 最新在前
+        .slice(0, 40); // Forge 版本較多，可以保留稍微多一點
+
+    } else if (newType === "neoforge") {
+      // NeoForge 邏輯
+      target = `https://bmclapi2.bangbang93.com/neoforge/list/${newMc}`;
+      const data = await proxyGet(target);
+      // NeoForge 返回的是字符串數組 ["20.1.1", "20.1.2"]
+      loaderVersions.value = data
+        .map((v: string) => ({ version: v, tag: "" }))
+        .reverse() // 最新在前
+        .slice(0, 40);
+
     } else if (newType === "fabric") {
+      // Fabric 邏輯
       target = `https://meta.fabricmc.net/v2/versions/loader/${newMc}`;
       const data = await proxyGet(target);
-      loaderVersions.value = data.map((v: any) => ({ 
-        version: v.loader.version, 
-        tag: v.loader.stable ? "" : "測試版" 
-      }));
+      // 根據你的需求：取最後 10 個版本，最新的排最前面
+      // Fabric API 通常已經是按時間排序，我們確保它是倒序後取前 10
+      loaderVersions.value = data
+        .map((v: any) => ({ 
+          version: v.loader.version, 
+          tag: v.loader.stable ? "" : "測試版" 
+        }))
+        .slice(0, 40); // 取前 10 個（最新）
     }
-    // 只取最新的 40 個版本，避免選單過長
-    loaderVersions.value = loaderVersions.value.reverse().slice(0, 40);
   } catch (err) {
-    loaderVersions.value = [];
-    message.warning("該 MC 版本下暫無可用的 Loader");
+    console.error("獲取 Loader 失敗:", err);
+    message.warning("該版本下暫無可用的 ModLoader");
   } finally {
     loadingLoaders.value = false;
   }
 });
-
 /**
  * 執行清空伺服器邏輯
  */
