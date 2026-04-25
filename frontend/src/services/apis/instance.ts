@@ -457,17 +457,15 @@ export const installModLoader = useDefineApi<{
   params: {
     daemonId: string;
     uuid: string;
-    task_name: string; // 保持 task_name 供轉發使用
+    task_name: string; 
   };
   data: {
-    // 這裡必須包含 instanceUuid 和 taskName 供後端路由識別
     instanceUuid: string;
     taskName: string;
-    parameter: {
-      mcVersion: string;
-      loaderType: string;
-      loaderVersion: string;
-    };
+    // 直接平舖參數，不要 parameter 層級
+    mcVersion: string;
+    loaderType: string;
+    loaderVersion: string;
   };
 }, any>({
   url: "/api/protected_instance/asynchronous",
