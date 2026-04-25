@@ -175,15 +175,11 @@ const handleCleanServer = async () => {
 /**
  * 提交安裝任務（強化數據傳遞版）
  */
-  const handleInstall = async () => {
-  // 這裡要對齊後端 Task 類的鍵名
-  const payload = {
-    mcVersion: String(form.mcVersion).trim(),    // 不要用 mcV
-    loaderType: String(form.loaderType).trim(),   // 不要用 lT
-    loaderVersion: String(form.loaderVersion).trim() // 不要用 lV
-  };
 
-  console.log("[LazyCloud Debug] 正確的 Payload:", payload);
+  const handleInstall = async () => {
+  const mcV = String(form.mcVersion).trim();
+  const lT = String(form.loaderType).trim();
+  const lV = String(form.loaderVersion).trim();
 
   confirmLoading.value = true;
   try {
@@ -196,7 +192,10 @@ const handleCleanServer = async () => {
       data: {
         instanceUuid: props.instanceId,
         taskName: "modloader_install",
-        parameter: payload // 這裡傳遞正確的鍵名
+        // 直接寫在這裡，不包 parameter
+        mcVersion: mcV,
+        loaderType: lT,
+        loaderVersion: lV
       }
     });
 
