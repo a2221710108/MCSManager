@@ -196,30 +196,29 @@ const handleInstall = async () => {
   if (!form.loaderVersion) return message.warning("請先選擇版本");
 
   confirmLoading.value = true;
-  try {
-    // 這裡的路徑應該對齊你之前成功的 CurseForge 請求路徑
-    // 注意：MCSManager 前端通常會自動處理 token 和基礎 URL
-    await axios.post(`/api/protected_instance/asynchronous`, {
-      // 注意：這裡的數據結構要對齊後端接收的格式
-      instanceUuid: props.instanceId, 
-      taskName: "modloader_install",
-      parameter: {
-        mcVersion: form.mcVersion,
-        loaderType: form.loaderType,
-        loaderVersion: form.loaderVersion
-      }
-    }, {
-      params: { 
+    try {
+    // 呼叫定義好的 API
+    await installModLoader().execute({
+      params: {
         daemonId: props.daemonId,
-        uuid: props.instanceId // 這裡的 uuid 是給 Panel 路由用的，保持不變
+        uuid: props.instanceId,
+        task_name: "modloader_install"
+      },
+      data: {
+        instanceUuid: props.instanceId,
+        taskName: "modloader_install",
+        parameter: {
+          mcVersion: form.mcVersion,
+          loaderType: form.loaderType,
+          loaderVersion: form.loaderVersion
+        }
       }
     });
 
-
-    message.success("安裝指令已發送至伺服器");
+    message.success("安裝任務已啟動");
     isVisible.value = false;
   } catch (err: any) {
-    message.error("啟動安裝失敗：" + err.message);
+    message.error("啟動失敗：" + (err.message || "未知錯誤"));
   } finally {
     confirmLoading.value = false;
   }
