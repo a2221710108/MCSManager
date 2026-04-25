@@ -494,7 +494,7 @@ routerApp.on("instance/query_asynchronous", (ctx, data) => {
   const taskName = data.taskName as string;
   const taskNameTypeMap: IJson<string> = {
     quick_install: QuickInstallTask.TYPE,
-    curseforge_install: CurseForgeInstallTask.TYPE // <--- 新增這行
+    curseforge_install: CurseForgeInstallTask.TYPE, // <--- 新增這行
     modloader_install: ModLoaderInstallTask.TYPE // <--- 新增這行
   };
   const type = String(taskNameTypeMap[taskName] || QuickInstallTask.TYPE);
