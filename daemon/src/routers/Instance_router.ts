@@ -442,20 +442,37 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
 
   // 找到 Instance_router.ts 中處理 modloader_install 的部分
 // Instance_router.ts
-  if (taskName === "modloader_install" && instance) {
-    // 數據現在就在 data 根目錄下
+if (taskName === "modloader_install" && instance) {
+    // 打印原始數據結構，這是找出真相的唯一方法
+    console.log("===== [LazyCloud Debug] 原始數據開始 =====");
+    console.log("Raw Data:", JSON.stringify(data));
+    console.log("===== [LazyCloud Debug] 原始數據結束 =====");
+
+    // 嘗試所有可能的抓取路徑
+    const mcVersion = data.mcVersion || (data.parameter && data.parameter.mcVersion) || (data.data && data.data.mcVersion);
+    const loaderType = data.loaderType || (data.parameter && data.parameter.loaderType) || (data.data && data.data.loaderType);
+    const loaderVersion = data.loaderVersion || (data.parameter && data.parameter.loaderVersion) || (data.data && data.data.loaderVersion);
+
     const config = {
-        mcVersion: String(data.mcVersion || ""),
-        loaderType: String(data.loaderType || ""),
-        loaderVersion: String(data.loaderVersion || "")
+        mcVersion: String(mcVersion || "").trim(),
+        loaderType: String(loaderType || "").trim(),
+        loaderVersion: String(loaderVersion || "").trim()
     };
 
-    console.log("[LazyCloud] 解析結果:", config);
+    if (!config.mcVersion || !config.loaderVersion) {
+        // 這裡就是你現在看到的報錯
+        return protocol.error(ctx, "instance/asynchronous", { 
+            err: `數據丟失。收到的鍵名有: ${Object.keys(data).join(", ")}` 
+        });
+    }
 
-    if (!config.mcVersion) {
-        return protocol.error(ctx, "instance/asynchronous", { err: "數據丟失，請檢查平舖結構" });
+    try {
+        const task = createModLoaderTask(instance, config);
+        return protocol.response(ctx, task.toObject());
+    } catch (err: any) {
+        return protocol.error(ctx, "instance/asynchronous", { err: err.message });
     }
-    }
+}
   
   
   protocol.response(ctx, true);
