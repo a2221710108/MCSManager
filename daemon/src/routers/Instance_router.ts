@@ -441,34 +441,47 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
   }
 
   // 找到 Instance_router.ts 中處理 modloader_install 的部分
-if (taskName === "modloader_install" && instance) {
-        // --- 核心修復開始 ---
-        
-        // 1. 強力抓取參數：先找 data.parameter，找不到就直接用 data
-        const p = data.parameter || data;
-        
-        // 2. 確保拿到值，如果拿到的是 undefined 就給個空字串防止報錯
-        const config = {
-            mcVersion: String(p.mcVersion || ""),
-            loaderType: String(p.loaderType || ""),
-            loaderVersion: String(p.loaderVersion || "")
-        };
+// Instance_router.ts
+routerApp.on("instance/asynchronous", (ctx, data) => {
+  const taskName = data.taskName;
+  const instanceUuid = data.instanceUuid;
+  const daemonId = data.daemonId;
 
-        // 3. 打印一條 Daemon 後台日誌，確認數據到站了
-        console.log(`[LazyCloud] 守護進程收到安裝請求: V=${config.mcVersion}, T=${config.loaderType}, L=${config.loaderVersion}`);
+  const instance = instanceService.getInstance(daemonId, instanceUuid);
 
-        // 4. 檢查數據是否真的進來了
-        if (!config.mcVersion || !config.loaderVersion) {
-            return protocol.error(ctx, "instance/asynchronous", { err: "後端未接收到有效的安裝參數" });
-        }
+  if (taskName === "modloader_install" && instance) {
+    // 【最關鍵的改動】：全路徑掃描
+    // 優先序：data.parameter (自定義) > data.data (Axios 預設) > data (根目錄)
+    const p = data.parameter || data.data || data;
 
-        try {
-            const task = createModLoaderTask(instance, config);
-            return protocol.response(ctx, task.toObject());
-        } catch (err: any) {
-            return protocol.error(ctx, "instance/asynchronous", { err: err.message });
-        }
-}
+    const config = {
+      mcVersion: String(p.mcVersion || ""),
+      loaderType: String(p.loaderType || ""),
+      loaderVersion: String(p.loaderVersion || "")
+    };
+
+    // 強制在 Daemon 終端打印收到的數據，方便你 debug
+    console.log("------------------------------------------");
+    console.log("[LazyCloud] 路由層解析結果:");
+    console.log("MC:", config.mcVersion);
+    console.log("Type:", config.loaderType);
+    console.log("Version:", config.loaderVersion);
+    console.log("------------------------------------------");
+
+    // 驗證邏輯
+    if (!config.mcVersion || !config.loaderVersion) {
+      // 如果還進到這裡，說明 p 還是沒抓對
+      console.error("[LazyCloud] 數據解析失敗，原始 data 內容為:", JSON.stringify(data));
+      return protocol.error(ctx, "instance/asynchronous", { err: "後端解析參數失敗，請檢查數據層級" });
+    }
+
+    try {
+      const task = createModLoaderTask(instance, config);
+      return protocol.response(ctx, task.toObject());
+    } catch (err: any) {
+      return protocol.error(ctx, "instance/asynchronous", { err: err.message });
+    }
+  }
   
   
   protocol.response(ctx, true);
