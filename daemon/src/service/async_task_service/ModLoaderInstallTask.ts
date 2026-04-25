@@ -47,9 +47,10 @@ export class ModLoaderInstallTask extends AsyncTask {
       env: {
         ...process.env,
         SERVER_DIR: this.instance.config.cwd,
-        MC_VERSION: this.config.mcVersion,
-        LOADER_TYPE: this.config.loaderType,
-        LOADER_VERSION: this.config.loaderVersion
+        // 關鍵：將 Key 改為腳本頂部定義的名字
+        mcVersion: this.config.mcVersion,
+        loaderType: this.config.loaderType,
+        loaderVersion: this.config.loaderVersion
       }
     });
 
