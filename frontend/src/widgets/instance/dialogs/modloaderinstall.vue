@@ -132,7 +132,7 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
 const handleCleanServer = async () => {
   Modal.confirm({
     title: "確定要清空伺服器嗎？",
-    content: "這將刪除除 LazyCloud_backup 外的所有檔案，請確認已備份！",
+    content: "這將刪除除本地備份外的所有檔案，請確認已備份！",
     okText: "確認刪除",
     okType: "danger",
     onOk: async () => {
@@ -199,7 +199,7 @@ const handleCleanServer = async () => {
       }
     });
 
-    message.success("安裝任務已啟動，請觀察控制台日誌");
+    message.success("安裝任務已啟動");
     isVisible.value = false;
   } catch (err: any) {
     console.error("安裝請求失敗:", err);
@@ -227,7 +227,7 @@ defineExpose({ openDialog });
         <cloud-download-outlined class="banner-icon" />
         <div class="banner-text">
           <h3>ModLoader 自動安裝</h3>
-          <p>如安裝過舊的 Minecraft 版本可能安裝失敗</p>
+          <p>如安裝過舊的 Minecraft 版本可能安裝失敗；如 安裝失敗 或 獲取版本 失敗請稍後重試</p>
         </div>
       </div>
 
