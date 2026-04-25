@@ -75,6 +75,11 @@ export class ModLoaderInstallTask extends AsyncTask {
     if (this.instance.asynchronousTask === this) this.instance.asynchronousTask = null;
   }
 
+  async onError(err: Error): Promise<void> {
+    this.instance.print(`\n[SYSTEM ERROR] 任務發生故障: ${err.message}\n`);
+    this.instance.status(Instance.STATUS_STOP);
+}
+
   toObject() {
     return {
       taskId: this.taskId,
