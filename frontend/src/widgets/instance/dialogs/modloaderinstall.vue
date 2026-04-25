@@ -13,7 +13,7 @@ import { fileList, deleteFile } from "@/services/apis/fileManager";
 
 // --- 配置區 ---
 // 請替換成你部署的 Cloudflare Worker 地址（記得保留最後的 ?url=）
-const PROXY = "https://get-modloader-version.leolu55165088.workers.dev/?url=";
+const PROXY = "https://get-modloader-version.lazycloud.one/?url=";
 
 const props = defineProps<{
   daemonId: string;
