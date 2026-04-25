@@ -191,22 +191,32 @@ const handleCleanServer = async () => {
 /**
  * 提交安裝任務給 MCSM 後端
  */
+// 修改 ModLoaderInstall.vue 中的 handleInstall
 const handleInstall = async () => {
   if (!form.loaderVersion) return message.warning("請先選擇版本");
 
   confirmLoading.value = true;
   try {
-    // 這裡調用 MCSM 原有的異步任務接口
-    await axios.post(`/api/protected/daemon/instance/asynchronous`, {
+    // 這裡的路徑應該對齊你之前成功的 CurseForge 請求路徑
+    // 注意：MCSManager 前端通常會自動處理 token 和基礎 URL
+    await axios.post(`/api/protected_instance/asynchronous`, {
+      // 注意：這裡的數據結構要對齊後端接收的格式
       daemonId: props.daemonId,
       instanceUuid: props.instanceId,
-      taskName: "modloader_install", // 這裡對應你未來在 Daemon 寫的安裝邏輯
+      taskName: "modloader_install",
       parameter: {
         mcVersion: form.mcVersion,
         loaderType: form.loaderType,
         loaderVersion: form.loaderVersion
       }
+    }, {
+      // 確保傳入 daemonId 作為 params，這樣前端攔截器才知道發給哪個節點
+      params: { 
+        daemonId: props.daemonId,
+        uuid: props.instanceId 
+      }
     });
+
 
     message.success("安裝指令已發送至伺服器");
     isVisible.value = false;
