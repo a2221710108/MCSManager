@@ -439,9 +439,6 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
       return protocol.error(ctx, "instance/asynchronous", { err: err.message });
     }
   }
-  
-  protocol.response(ctx, true);
-});
 
   if (taskName === "modloader_install" && instance) {
     try {
@@ -455,6 +452,10 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
         return protocol.error(ctx, "instance/asynchronous", { err: err.message });
     }
 }
+  
+  protocol.response(ctx, true);
+});
+
 
 // Terminate the execution of complex asynchronous tasks
 routerApp.on("instance/stop_asynchronous", (ctx, data) => {
