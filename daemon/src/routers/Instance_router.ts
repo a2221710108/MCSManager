@@ -442,25 +442,32 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
 
   // 找到 Instance_router.ts 中處理 modloader_install 的部分
 if (taskName === "modloader_install" && instance) {
-    if (instance.status() !== 0) return protocol.error(ctx, "instance/asynchronous", { err: "請先關閉伺服器" });
-    
-    try {
-        // 強力兼容邏輯：如果 data.parameter 沒拿到，就直接從 data 拿
+        // --- 核心修復開始 ---
+        
+        // 1. 強力抓取參數：先找 data.parameter，找不到就直接用 data
         const p = data.parameter || data;
-
-        const task = createModLoaderTask(instance, {
+        
+        // 2. 確保拿到值，如果拿到的是 undefined 就給個空字串防止報錯
+        const config = {
             mcVersion: String(p.mcVersion || ""),
             loaderType: String(p.loaderType || ""),
             loaderVersion: String(p.loaderVersion || "")
-        });
+        };
 
-        // 調試日誌：如果這裡打印出空，說明面板端傳過來時就丟了
-        console.log(`[LazyCloud] 構建任務參數: V=${p.mcVersion}, T=${p.loaderType}, L=${p.loaderVersion}`);
+        // 3. 打印一條 Daemon 後台日誌，確認數據到站了
+        console.log(`[LazyCloud] 守護進程收到安裝請求: V=${config.mcVersion}, T=${config.loaderType}, L=${config.loaderVersion}`);
 
-        return protocol.response(ctx, task.toObject());
-    } catch (err: any) {
-        return protocol.error(ctx, "instance/asynchronous", { err: err.message });
-    }
+        // 4. 檢查數據是否真的進來了
+        if (!config.mcVersion || !config.loaderVersion) {
+            return protocol.error(ctx, "instance/asynchronous", { err: "後端未接收到有效的安裝參數" });
+        }
+
+        try {
+            const task = createModLoaderTask(instance, config);
+            return protocol.response(ctx, task.toObject());
+        } catch (err: any) {
+            return protocol.error(ctx, "instance/asynchronous", { err: err.message });
+        }
 }
   
   
