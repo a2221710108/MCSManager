@@ -45,6 +45,12 @@ const instanceGameServerInfo = computed(() => {
   }
 });
 
+const pingAddr = computed(() => {
+  const conf = instanceInfo.value?.config?.pingConfig;
+  if (!conf || !conf.port) return null;
+  return `${conf.ip || "127.0.0.1"}:${conf.port}`;
+});
+
 onMounted(async () => {
   if (instanceId && daemonId) {
     await execute({
@@ -96,6 +102,13 @@ onMounted(async () => {
         </div>
       </a-typography-paragraph>
 
+      <a-typography-paragraph v-if="pingAddr">
+  <div>Minecraft 預設 IP：</div>
+  <a-typography-text strong style="font-size: 16px;">
+    {{ pingAddr }}
+  </a-typography-text>
+</a-typography-paragraph>
+      
       <a-typography-paragraph v-if="instanceGameServerInfo">
         <span>{{ t("TXT_CODE_855c4a1c") }}</span>
         <span>{{ instanceGameServerInfo.players }}</span>
