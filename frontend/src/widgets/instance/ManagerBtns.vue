@@ -224,7 +224,7 @@ const btns = computed(() => {
   condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
 },
     {
-  title: t("Modloader 自動化安裝"),
+  title: t("ModLoader 自動化安裝"),
   icon: CloudDownloadOutlined,
   click: () => {
     modloaderinstallDialog.value?.openDialog();
