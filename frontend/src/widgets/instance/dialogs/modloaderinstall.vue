@@ -201,8 +201,7 @@ const handleInstall = async () => {
     // 注意：MCSManager 前端通常會自動處理 token 和基礎 URL
     await axios.post(`/api/protected_instance/asynchronous`, {
       // 注意：這裡的數據結構要對齊後端接收的格式
-      daemonId: props.daemonId,
-      instanceUuid: props.instanceId,
+      instanceUuid: props.instanceId, 
       taskName: "modloader_install",
       parameter: {
         mcVersion: form.mcVersion,
@@ -210,10 +209,9 @@ const handleInstall = async () => {
         loaderVersion: form.loaderVersion
       }
     }, {
-      // 確保傳入 daemonId 作為 params，這樣前端攔截器才知道發給哪個節點
       params: { 
         daemonId: props.daemonId,
-        uuid: props.instanceId 
+        uuid: props.instanceId // 這裡的 uuid 是給 Panel 路由用的，保持不變
       }
     });
 
