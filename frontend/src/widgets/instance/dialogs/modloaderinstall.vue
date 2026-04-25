@@ -10,6 +10,7 @@ import {
 } from "@ant-design/icons-vue";
 import axios from "axios";
 import { fileList, deleteFile } from "@/services/apis/fileManager";
+import { installModLoader } from "@/services/apis/instance";
 
 // --- 配置區 ---
 // 請替換成你部署的 Cloudflare Worker 地址（記得保留最後的 ?url=）
