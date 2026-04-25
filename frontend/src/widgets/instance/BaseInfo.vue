@@ -104,7 +104,7 @@ onMounted(async () => {
 
       <a-typography-paragraph v-if="pingAddr">
   <div>Minecraft 預設 IP：</div>
-  <a-typography-text strong style="font-size: 16px;">
+  <a-typography-text :copyable="{ text: pingAddr }" strong>
     {{ pingAddr }}
   </a-typography-text>
 </a-typography-paragraph>
