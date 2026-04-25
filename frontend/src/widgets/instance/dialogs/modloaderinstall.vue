@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted } from "vue";
+import { ref, reactive, watch } from "vue";
 import { message, Modal } from "ant-design-vue";
 import { 
   CloudDownloadOutlined, 
-  SettingOutlined, 
-  DeleteOutlined,
-  ExclamationCircleOutlined,
   CheckCircleOutlined
 } from "@ant-design/icons-vue";
 import axios from "axios";
@@ -13,7 +10,6 @@ import { fileList, deleteFile } from "@/services/apis/fileManager";
 import { installModLoader } from "@/services/apis/instance";
 
 // --- 配置區 ---
-// 請替換成你部署的 Cloudflare Worker 地址（記得保留最後的 ?url=）
 const PROXY = "https://get-modloader-version.lazycloud.one/?url=";
 
 const props = defineProps<{
@@ -39,7 +35,7 @@ const form = reactive({
   loaderVersion: ""
 });
 
-// MCSManager 內建的文件操作 API
+// MCSManager 內建 API 執行器
 const { execute: fetchFileList } = fileList();
 const { execute: executeDelete } = deleteFile();
 
@@ -66,18 +62,14 @@ const openDialog = async () => {
       .filter((v: any) => v.type === "release")
       .map((v: any) => v.id);
   } catch (err) {
-    message.error("獲取 Minecraft 版本清單失敗，請檢查 Worker 配置");
+    message.error("獲取 Minecraft 版本清單失敗");
   }
 };
 
 /**
  * 監聽選擇變化，自動獲取對應的 Loader 版本
  */
-/**
- * 監聽選擇變化，自動獲取對應的 Loader 版本
- */
 watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) => {
-  // 1. 如果必填資訊不全，清空列表並退出
   if (!newMc || !newType) {
     loaderVersions.value = [];
     form.loaderVersion = "";
@@ -85,8 +77,6 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
   }
   
   loadingLoaders.value = true;
-  // 這裡不要立刻清空 loaderVersions.value，等數據拿到了再覆蓋，
-  // 這樣可以防止 a-select 因為數據瞬間消失而產生的 emitsOptions 報錯
   const tempVersions: {version: string, tag?: string}[] = [];
 
   try {
@@ -107,7 +97,6 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
       target = `https://bmclapi2.bangbang93.com/neoforge/list/${newMc}`;
       const data = await proxyGet(target);
       if (Array.isArray(data)) {
-        // NeoForge 有時返回對象，有時返回字串，這裡做個兼容處理
         data.reverse().slice(0, 15).forEach((v: any) => {
           const vStr = typeof v === 'string' ? v : (v.version || JSON.stringify(v));
           tempVersions.push({ version: vStr, tag: "" });
@@ -121,50 +110,44 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
         data.slice(0, 10).forEach((v: any) => {
           tempVersions.push({ 
             version: v.loader.version, 
-            tag: v.loader.stable ? "" : "[舊版]" 
+            tag: v.loader.stable ? "" : "[測試版]" 
           });
         });
       }
     }
 
-    // 最後一次性更新響應式數據
     form.loaderVersion = ""; 
     loaderVersions.value = tempVersions;
-
-    if (tempVersions.length === 0) {
-      message.info("該版本下暫無可用加載器");
-    }
   } catch (err) {
     console.error("Loader Fetch Error:", err);
     loaderVersions.value = [];
-    message.error("獲取版本失敗，請確認網絡或 Worker 狀態");
   } finally {
     loadingLoaders.value = false;
   }
 });
+
 /**
- * 執行清空伺服器邏輯
+ * 環境清理邏輯
  */
 const handleCleanServer = async () => {
   Modal.confirm({
     title: "確定要清空伺服器嗎？",
-    content: "這將刪除實例目錄下的所有檔案（LazyCloud_backup 除外），請務必確認已備份重要地圖！",
+    content: "這將刪除除 LazyCloud_backup 外的所有檔案，請確認已備份！",
     okText: "確認刪除",
     okType: "danger",
     onOk: async () => {
       try {
         isCleaning.value = true;
         const res = await fetchFileList({
-  params: { 
-    daemonId: props.daemonId, 
-    uuid: props.instanceId, 
-    target: "/",
-    page: 0, 
-    page_size: 100,
-    // 加上下面這一行，解決 TS2345 錯誤
-    file_name: "" 
-  }
-});
+          params: { 
+            daemonId: props.daemonId, 
+            uuid: props.instanceId, 
+            target: "/",
+            page: 0, 
+            page_size: 100,
+            file_name: "" 
+          }
+        });
         
         const items = res.value?.items || [];
         const targets = items
@@ -181,7 +164,7 @@ const handleCleanServer = async () => {
         message.success("環境清理完成");
         hasCleaned.value = true;
       } catch (err) {
-        message.error("清理失敗，請檢查權限");
+        message.error("清理失敗");
       } finally {
         isCleaning.value = false;
       }
@@ -190,13 +173,21 @@ const handleCleanServer = async () => {
 };
 
 /**
- * 提交安裝任務給 MCSM 後端
+ * 提交安裝任務（強化數據傳遞版）
  */
-// 修改 ModLoaderInstall.vue 中的 handleInstall
 const handleInstall = async () => {
-  if (!form.loaderVersion) return message.warning("請先選擇版本");
+  // 1. 數據校驗與脫殼 (防止 Proxy 影響)
+  const mcV = String(form.mcVersion || "").trim();
+  const lT = String(form.loaderType || "").trim();
+  const lV = String(form.loaderVersion || "").trim();
+
+  if (!mcV || !lV) return message.warning("請先選擇完整的版本資訊");
+
   confirmLoading.value = true;
   try {
+    // 打印 Debug 信息到瀏覽器控制台
+    console.log("[LazyCloud] 正在提交安裝請求:", { mcV, lT, lV });
+
     await installModLoader().execute({
       params: {
         daemonId: props.daemonId,
@@ -206,22 +197,22 @@ const handleInstall = async () => {
       data: {
         instanceUuid: props.instanceId,
         taskName: "modloader_install",
-        // 確保這裡的 key 和後端 router 讀取的一致
         parameter: {
-          mcVersion: form.mcVersion,
-          loaderType: form.loaderType,
-          loaderVersion: form.loaderVersion
+          mcVersion: mcV,
+          loaderType: lT,
+          loaderVersion: lV
         }
       }
     });
-    message.success("安裝任務已啟動");
+    message.success("安裝任務已啟動，請觀察控制台日誌");
+    isVisible.value = false;
   } catch (err: any) {
-    message.error("啟動失敗：" + (err.message || "未知錯誤"));
+    console.error("安裝請求失敗:", err);
+    message.error("啟動失敗：" + (err.response?.data?.err || err.message));
   } finally {
     confirmLoading.value = false;
   }
 };
-    
 
 defineExpose({ openDialog });
 </script>
@@ -247,7 +238,7 @@ defineExpose({ openDialog });
           <span class="step-num">1</span>
           <div class="text">
             <div class="t">環境初始化</div>
-            <div class="d">刪除現有檔案以避免衝突</div>
+            <div class="d">建議清空實例目錄以避免核心衝突</div>
           </div>
           <a-tag v-if="hasCleaned" color="success"><check-circle-outlined /> 已完成</a-tag>
         </div>
@@ -270,7 +261,7 @@ defineExpose({ openDialog });
           <span class="step-num">2</span>
           <div class="text">
             <div class="t">版本配置</div>
-            <div class="d">選擇您想要的 MC 版本與加載器</div>
+            <div class="d">選擇遊戲版本與對應的加載器</div>
           </div>
         </div>
         
@@ -286,10 +277,10 @@ defineExpose({ openDialog });
             <div class="f-item">
               <label>類型</label>
               <a-select v-model:value="form.loaderType">
-  <a-select-option value="forge">Forge</a-select-option>
-  <a-select-option value="neoforge">NeoForge</a-select-option>
-  <a-select-option value="fabric">Fabric</a-select-option>
-</a-select>
+                <a-select-option value="forge">Forge</a-select-option>
+                <a-select-option value="neoforge">NeoForge</a-select-option>
+                <a-select-option value="fabric">Fabric</a-select-option>
+              </a-select>
             </div>
             <div class="f-item" style="flex: 2">
               <label>Loader 版本</label>
