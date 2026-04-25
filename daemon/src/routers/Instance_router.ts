@@ -455,6 +455,7 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
     if (!config.mcVersion) {
         return protocol.error(ctx, "instance/asynchronous", { err: "數據丟失，請檢查平舖結構" });
     }
+    }
   
   
   protocol.response(ctx, true);
