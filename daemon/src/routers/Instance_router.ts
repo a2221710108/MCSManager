@@ -443,26 +443,26 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
   // 找到 Instance_router.ts 中處理 modloader_install 的部分
 if (taskName === "modloader_install" && instance) {
     if (instance.status() !== 0) return protocol.error(ctx, "instance/asynchronous", { err: "請先關閉伺服器" });
-    if (instance.asynchronousTask) return protocol.error(ctx, "instance/asynchronous", { err: "該實例已有任務正在運行" });
-
+    
     try {
-      // 【修改點】增加日誌，並確保從正確的位置獲取 parameter
-      console.log("[Debug] 接收到的原始數據:", JSON.stringify(data));
-      
-      // 有些版本 data 本身就是參數，有些則是在 data.parameter 裡
-      const params = data.parameter || data; 
+        // 強力兼容邏輯：如果 data.parameter 沒拿到，就直接從 data 拿
+        const p = data.parameter || data;
 
-      const task = createModLoaderTask(instance, {
-        mcVersion: String(params.mcVersion || ""),
-        loaderType: String(params.loaderType || ""),
-        loaderVersion: String(params.loaderVersion || "")
-      });
-      
-      return protocol.response(ctx, task.toObject());
+        const task = createModLoaderTask(instance, {
+            mcVersion: String(p.mcVersion || ""),
+            loaderType: String(p.loaderType || ""),
+            loaderVersion: String(p.loaderVersion || "")
+        });
+
+        // 調試日誌：如果這裡打印出空，說明面板端傳過來時就丟了
+        console.log(`[LazyCloud] 構建任務參數: V=${p.mcVersion}, T=${p.loaderType}, L=${p.loaderVersion}`);
+
+        return protocol.response(ctx, task.toObject());
     } catch (err: any) {
-      return protocol.error(ctx, "instance/asynchronous", { err: err.message });
+        return protocol.error(ctx, "instance/asynchronous", { err: err.message });
     }
 }
+  
   
   protocol.response(ctx, true);
 });
