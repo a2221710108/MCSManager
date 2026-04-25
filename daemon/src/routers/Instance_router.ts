@@ -440,23 +440,29 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
     }
   }
 
-  if (taskName === "modloader_install" && instance) {
-    // 安全檢查：務必檢查狀態
+  // 找到 Instance_router.ts 中處理 modloader_install 的部分
+if (taskName === "modloader_install" && instance) {
     if (instance.status() !== 0) return protocol.error(ctx, "instance/asynchronous", { err: "請先關閉伺服器" });
     if (instance.asynchronousTask) return protocol.error(ctx, "instance/asynchronous", { err: "該實例已有任務正在運行" });
 
     try {
+      // 【修改點】增加日誌，並確保從正確的位置獲取 parameter
+      console.log("[Debug] 接收到的原始數據:", JSON.stringify(data));
+      
+      // 有些版本 data 本身就是參數，有些則是在 data.parameter 裡
+      const params = data.parameter || data; 
+
       const task = createModLoaderTask(instance, {
-        mcVersion: String(parameter.mcVersion || ""),
-        loaderType: String(parameter.loaderType || ""),
-        loaderVersion: String(parameter.loaderVersion || "")
+        mcVersion: String(params.mcVersion || ""),
+        loaderType: String(params.loaderType || ""),
+        loaderVersion: String(params.loaderVersion || "")
       });
-      // 這裡一定要直接回傳，不要往下執行到 protocol.response(ctx, true)
+      
       return protocol.response(ctx, task.toObject());
     } catch (err: any) {
       return protocol.error(ctx, "instance/asynchronous", { err: err.message });
     }
-  }
+}
   
   protocol.response(ctx, true);
 });
