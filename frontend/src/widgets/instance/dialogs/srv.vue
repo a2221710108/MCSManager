@@ -146,7 +146,7 @@ defineExpose({ openDialog });
   >
     <div class="srv-manager-wrapper">
       <a-typography-paragraph type="secondary" class="desc-text">
-        {{ t("您可以自定義一個子域名，讓玩家無需輸入端口即可加入 Minecraft Java 伺服器。請輸入你被分配的端口。") }}
+        {{ t("您可以自定義一個子域名，讓玩家無需輸入端口即可加入 Minecraft Java 伺服器。請輸入您被分配的端口。") }}
       </a-typography-paragraph>
 
       <div class="config-card">
