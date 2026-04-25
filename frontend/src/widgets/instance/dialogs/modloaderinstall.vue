@@ -175,19 +175,18 @@ const handleCleanServer = async () => {
 /**
  * 提交安裝任務（強化數據傳遞版）
  */
-const handleInstall = async () => {
-  // 1. 數據校驗與脫殼 (防止 Proxy 影響)
-  const mcV = String(form.mcVersion || "").trim();
-  const lT = String(form.loaderType || "").trim();
-  const lV = String(form.loaderVersion || "").trim();
+  const handleInstall = async () => {
+  // 這裡要對齊後端 Task 類的鍵名
+  const payload = {
+    mcVersion: String(form.mcVersion).trim(),    // 不要用 mcV
+    loaderType: String(form.loaderType).trim(),   // 不要用 lT
+    loaderVersion: String(form.loaderVersion).trim() // 不要用 lV
+  };
 
-  if (!mcV || !lV) return message.warning("請先選擇完整的版本資訊");
+  console.log("[LazyCloud Debug] 正確的 Payload:", payload);
 
   confirmLoading.value = true;
   try {
-    // 打印 Debug 信息到瀏覽器控制台
-    console.log("[LazyCloud] 正在提交安裝請求:", { mcV, lT, lV });
-
     await installModLoader().execute({
       params: {
         daemonId: props.daemonId,
@@ -197,13 +196,10 @@ const handleInstall = async () => {
       data: {
         instanceUuid: props.instanceId,
         taskName: "modloader_install",
-        parameter: {
-          mcVersion: mcV,
-          loaderType: lT,
-          loaderVersion: lV
-        }
+        parameter: payload // 這裡傳遞正確的鍵名
       }
     });
+
     message.success("安裝任務已啟動，請觀察控制台日誌");
     isVisible.value = false;
   } catch (err: any) {
