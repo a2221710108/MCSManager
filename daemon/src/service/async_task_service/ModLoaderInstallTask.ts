@@ -63,7 +63,7 @@ SERVER_DIR: this.instance.config.cwd,
 
     this.process.on("close", (code: number) => {
       if (code === 0) {
-        this.instance.print("\n[SUCCESS] ModLoader 安裝完成！\n");
+        this.instance.print("\n[SUCCESS] ModLoader 安裝完成！請手動切換合適的 Java 版本。首次啟動需要同意 Minecraft EULA 協議。\n");
       } else {
         this.instance.print(`\n[ERROR] 安裝異常退出，代碼: ${code}\n`);
       }
