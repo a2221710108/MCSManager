@@ -85,14 +85,21 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
       target = `https://bmclapi2.bangbang93.com/forge/minecraft/${newMc}`;
       const data = await proxyGet(target);
       if (Array.isArray(data)) {
-        data.reverse().slice(0, 100).forEach((v: any) => {
+        // 1. 先進行自定義排序：將版本號從大到小排列
+        const sortedData = data.sort((a: any, b: any) => {
+          // 使用 localeCompare 並開啟 numeric 模式，這樣 "47.2.20" 就會大於 "47.2.2"
+          return b.version.localeCompare(a.version, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+        // 2. 取前 100 筆數據（此時已經是最新在前）
+        sortedData.slice(0, 30).forEach((v: any) => {
           tempVersions.push({ 
             version: v.version, 
             tag: v.category === "recommended" ? "⭐" : "" 
           });
         });
       }
-    } 
+    }
     else if (newType === "neoforge") {
       target = `https://bmclapi2.bangbang93.com/neoforge/list/${newMc}`;
       const data = await proxyGet(target);
