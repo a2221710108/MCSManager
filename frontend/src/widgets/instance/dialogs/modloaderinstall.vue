@@ -215,129 +215,162 @@ defineExpose({ openDialog });
 <template>
   <a-modal
     v-model:open="isVisible"
+    centered
     :title="null"
     :footer="null"
-    :width="500"
-    centered
+    :mask-closable="false"
     destroy-on-close
+    :width="520"
   >
-    <div class="install-wrapper">
-      <div class="header-section">
-        <cloud-download-outlined class="main-icon" />
-        <h3>自動化核心安裝</h3>
-        <p>為您的 LazyCloud 實例一鍵部署運行環境</p>
+    <div class="install-container">
+      <div class="header-banner">
+        <cloud-download-outlined class="banner-icon" />
+        <div class="banner-text">
+          <h3>自動化核心安裝</h3>
+          <p>由 LazyCloud 提供的自動化運行環境部署工具</p>
+        </div>
       </div>
 
-      <div class="step-box danger-box">
-        <div class="step-info">
-          <span class="step-num">1</span>
-          <div class="text">
-            <div class="t">環境初始化</div>
-            <div class="d">建議清空實例目錄以避免核心衝突</div>
+      <div class="step-card danger-zone">
+        <div class="card-header">
+          <div class="header-content">
+            <h4 class="step-title danger">
+              <delete-outlined /> 第一步：環境清理
+            </h4>
+            <p class="step-desc">為確保安裝過程無核心衝突，強烈建議清空目前的實例檔案。</p>
           </div>
-          <a-tag v-if="hasCleaned" color="success"><check-circle-outlined /> 已完成</a-tag>
+          <transition name="fade">
+            <a-tag v-if="hasCleaned" color="success" class="status-tag">
+              <check-circle-outlined /> 已完成
+            </a-tag>
+          </transition>
         </div>
-        <div class="step-ctrl">
-          <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned">我已備份地圖等重要數據</a-checkbox>
+
+        <div class="card-action">
+          <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned" class="custom-checkbox">
+            <span class="checkbox-text">我同意清空檔案（LazyCloud_backup 除外）</span>
+          </a-checkbox>
           <a-button 
             danger 
-            block 
+            block
             :loading="isCleaning"
             :disabled="!agreeClean || hasCleaned"
+            class="action-btn"
             @click="handleCleanServer"
           >
-            {{ hasCleaned ? '清理成功' : '立即清空伺服器' }}
+            {{ hasCleaned ? '伺服器已處於乾淨狀態' : '立即執行環境清空' }}
           </a-button>
         </div>
       </div>
 
-      <div class="step-box" :class="{ 'is-locked': !hasCleaned }">
-        <div class="step-info">
-          <span class="step-num">2</span>
-          <div class="text">
-            <div class="t">版本配置</div>
-            <div class="d">選擇遊戲版本與對應的加載器</div>
-          </div>
-        </div>
+      <div class="step-card config-zone" :class="{ 'is-locked': !hasCleaned }">
+        <h4 class="step-title">
+          <setting-outlined /> 第二步：運行環境配置
+        </h4>
+        <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與核心加載器。</p>
         
-        <div class="form-content">
-          <div class="f-item">
-            <label>Minecraft 版本</label>
+        <a-form layout="vertical" class="mt-4">
+          <a-form-item label="Minecraft 版本">
             <a-select v-model:value="form.mcVersion" show-search placeholder="請選擇版本">
+              <template #prefix><block-outlined /></template>
               <a-select-option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</a-select-option>
             </a-select>
-          </div>
+          </a-form-item>
 
-          <div class="f-group">
-            <div class="f-item">
-              <label>類型</label>
-              <a-select v-model:value="form.loaderType">
-                <a-select-option value="forge">Forge</a-select-option>
-                <a-select-option value="neoforge">NeoForge</a-select-option>
-                <a-select-option value="fabric">Fabric</a-select-option>
-              </a-select>
-            </div>
-            <div class="f-item" style="flex: 2">
-              <label>Loader 版本</label>
-              <a-select v-model:value="form.loaderVersion" :loading="loadingLoaders" placeholder="選擇版本">
-                <a-select-option v-for="l in loaderVersions" :key="l.version" :value="l.version">
-                  {{ l.version }} <small style="color: #888">{{ l.tag }}</small>
-                </a-select-option>
-              </a-select>
-            </div>
-          </div>
-        </div>
+          <a-row :gutter="12">
+            <a-col :span="10">
+              <a-form-item label="核心類型">
+                <a-select v-model:value="form.loaderType">
+                  <a-select-option value="forge">Forge</a-select-option>
+                  <a-select-option value="neoforge">NeoForge</a-select-option>
+                  <a-select-option value="fabric">Fabric</a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="14">
+              <a-form-item label="核心版本">
+                <a-select v-model:value="form.loaderVersion" :loading="loadingLoaders" placeholder="請先選擇遊戲版本">
+                  <a-select-option v-for="l in loaderVersions" :key="l.version" :value="l.version">
+                    {{ l.version }} <small style="color: #888">{{ l.tag }}</small>
+                  </a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+          </a-row>
 
-        <a-button 
-          type="primary" 
-          block 
-          size="large"
-          class="install-btn"
-          :loading="confirmLoading"
-          :disabled="!form.loaderVersion"
-          @click="handleInstall"
-        >
-          開始安裝
-        </a-button>
+          <div class="footer-actions">
+            <a-button @click="isVisible = false">取消</a-button>
+            <a-button 
+              type="primary" 
+              :loading="confirmLoading" 
+              :disabled="!hasCleaned || !form.loaderVersion"
+              class="submit-btn"
+              @click="handleInstall"
+            >
+              <template #icon><cloud-download-outlined /></template>
+              {{ hasCleaned ? '開始安裝任務' : '請先完成第一步' }}
+            </a-button>
+          </div>
+        </a-form>
       </div>
     </div>
   </a-modal>
 </template>
 
 <style scoped>
-.install-wrapper { padding: 10px; }
-.header-section { text-align: center; margin-bottom: 24px; }
-.main-icon { font-size: 48px; color: #1890ff; margin-bottom: 12px; }
-.header-section h3 { margin: 0; font-size: 20px; font-weight: 600; }
-.header-section p { color: #8c8c8c; font-size: 13px; }
+.install-container { padding: 4px 0; display: flex; flex-direction: column; gap: 16px; }
 
-.step-box {
-  background: #fbfbfb;
-  border: 1px solid #eee;
+/* 頂部橫幅 */
+.header-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 8px 8px 8px;
+}
+.banner-icon { font-size: 32px; color: #1677ff; }
+.banner-text h3 { margin: 0; font-weight: 600; font-size: 18px; }
+.banner-text p { margin: 0; font-size: 12px; color: #8c8c8c; }
+
+/* 通用卡片 */
+.step-card {
   border-radius: 12px;
   padding: 16px;
-  margin-bottom: 16px;
-  transition: all 0.3s;
+  border: 1px solid rgba(140, 140, 140, 0.15);
+  transition: all 0.3s ease;
 }
 
-.danger-box { border-left: 4px solid #ff4d4f; background: #fffcfc; }
-.is-locked { opacity: 0.4; pointer-events: none; filter: grayscale(1); }
+.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
 
-.step-info { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.step-num { 
-  width: 24px; height: 24px; background: #1890ff; color: #fff; 
-  border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-weight: bold; font-size: 12px;
+.step-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.step-info .text .t { font-weight: 600; font-size: 14px; }
-.step-info .text .d { font-size: 12px; color: #8c8c8c; }
 
-.step-ctrl { display: flex; flex-direction: column; gap: 10px; }
+.step-desc { font-size: 12px; opacity: 0.6; margin: 0; line-height: 1.5; }
 
-.form-content { display: flex; flex-direction: column; gap: 12px; }
-.f-group { display: flex; gap: 10px; }
-.f-item { display: flex; flex-direction: column; gap: 4px; }
-.f-item label { font-size: 12px; color: #555; }
+/* 危險區域樣式 */
+.danger-zone { background: rgba(255, 77, 79, 0.04); border-color: rgba(255, 77, 79, 0.15); }
+.danger-zone .danger { color: #ff4d4f; }
 
-.install-btn { margin-top: 20px; border-radius: 8px; font-weight: 600; }
+.card-action { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.checkbox-text { font-size: 12px; }
+
+/* 配置區域樣式 */
+.config-zone { background: rgba(22, 119, 255, 0.04); border-color: rgba(22, 119, 255, 0.15); }
+.config-zone.is-locked { opacity: 0.4; filter: grayscale(0.5); pointer-events: none; }
+
+.footer-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.submit-btn { min-width: 140px; font-weight: 500; border-radius: 6px; }
+
+.status-tag { border-radius: 6px; }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+:deep(.ant-form-item) { margin-bottom: 12px; }
+:deep(.ant-select-selector), :deep(.ant-input) { border-radius: 6px !important; }
 </style>
