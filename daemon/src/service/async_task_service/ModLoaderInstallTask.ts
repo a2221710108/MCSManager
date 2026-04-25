@@ -48,7 +48,7 @@ export class ModLoaderInstallTask extends AsyncTask {
   this.config.loaderType,     // 傳遞給腳本的 $2
   this.config.loaderVersion   // 傳遞給腳本的 $3
 ], {
-      detached: true,
+      cwd: path.dirname(scriptPath),
       env: {
         ...process.env,
         SERVER_DIR: this.instance.config.cwd,
