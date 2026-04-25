@@ -272,7 +272,7 @@ defineExpose({ openDialog });
         <a-form layout="vertical" class="mt-4">
           <a-form-item label="Minecraft 版本">
             <a-select v-model:value="form.mcVersion" show-search placeholder="請選擇版本">
-              <template #prefix><block-outlined /></template>
+              
               <a-select-option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</a-select-option>
             </a-select>
           </a-form-item>
