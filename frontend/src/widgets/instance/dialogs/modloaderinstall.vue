@@ -195,10 +195,8 @@ const handleCleanServer = async () => {
 // 修改 ModLoaderInstall.vue 中的 handleInstall
 const handleInstall = async () => {
   if (!form.loaderVersion) return message.warning("請先選擇版本");
-
   confirmLoading.value = true;
-    try {
-    // 呼叫定義好的 API
+  try {
     await installModLoader().execute({
       params: {
         daemonId: props.daemonId,
@@ -208,6 +206,7 @@ const handleInstall = async () => {
       data: {
         instanceUuid: props.instanceId,
         taskName: "modloader_install",
+        // 確保這裡的 key 和後端 router 讀取的一致
         parameter: {
           mcVersion: form.mcVersion,
           loaderType: form.loaderType,
@@ -215,15 +214,14 @@ const handleInstall = async () => {
         }
       }
     });
-
     message.success("安裝任務已啟動");
-    isVisible.value = false;
   } catch (err: any) {
     message.error("啟動失敗：" + (err.message || "未知錯誤"));
   } finally {
     confirmLoading.value = false;
   }
 };
+    
 
 defineExpose({ openDialog });
 </script>
