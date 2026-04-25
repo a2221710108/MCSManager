@@ -42,7 +42,12 @@ export class ModLoaderInstallTask extends AsyncTask {
     this.instance.print(`版本: ${this.config.mcVersion} - ${this.config.loaderVersion}\n`);
     this.instance.print("--------------------------------------------------\n");
 
-    this.process = spawn("bash", [scriptPath], {
+    this.process = spawn("bash", [
+  scriptPath,
+  this.config.mcVersion,      // 傳遞給腳本的 $1
+  this.config.loaderType,     // 傳遞給腳本的 $2
+  this.config.loaderVersion   // 傳遞給腳本的 $3
+], {
       detached: true,
       env: {
         ...process.env,
