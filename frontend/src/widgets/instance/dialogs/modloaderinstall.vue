@@ -85,7 +85,7 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
       target = `https://bmclapi2.bangbang93.com/forge/minecraft/${newMc}`;
       const data = await proxyGet(target);
       if (Array.isArray(data)) {
-        data.reverse().slice(0, 15).forEach((v: any) => {
+        data.reverse().slice(0, 100).forEach((v: any) => {
           tempVersions.push({ 
             version: v.version, 
             tag: v.category === "recommended" ? "⭐" : "" 
@@ -97,7 +97,7 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
       target = `https://bmclapi2.bangbang93.com/neoforge/list/${newMc}`;
       const data = await proxyGet(target);
       if (Array.isArray(data)) {
-        data.reverse().slice(0, 15).forEach((v: any) => {
+        data.reverse().slice(0, 30).forEach((v: any) => {
           const vStr = typeof v === 'string' ? v : (v.version || JSON.stringify(v));
           tempVersions.push({ version: vStr, tag: "" });
         });
@@ -107,10 +107,10 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
       target = `https://meta.fabricmc.net/v2/versions/loader/${newMc}`;
       const data = await proxyGet(target);
       if (Array.isArray(data)) {
-        data.slice(0, 10).forEach((v: any) => {
+        data.slice(0, 30).forEach((v: any) => {
           tempVersions.push({ 
             version: v.loader.version, 
-            tag: v.loader.stable ? "" : "[測試版]" 
+            tag: v.loader.stable ? "" : "[舊版]" 
           });
         });
       }
