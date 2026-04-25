@@ -9,6 +9,7 @@ import InstanceSubsystem from "../service/system_instance";
 // 在 Instance_router.ts 的頂部加入這行
 // 注意：如果你的檔案名稱是 CurseForgeInstallTask.ts，這裡結尾不要加 .ts
 import { createCurseForgeTask, CurseForgeInstallTask } from "../service/async_task_service/CurseForgeInstallTask";
+import { createModLoaderTask, ModLoaderInstallTask } from "../service/async_task_service/ModLoaderInstallTask";
 
 import { arrayUnique, toNumber } from "mcsmanager-common";
 import ProcessInfoCommand from "../entity/commands/process_info";
@@ -442,6 +443,19 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
   protocol.response(ctx, true);
 });
 
+  if (taskName === "modloader_install" && instance) {
+    try {
+        const task = createModLoaderTask(instance, {
+            mcVersion: String(parameter.mcVersion),
+            loaderType: String(parameter.loaderType),
+            loaderVersion: String(parameter.loaderVersion)
+        });
+        return protocol.response(ctx, task.toObject());
+    } catch (err: any) {
+        return protocol.error(ctx, "instance/asynchronous", { err: err.message });
+    }
+}
+
 // Terminate the execution of complex asynchronous tasks
 routerApp.on("instance/stop_asynchronous", (ctx, data) => {
   const instanceUuid = data.instanceUuid;
@@ -481,6 +495,7 @@ routerApp.on("instance/query_asynchronous", (ctx, data) => {
   const taskNameTypeMap: IJson<string> = {
     quick_install: QuickInstallTask.TYPE,
     curseforge_install: CurseForgeInstallTask.TYPE // <--- 新增這行
+    modloader_install: ModLoaderInstallTask.TYPE // <--- 新增這行
   };
   const type = String(taskNameTypeMap[taskName] || QuickInstallTask.TYPE);
   if (!taskId) {
