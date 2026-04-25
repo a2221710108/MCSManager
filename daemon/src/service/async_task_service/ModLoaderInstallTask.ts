@@ -51,11 +51,10 @@ export class ModLoaderInstallTask extends AsyncTask {
       cwd: path.dirname(scriptPath),
       env: {
         ...process.env,
-        SERVER_DIR: this.instance.config.cwd,
-        // 關鍵：將 Key 改為腳本頂部定義的名字
-        mcVersion: this.config.mcVersion,
-        loaderType: this.config.loaderType,
-        loaderVersion: this.config.loaderVersion
+SERVER_DIR: this.instance.config.cwd,
+    MC_VERSION: this.config.mcVersion,      // 改大寫
+    LOADER_TYPE: this.config.loaderType,    // 改大寫
+    LOADER_VERSION: this.config.loaderVersion
       }
     });
 
