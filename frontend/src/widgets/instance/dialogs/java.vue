@@ -29,7 +29,7 @@ const JAVA_VERSIONS = [
   { label: "Java 25", value: "25", script: "/home/steam/start_25_mc.sh", jarFile: "startmc.jar" },
   { label: "17 (Forge 1.17+)", value: "17F", script: "/home/steam/start_17_newforge.sh", jarFile: "run.sh" },
   { label: "21 (Forge 1.17+)", value: "21F", script: "/home/steam/start_21_newforge.sh", jarFile: "run.sh" },
-  { label: "25 (Forge 26.1+)", value: "25F", script: "/home/steam/start_25_newforge.sh", jarFile: "run.sh" },
+  { label: "25 (Forge 26.1+)", value: "25F", script: "/home/steam/start_25_newforge.sh", jarFile: "run.sh" }
 ];
 
 const open = ref(false);
