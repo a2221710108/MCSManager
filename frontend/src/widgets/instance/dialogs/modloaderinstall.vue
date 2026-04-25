@@ -226,8 +226,8 @@ defineExpose({ openDialog });
       <div class="header-banner">
         <cloud-download-outlined class="banner-icon" />
         <div class="banner-text">
-          <h3>自動化核心安裝</h3>
-          <p>由 LazyCloud 提供的自動化運行環境部署工具</p>
+          <h3>ModLoader 自動安裝</h3>
+          <p>如安裝過舊的 Minecraft 版本可能安裝失敗</p>
         </div>
       </div>
 
@@ -237,7 +237,7 @@ defineExpose({ openDialog });
             <h4 class="step-title danger">
               <delete-outlined /> 第一步：環境清理
             </h4>
-            <p class="step-desc">為確保安裝過程無核心衝突，強烈建議清空目前的實例檔案。</p>
+            <p class="step-desc">為確保安裝過程無衝突，需要清空目前的實例檔案。</p>
           </div>
           <transition name="fade">
             <a-tag v-if="hasCleaned" color="success" class="status-tag">
@@ -248,7 +248,7 @@ defineExpose({ openDialog });
 
         <div class="card-action">
           <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned" class="custom-checkbox">
-            <span class="checkbox-text">我同意清空檔案（LazyCloud_backup 除外）</span>
+            <span class="checkbox-text">我同意清空檔案</span>
           </a-checkbox>
           <a-button 
             danger 
@@ -265,9 +265,9 @@ defineExpose({ openDialog });
 
       <div class="step-card config-zone" :class="{ 'is-locked': !hasCleaned }">
         <h4 class="step-title">
-          <setting-outlined /> 第二步：運行環境配置
+          <setting-outlined /> 第二步：選擇 ModLoader
         </h4>
-        <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與核心加載器。</p>
+        <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與 ModLoader。</p>
         
         <a-form layout="vertical" class="mt-4">
           <a-form-item label="Minecraft 版本">
@@ -279,7 +279,7 @@ defineExpose({ openDialog });
 
           <a-row :gutter="12">
             <a-col :span="10">
-              <a-form-item label="核心類型">
+              <a-form-item label="ModLoader 類型">
                 <a-select v-model:value="form.loaderType">
                   <a-select-option value="forge">Forge</a-select-option>
                   <a-select-option value="neoforge">NeoForge</a-select-option>
@@ -288,7 +288,7 @@ defineExpose({ openDialog });
               </a-form-item>
             </a-col>
             <a-col :span="14">
-              <a-form-item label="核心版本">
+              <a-form-item label="ModLoader 版本">
                 <a-select v-model:value="form.loaderVersion" :loading="loadingLoaders" placeholder="請先選擇遊戲版本">
                   <a-select-option v-for="l in loaderVersions" :key="l.version" :value="l.version">
                     {{ l.version }} <small style="color: #888">{{ l.tag }}</small>
