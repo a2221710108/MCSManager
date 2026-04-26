@@ -244,7 +244,7 @@ defineExpose({ openDialog });
             <h4 class="step-title danger">
               <delete-outlined /> 第一步：清空伺服器
             </h4>
-            <p class="step-desc">為確保安裝過程無衝突，需要清空目前的實例檔案。</p>
+            <p class="step-desc">為確保安裝過程無衝突，需要清空目前的實例檔案</p>
           </div>
           <transition name="fade">
             <a-tag v-if="hasCleaned" color="success" class="status-tag">
@@ -274,7 +274,7 @@ defineExpose({ openDialog });
         <h4 class="step-title">
           <setting-outlined /> 第二步：選擇 ModLoader
         </h4>
-        <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與 ModLoader。</p>
+        <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與 ModLoader</p>
         
         <a-form layout="vertical" class="mt-4">
           <a-form-item label="Minecraft 版本">
