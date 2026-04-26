@@ -52,7 +52,7 @@ const handleCleanServer = async () => {
   Modal.confirm({
     title: t("確定要清空伺服器嗎？"),
     icon: createVNode(ExclamationCircleOutlined, { style: 'color: #ff4d4f' }),
-    content: t("這將刪除您的所有檔案，此操作不可撤銷！"),
+    content: t("這將刪除除本地備份外的所有檔案，請確認已備份！"),
     okText: t("確定清空"),
     okType: "danger",
     onOk: async () => {
@@ -84,7 +84,7 @@ const handleCleanServer = async () => {
           });
         }
         
-        message.success(t("伺服器已清空"));
+        message.success(t("已清空伺服器檔案"));
         hasCleaned.value = true;
       } catch (err: any) {
         message.error(t("清空失敗: ") + (err.message || "Unknown Error"));
@@ -151,7 +151,7 @@ defineExpose({ openDialog });
         <div class="card-header">
           <div class="header-content">
             <h4 class="step-title danger">
-              <delete-outlined /> {{ t('第一步：環境清理') }}
+              <delete-outlined /> {{ t('第一步：清空伺服器') }}
             </h4>
             <p class="step-desc">
   {{ t('請注意：為防止錯誤，建議安裝有 Server Pack 的 Modpack！ 如有疑問請閱讀') }}
@@ -175,7 +175,7 @@ defineExpose({ openDialog });
 
         <div class="card-action">
           <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned" class="custom-checkbox">
-            <span class="checkbox-text">{{ t('我同意清空所有檔案') }}</span>
+            <span class="checkbox-text">{{ t('我同意清空伺服器檔案') }}</span>
           </a-checkbox>
           <a-button 
             danger 
@@ -185,7 +185,7 @@ defineExpose({ openDialog });
             class="action-btn"
             @click="handleCleanServer"
           >
-            {{ hasCleaned ? t('伺服器已處於乾淨狀態') : t('立即執行環境清空') }}
+            {{ hasCleaned ? t('伺服器檔案已清空') : t('立即執行檔案清空') }}
           </a-button>
         </div>
       </div>
