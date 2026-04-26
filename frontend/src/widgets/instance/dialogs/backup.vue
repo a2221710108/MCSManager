@@ -85,7 +85,7 @@ const handleRestore = (file: any) => {
   Modal.confirm({
     title: t("確認還原備份？"),
     icon: createVNode(ExclamationCircleOutlined),
-    content: createVNode("div", { style: "color:red;" }, t("警告：這將刪除伺服器根目錄所有檔案，並還原此備份！")),
+    content: createVNode("div", { style: "color:red;" }, t("警告：這將刪除伺服器根目錄所有檔案，並還原此備份！如果備份檔案過大可能導致還原失敗，您可以在還原失敗後前往檔案管理手動解壓.tar檔案。")),
     okText: t("確認還原"),
     cancelText: t("取消"),
     okType: "danger",
