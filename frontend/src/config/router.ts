@@ -371,6 +371,11 @@ router.beforeEach((to, from, next) => {
     return next(to.meta.redirect as string);
   }
 
+    if (toRoutePath === "/login" && state.userInfo?.token) {
+    return next(isAdmin.value ? "/" : "/customer");
+  }
+
+
   if (
     toRoutePath.includes("_open_page") ||
     ["/shop", "/login", "/install", "/404"].includes(toRoutePath)
