@@ -94,7 +94,7 @@ const originRouterConfig: RouterConfig[] = [
       mainMenu: true,
       redirect: (user) => {
         if (user?.permission === ROLE.ADMIN) {
-          return "/instances";
+          return "/overview";
         }
         if (user?.permission && user.permission >= ROLE.USER) {
           return "/customer";
@@ -372,7 +372,7 @@ router.beforeEach((to, from, next) => {
   }
 
     if (toRoutePath === "/login" && state.userInfo?.token) {
-    return next(isAdmin.value ? "/" : "/customer");
+    return next("/customer");
   }
 
 
