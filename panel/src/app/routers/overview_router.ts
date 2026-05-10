@@ -88,7 +88,7 @@ router.get("/", permission({ level: ROLE.ADMIN, token: false }), async (ctx) => 
 // [Top-level Permission]
 // Get user operation logs
 router.get("/operation_logs", permission({ level: ROLE.ADMIN }), async (ctx) => {
-  const limit = +(ctx?.query?.limit || 20);
+  const limit = +(ctx?.query?.limit || 50);
 
   if (isNaN(limit)) return ctx.throw(400, "Invalid limit value. It must be a number.");
 
