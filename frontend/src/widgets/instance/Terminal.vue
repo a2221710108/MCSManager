@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from "vue";
+import { h, ref, computed, nextTick } from "vue";
 import CardPanel from "@/components/CardPanel.vue";
 import { openMarketDialog, openRenewalDialog } from "@/components/fc";
 import IconBtn from "@/components/IconBtn.vue";
