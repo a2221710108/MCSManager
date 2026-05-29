@@ -27,11 +27,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "open-ai"): void;
+  (e: "analyze-log", logText: string): void;   // 新增：日志分析事件
 }>();
 
 const { containerState } = useLayoutContainerStore();
 
-// --- 靜態日誌視圖狀態 ---
+// --- 静態日誌視圖狀態 ---
 const isStaticView = ref(false);
 const staticLogContent = ref("");
 const isLogLoading = ref(false);
@@ -128,6 +129,38 @@ const refreshPage = () => {
   window.location.reload();
 };
 
+// ---------- 新增：文字選取與懸浮按鈕 ----------
+const showFloatBtn = ref(false);
+const floatBtnPos = ref({ x: 0, y: 0 });
+const selectedText = ref("");
+
+const handleTextSelection = () => {
+  // 只在靜態視圖下運作
+  if (!isStaticView.value) return;
+  const selection = window.getSelection();
+  const text = selection?.toString().trim();
+  if (text && selection?.rangeCount) {
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    // 按鈕置於選取文字上方中央
+    floatBtnPos.value = {
+      x: rect.left + rect.width / 2 - 30,
+      y: rect.top - 35,
+    };
+    selectedText.value = text;
+    showFloatBtn.value = true;
+  } else {
+    showFloatBtn.value = false;
+  }
+};
+
+const handleAnalyze = () => {
+  emit("analyze-log", selectedText.value);
+  showFloatBtn.value = false;
+  window.getSelection()?.removeAllRanges();
+};
+// ------------------------------------------
+
 onMounted(async () => {
   try {
     if (instanceId && daemonId) {
@@ -208,6 +241,7 @@ onMounted(async () => {
           <template #prefix>
             <CodeOutlined style="font-size: 18px" />
           </template>
+          <!-- AI 按钮（指令生成）放在后缀中 -->
           <template #suffix>
             <a-button
               class="ai-suffix-btn"
@@ -224,10 +258,15 @@ onMounted(async () => {
         </a-input>
       </div>
     </div>
+    <!-- 靜態日誌視圖 -->
     <div v-if="isStaticView" class="static-log-view-wrapper">
       <div class="terminal-wrapper global-card-container-shadow">
         <a-spin :spinning="isLogLoading">
-          <div class="static-log-content" :style="{ height: props.height, minHeight: props.height }">
+          <div
+            class="static-log-content"
+            :style="{ height: props.height, minHeight: props.height }"
+            @mouseup="handleTextSelection"
+          >
             <pre v-if="staticLogContent">{{ staticLogContent }}</pre>
             <div v-else-if="!isLogLoading" class="flex-center flex-column empty-box">
               <InfoCircleOutlined style="font-size: 32px" />
@@ -236,10 +275,21 @@ onMounted(async () => {
           </div>
         </a-spin>
       </div>
+      <!-- 懸浮分析按鈕 -->
+      <div
+        v-if="showFloatBtn"
+        class="float-ai-btn"
+        :style="{ left: floatBtnPos.x + 'px', top: floatBtnPos.y + 'px' }"
+        @click.stop="handleAnalyze"
+      >
+        <RobotOutlined />
+        分析
+      </div>
       <div class="command-input" style="visibility: hidden">
         <a-input disabled />
       </div>
     </div>
+    <!-- 錯誤卡片 -->
     <div v-if="socketError" class="error-card">
       <div class="error-card-container">
         <a-typography-title :level="5">{{ $t("TXT_CODE_6929b0b2") }}</a-typography-title>
@@ -283,6 +333,7 @@ onMounted(async () => {
 </template>
 
 <style lang="scss" scoped>
+/* 原有样式完整保留 */
 .console-wrapper {
   position: relative;
   height: 100%;
@@ -431,7 +482,7 @@ onMounted(async () => {
   }
 }
 
-/* AI 按鈕樣式（放在輸入框 suffix 中） */
+/* AI 指令按鈕樣式（放在輸入框 suffix 中） */
 .ai-suffix-btn {
   background: transparent !important;
   border: none !important;
@@ -439,6 +490,26 @@ onMounted(async () => {
   color: var(--color-primary) !important;
   &:disabled {
     color: var(--color-text-disabled) !important;
+  }
+}
+
+/* 新增懸浮分析按鈕 */
+.float-ai-btn {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-primary);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  user-select: none;
+  &:hover {
+    background: var(--color-primary-hover);
   }
 }
 </style>
