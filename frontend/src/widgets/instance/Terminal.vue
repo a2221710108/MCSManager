@@ -367,7 +367,7 @@ const isConfirmVisible = ref(false);
 const aiResult = ref<AICommandResult | null>(null);
 
 // Cloudflare Worker 的地址，請換成你自己的
-const WORKER_URL = "https://your-worker.your-subdomain.workers.dev/api/parse-command";
+const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/";
 
 const parseCommand = async () => {
   const input = naturalLanguage.value.trim();
