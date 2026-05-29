@@ -376,8 +376,8 @@ const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
 // ⚠️ 請修改為你自己的 Cloudflare Worker 地址
-const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/api/parse-command";
-const ANALYZE_LOG_WORKER_URL = "https://your-log-analyzer.workers.dev/api/analyze-log"; // 改成你自己的
+const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
+const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log"; // 改成你自己的
 
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 
