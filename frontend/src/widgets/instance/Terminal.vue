@@ -79,7 +79,7 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 日誌過濾功能（原有）---
+// --- 日誌過濾功能 ---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
@@ -353,18 +353,13 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   ]);
 });
 
-// ===================== AI 自然语言轉指令功能 =====================
+// ===================== AI 自然語言指令轉換 =====================
 const showAiModal = ref(false);
 const nlInput = ref("");
 const isParsing = ref(false);
 const isExecuting = ref(false);
 const confirmVisible = ref(false);
-const aiResult = ref<{
-  success: boolean;
-  commands: string[];
-  explanation: string;
-  error?: string;
-} | null>(null);
+const aiResult = ref<{ success: boolean; commands: string[]; explanation: string; error?: string } | null>(null);
 
 interface OnlinePlayer {
   name: string;
@@ -373,21 +368,15 @@ interface OnlinePlayer {
 const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
-// 🔧 請修改為你的 Cloudflare Worker 實際地址
-const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/api/parse-command";
+const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/api/parse-command"; // 請改為自己的 Worker 位址
 
-// 從實例資訊中取得 MC 版本
-const mcVersion = computed(() => {
-  return instanceInfo.value?.info?.version || "未知";
-});
+const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 
-// ping 配置
 const pingConfig = computed(() => ({
   ip: instanceInfo.value?.config?.pingConfig?.ip || "",
   port: instanceInfo.value?.config?.pingConfig?.port || 25565
 }));
 
-// 取得線上玩家
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) {
     message.warning("未配置服务器 IP");
@@ -417,19 +406,16 @@ const fetchPlayers = async () => {
   }
 };
 
-// 點擊玩家名插入到輸入框
 const insertPlayerName = (name: string) => {
   nlInput.value += ` ${name} `;
 };
 
-// 打開 AI 窗口
 const openAiModal = () => {
   showAiModal.value = true;
   nlInput.value = "";
-  fetchPlayers(); // 自動加載玩家列表
+  fetchPlayers();
 };
 
-// 解析自然語言
 const parseCommand = async () => {
   const text = nlInput.value.trim();
   if (!text) return;
@@ -460,7 +446,6 @@ const parseCommand = async () => {
   }
 };
 
-// 執行指令
 const executeCommands = async () => {
   if (!aiResult.value?.commands?.length) return;
   isExecuting.value = true;
@@ -488,7 +473,7 @@ const cancelExecution = () => {
 </script>
 
 <template>
-  <!-- 內部終端視圖 (inner) -->
+  <!-- 內部終端視圖 -->
   <div v-if="innerTerminalType">
     <div class="mb-24">
       <BetweenMenus>
@@ -514,10 +499,7 @@ const cancelExecution = () => {
                 </a-tag>
               </span>
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
-              <span
-                v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1"
-                class="ml-16"
-              >
+              <span v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1" class="ml-16">
                 <a-tooltip>
                   <template #title>{{ t("TXT_CODE_4a37ec9c") }}</template>
                   <LaptopOutlined />
@@ -529,10 +511,7 @@ const cancelExecution = () => {
         </template>
         <template #right>
           <div v-if="!isPhone">
-            <template
-              v-for="item in [...quickOperations, ...instanceOperations]"
-              :key="item.title"
-            >
+            <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
               <a-button
                 v-if="item.noConfirm"
                 class="ml-8"
@@ -544,12 +523,7 @@ const cancelExecution = () => {
                 <component :is="item.icon" />
                 {{ item.title }}
               </a-button>
-              <a-popconfirm
-                v-else
-                :key="item.title"
-                :title="t('TXT_CODE_276756b2')"
-                @confirm="item.click"
-              >
+              <a-popconfirm v-else :key="item.title" :title="t('TXT_CODE_276756b2')" @confirm="item.click">
                 <a-button
                   class="ml-8"
                   :danger="item.type === 'danger'"
@@ -589,32 +563,36 @@ const cancelExecution = () => {
           <a-radio-button value="warn">WARN</a-radio-button>
           <a-radio-button value="error">ERROR</a-radio-button>
         </a-radio-group>
-        <!-- AI 按鈕：透明圓形 -->
-        <a-button
-          class="ai-trigger-btn"
-          shape="circle"
-          :disabled="!isRunning || !isConnect"
-          @click="openAiModal"
-        >
-          <template #icon><RobotOutlined /></template>
-        </a-button>
+        <!-- AI 按鈕已移至終端輸入框右側，此處不再放置 -->
       </div>
       <div class="status-right">
         <TerminalTags :tags="terminalTopTags" />
       </div>
     </div>
 
-    <TerminalCore
-      v-if="instanceId && daemonId"
-      ref="terminalCoreRef"
-      :use-terminal-hook="terminalHook"
-      :instance-id="instanceId"
-      :daemon-id="daemonId"
-      :height="card.height"
-    />
+    <!-- 終端容器，加入 AI 按鈕 -->
+    <div class="terminal-wrapper" style="position: relative;">
+      <TerminalCore
+        v-if="instanceId && daemonId"
+        ref="terminalCoreRef"
+        :use-terminal-hook="terminalHook"
+        :instance-id="instanceId"
+        :daemon-id="daemonId"
+        :height="card.height"
+      />
+      <!-- AI 開窗按鈕，懸浮於輸入框右側 -->
+      <a-button
+        class="ai-float-btn"
+        shape="circle"
+        :disabled="!isRunning || !isConnect"
+        @click="openAiModal"
+      >
+        <template #icon><RobotOutlined /></template>
+      </a-button>
+    </div>
   </div>
 
-  <!-- 外部卡片視圖 (非 inner) -->
+  <!-- 外部卡片視圖 -->
   <CardPanel v-else class="containerWrapper" style="height: 100%">
     <template #title>
       <CloudServerOutlined />
@@ -631,31 +609,33 @@ const cancelExecution = () => {
             <a-radio-button value="warn">WARN</a-radio-button>
             <a-radio-button value="error">ERROR</a-radio-button>
           </a-radio-group>
-          <a-button
-            class="ai-trigger-btn"
-            shape="circle"
-            :disabled="!isRunning || !isConnect"
-            @click="openAiModal"
-          >
-            <template #icon><RobotOutlined /></template>
-          </a-button>
         </div>
         <div class="status-right">
           <TerminalTags :tags="terminalTopTags" />
         </div>
       </div>
-      <TerminalCore
-        v-if="instanceId && daemonId"
-        ref="terminalCoreRef"
-        :use-terminal-hook="terminalHook"
-        :instance-id="instanceId"
-        :daemon-id="daemonId"
-        :height="card.height"
-      />
+      <div class="terminal-wrapper" style="position: relative;">
+        <TerminalCore
+          v-if="instanceId && daemonId"
+          ref="terminalCoreRef"
+          :use-terminal-hook="terminalHook"
+          :instance-id="instanceId"
+          :daemon-id="daemonId"
+          :height="card.height"
+        />
+        <a-button
+          class="ai-float-btn"
+          shape="circle"
+          :disabled="!isRunning || !isConnect"
+          @click="openAiModal"
+        >
+          <template #icon><RobotOutlined /></template>
+        </a-button>
+      </div>
     </template>
   </CardPanel>
 
-  <!-- AI 自然語言轉指令窗口（簡約風格） -->
+  <!-- AI 指令視窗 -->
   <a-modal
     v-model:open="showAiModal"
     title="自然语言转 Minecraft 指令"
@@ -664,13 +644,11 @@ const cancelExecution = () => {
     destroy-on-close
   >
     <div class="ai-modal-simple">
-      <!-- 版本提示 -->
       <div class="version-hint">
         <a-tag color="processing">Minecraft {{ mcVersion }}</a-tag>
         <span class="text-muted">AI 将根据此版本生成指令</span>
       </div>
 
-      <!-- 輸入區 -->
       <a-textarea
         v-model:value="nlInput"
         placeholder="描述你想执行的操作，例如：把 Tom 传送到我身边，再给他一把钻石剑"
@@ -680,7 +658,6 @@ const cancelExecution = () => {
         class="nl-textarea"
       />
 
-      <!-- 操作欄 -->
       <div class="action-bar">
         <a-button
           type="primary"
@@ -690,12 +667,12 @@ const cancelExecution = () => {
         >
           <SendOutlined /> 解析指令
         </a-button>
-        <a-button :loading="isLoadingPlayers" @click="fetchPlayers">
-          <ReloadOutlined /> 刷新玩家
+        <!-- 按玩家管理風格重構的刷新按鈕 -->
+        <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers">
+          <ReloadOutlined /> 重新整理
         </a-button>
       </div>
 
-      <!-- 線上玩家列表 -->
       <div class="player-section">
         <div class="section-title">
           <UserOutlined />
@@ -790,13 +767,20 @@ const cancelExecution = () => {
   align-items: center;
 }
 
-/* 新增 AI 按鈕樣式 (透明圓形) */
-.ai-trigger-btn {
+/* 終端容器與 AI 浮動按鈕 */
+.terminal-wrapper {
+  position: relative;
+  height: 100%;
+}
+.ai-float-btn {
+  position: absolute !important;
+  right: 12px;
+  bottom: 12px;
+  z-index: 10;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   color: var(--color-text-secondary);
-  margin-left: 8px;
   &:hover {
     color: var(--color-primary);
   }
@@ -859,11 +843,9 @@ const cancelExecution = () => {
         }
       }
     }
-    .ant-empty {
-      margin: 10px 0;
-    }
   }
 }
+
 .ml-16 { margin-left: 16px; }
 .ml-8 { margin-left: 8px; }
 .mb-10 { margin-bottom: 10px; }
