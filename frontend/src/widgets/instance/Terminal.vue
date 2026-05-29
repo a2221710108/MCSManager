@@ -372,7 +372,7 @@ const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
 // ⚠️ 請修改為你自己的 Cloudflare Worker 地址
-const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/api/parse-command";
+const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
 
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 
