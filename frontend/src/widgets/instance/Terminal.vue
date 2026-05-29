@@ -624,7 +624,7 @@ const parseCommand = async () => {
     </template>
   </CardPanel>
 
-  <!-- AI 自然語言轉換窗口（簡潔原生風格） -->
+  <!-- AI 自然語言轉換窗口（舒適佈局） -->
   <a-modal
     v-model:open="showAiModal"
     title="自然语言转 Minecraft 指令"
@@ -647,7 +647,7 @@ const parseCommand = async () => {
         allow-clear
       />
 
-      <!-- 操作按鈕 -->
+      <!-- 操作按鈕行 -->
       <div class="action-buttons">
         <a-button
           type="primary"
@@ -673,13 +673,13 @@ const parseCommand = async () => {
         @close="aiError = ''"
       />
 
-      <!-- AI 解析結果 -->
+      <!-- AI 解析結果區塊 -->
       <div v-if="aiCommands.length > 0" class="result-section">
         <div class="explanation-text">{{ aiExplanation }}</div>
         <div class="command-list">
           <div v-for="cmd in aiCommands" :key="cmd" class="command-item">
             <code>{{ cmd }}</code>
-            <a-button size="small" @click="handleSendCommand(cmd)" :disabled="!isConnect">
+            <a-button @click="handleSendCommand(cmd)" :disabled="!isConnect">
               <template #icon><SendOutlined /></template>
               发送
             </a-button>
@@ -687,11 +687,10 @@ const parseCommand = async () => {
         </div>
       </div>
 
-      <!-- 玩家列表 -->
+      <!-- 玩家列表區塊 -->
       <div class="player-section">
         <div class="player-header">
           <span><UserOutlined /> 在线玩家（点击名字快速插入）</span>
-          <!-- 刷新按钮已放在上方，此处可省略，保留空位 -->
         </div>
         <div v-if="onlinePlayers.length > 0" class="player-items">
           <div
@@ -763,11 +762,11 @@ const parseCommand = async () => {
   align-items: center;
 }
 
-/* AI 窗口容器 */
+/* AI 窗口容器 (加大間距) */
 .ai-modal-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .version-info {
@@ -787,44 +786,48 @@ const parseCommand = async () => {
   align-items: center;
 }
 
-/* 解析結果區塊 */
+/* 解析結果區塊 (增加內部間距) */
 .result-section {
   margin-top: 4px;
 }
 
 .explanation-text {
   color: var(--color-text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   font-size: 14px;
 }
 
 .command-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .command-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 
   code {
     background: #f5f5f5;
     border: 1px solid #d9d9d9;
-    padding: 4px 8px;
+    padding: 6px 12px;
     border-radius: 4px;
     flex: 1;
     font-size: 13px;
     color: #000;
     word-break: break-all;
   }
+
+  .ant-btn {
+    flex-shrink: 0; /* 防止按鈕壓縮 */
+  }
 }
 
-/* 玩家列表區塊 */
+/* 玩家列表區塊 (增加間距) */
 .player-section {
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .player-header {
