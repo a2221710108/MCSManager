@@ -67,7 +67,7 @@ const {
   isGlobalTerminal,
   isDockerMode,
   clearTerminal,
-  sendCommand,
+  sendCommand,   // 确保 useTerminal 暴露出该方法
   isConnect
 } = terminalHook;
 
@@ -79,7 +79,7 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 日誌過濾功能 ---
+// -------------------- 日誌過濾功能（原封不動）--------------------
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
@@ -140,7 +140,7 @@ const handleTabChange = async () => {
   }
 };
 
-// --- 原有實例操作邏輯 ---
+// -------------------- 實例操作邏輯（原封不動）--------------------
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 const toOpenInstance = async () => {
   clearTerminal();
@@ -368,7 +368,8 @@ interface OnlinePlayer {
 const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
-const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/api/parse-command"; // 請改為自己的 Worker 位址
+// ⚠️ 請修改為你自己的 Cloudflare Worker 地址
+const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
 
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 
@@ -473,7 +474,7 @@ const cancelExecution = () => {
 </script>
 
 <template>
-  <!-- 內部終端視圖 -->
+  <!-- 內部終端視圖 (innerTerminalType) -->
   <div v-if="innerTerminalType">
     <div class="mb-24">
       <BetweenMenus>
@@ -499,7 +500,10 @@ const cancelExecution = () => {
                 </a-tag>
               </span>
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
-              <span v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1" class="ml-16">
+              <span
+                v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1"
+                class="ml-16"
+              >
                 <a-tooltip>
                   <template #title>{{ t("TXT_CODE_4a37ec9c") }}</template>
                   <LaptopOutlined />
@@ -511,7 +515,10 @@ const cancelExecution = () => {
         </template>
         <template #right>
           <div v-if="!isPhone">
-            <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
+            <template
+              v-for="item in [...quickOperations, ...instanceOperations]"
+              :key="item.title"
+            >
               <a-button
                 v-if="item.noConfirm"
                 class="ml-8"
@@ -523,7 +530,12 @@ const cancelExecution = () => {
                 <component :is="item.icon" />
                 {{ item.title }}
               </a-button>
-              <a-popconfirm v-else :key="item.title" :title="t('TXT_CODE_276756b2')" @confirm="item.click">
+              <a-popconfirm
+                v-else
+                :key="item.title"
+                :title="t('TXT_CODE_276756b2')"
+                @confirm="item.click"
+              >
                 <a-button
                   class="ml-8"
                   :danger="item.type === 'danger'"
@@ -563,15 +575,15 @@ const cancelExecution = () => {
           <a-radio-button value="warn">WARN</a-radio-button>
           <a-radio-button value="error">ERROR</a-radio-button>
         </a-radio-group>
-        <!-- AI 按鈕已移至終端輸入框右側，此處不再放置 -->
+        <!-- AI 按鈕已移至 TerminalCore 容器內右側，此處不再放置 -->
       </div>
       <div class="status-right">
         <TerminalTags :tags="terminalTopTags" />
       </div>
     </div>
 
-    <!-- 終端容器，加入 AI 按鈕 -->
-    <div class="terminal-wrapper" style="position: relative;">
+    <!-- 終端容器 + AI 浮動按鈕 -->
+    <div class="terminal-wrapper">
       <TerminalCore
         v-if="instanceId && daemonId"
         ref="terminalCoreRef"
@@ -580,7 +592,6 @@ const cancelExecution = () => {
         :daemon-id="daemonId"
         :height="card.height"
       />
-      <!-- AI 開窗按鈕，懸浮於輸入框右側 -->
       <a-button
         class="ai-float-btn"
         shape="circle"
@@ -592,7 +603,7 @@ const cancelExecution = () => {
     </div>
   </div>
 
-  <!-- 外部卡片視圖 -->
+  <!-- 外部卡片視圖 (非 innerTerminalType) -->
   <CardPanel v-else class="containerWrapper" style="height: 100%">
     <template #title>
       <CloudServerOutlined />
@@ -614,7 +625,7 @@ const cancelExecution = () => {
           <TerminalTags :tags="terminalTopTags" />
         </div>
       </div>
-      <div class="terminal-wrapper" style="position: relative;">
+      <div class="terminal-wrapper">
         <TerminalCore
           v-if="instanceId && daemonId"
           ref="terminalCoreRef"
@@ -635,7 +646,7 @@ const cancelExecution = () => {
     </template>
   </CardPanel>
 
-  <!-- AI 指令視窗 -->
+  <!-- AI 自然語言轉換窗口 -->
   <a-modal
     v-model:open="showAiModal"
     title="自然语言转 Minecraft 指令"
@@ -644,11 +655,13 @@ const cancelExecution = () => {
     destroy-on-close
   >
     <div class="ai-modal-simple">
+      <!-- 版本提示 -->
       <div class="version-hint">
         <a-tag color="processing">Minecraft {{ mcVersion }}</a-tag>
         <span class="text-muted">AI 将根据此版本生成指令</span>
       </div>
 
+      <!-- 自然語言輸入框 -->
       <a-textarea
         v-model:value="nlInput"
         placeholder="描述你想执行的操作，例如：把 Tom 传送到我身边，再给他一把钻石剑"
@@ -658,6 +671,7 @@ const cancelExecution = () => {
         class="nl-textarea"
       />
 
+      <!-- 操作與刷新按鈕 -->
       <div class="action-bar">
         <a-button
           type="primary"
@@ -667,12 +681,12 @@ const cancelExecution = () => {
         >
           <SendOutlined /> 解析指令
         </a-button>
-        <!-- 按玩家管理風格重構的刷新按鈕 -->
         <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers">
           <ReloadOutlined /> 重新整理
         </a-button>
       </div>
 
+      <!-- 在線玩家列表（頭像+名字） -->
       <div class="player-section">
         <div class="section-title">
           <UserOutlined />
@@ -698,7 +712,7 @@ const cancelExecution = () => {
     </div>
   </a-modal>
 
-  <!-- 二次確認彈窗 -->
+  <!-- 二次確認執行彈窗 -->
   <a-modal
     v-model:open="confirmVisible"
     title="确认执行指令"
@@ -767,7 +781,7 @@ const cancelExecution = () => {
   align-items: center;
 }
 
-/* 終端容器與 AI 浮動按鈕 */
+/* 終端容器與 AI 浮動按鈕（優化定位與顏色） */
 .terminal-wrapper {
   position: relative;
   height: 100%;
@@ -775,21 +789,22 @@ const cancelExecution = () => {
 .ai-float-btn {
   position: absolute !important;
   right: 12px;
-  bottom: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 10;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  color: var(--color-text-secondary);
+  color: var(--color-primary) !important;   /* 預設藍色 */
   &:hover {
-    color: var(--color-primary);
+    color: var(--color-primary-hover) !important;
   }
   &:disabled {
-    color: var(--color-text-disabled);
+    color: var(--color-text-disabled) !important;
   }
 }
 
-/* AI 窗口簡約內部佈局 */
+/* AI 窗口內部簡約佈局 */
 .ai-modal-simple {
   .version-hint {
     display: flex;
