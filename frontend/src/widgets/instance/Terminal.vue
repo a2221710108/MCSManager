@@ -41,6 +41,7 @@ import {
   RobotOutlined,
   SendOutlined,
   UserOutlined,
+  ReloadOutlined
 } from "@ant-design/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
 import prettyBytes, { type Options as PrettyOptions } from "pretty-bytes";
@@ -78,7 +79,7 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 日志过滤功能（保留原有）---
+// --- 日誌過濾功能（原有）---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
@@ -139,7 +140,7 @@ const handleTabChange = async () => {
   }
 };
 
-// --- 原有的实例操作逻辑 ---
+// --- 原有實例操作邏輯 ---
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 const toOpenInstance = async () => {
   clearTerminal();
@@ -196,7 +197,98 @@ const quickOperations = computed(() =>
 );
 const instanceOperations = computed(() =>
   arrayFilter([
-    // ... 其他操作（保持原有，不再重复）
+    {
+      title: t("TXT_CODE_47dcfa5"),
+      icon: RedoOutlined,
+      type: "default",
+      noConfirm: false,
+      click: async () => {
+        try {
+          await restartInstance().execute({
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || ""
+            }
+          });
+        } catch (error: any) {
+          reportErrorMsg(error);
+        }
+      },
+      condition: () => isRunning.value
+    },
+    {
+      title: t("TXT_CODE_7b67813a"),
+      icon: CloseOutlined,
+      type: "danger",
+      class: "color-warning",
+      click: async () => {
+        try {
+          await killInstance().execute({
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || ""
+            }
+          });
+        } catch (error: any) {
+          reportErrorMsg(error);
+        }
+      },
+      condition: () => !isStopped.value
+    },
+    {
+      title: t("TXT_CODE_40ca4f2"),
+      type: "default",
+      icon: CloudDownloadOutlined,
+      click: async () => {
+        try {
+          clearTerminal();
+          await updateInstance().execute({
+            params: {
+              uuid: instanceId || "",
+              daemonId: daemonId || "",
+              task_name: "update"
+            },
+            data: {
+              time: new Date().getTime()
+            }
+          });
+        } catch (error: any) {
+          reportErrorMsg(error);
+        }
+      },
+      condition: () => isStopped.value && updateCmd.value
+    },
+    {
+      title: t("TXT_CODE_b19ed1dd"),
+      icon: InteractionOutlined,
+      noConfirm: true,
+      click: async () => {
+        try {
+          clearTerminal();
+          await openMarketDialog(daemonId ?? "", instanceId ?? "", {
+            autoInstall: true,
+            onlyDockerTemplate: isDockerMode.value
+          });
+        } catch (error: any) {}
+      },
+      props: {},
+      condition: () =>
+        isStopped.value && (state.settings.allowUsePreset || isAdmin.value) && !isGlobalTerminal.value
+    },
+    {
+      title: t("TXT_CODE_f77093c8"),
+      icon: MoneyCollectOutlined,
+      noConfirm: true,
+      click: async () => {
+        await openRenewalDialog(
+          instanceInfo.value?.instanceUuid ?? "",
+          daemonId ?? "",
+          instanceInfo.value?.config.category ?? 0
+        );
+      },
+      props: {},
+      condition: () => !!instanceInfo.value?.config?.category
+    }
   ])
 );
 const getInstanceName = computed(() => {
@@ -261,27 +353,41 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   ]);
 });
 
-// ============= AI 自然语言指令转换 =============
+// ===================== AI 自然语言轉指令功能 =====================
 const showAiModal = ref(false);
 const nlInput = ref("");
 const isParsing = ref(false);
 const isExecuting = ref(false);
 const confirmVisible = ref(false);
-const aiResult = ref<{ success: boolean; commands: string[]; explanation: string; error?: string } | null>(null);
-const onlinePlayers = ref<string[]>([]);
+const aiResult = ref<{
+  success: boolean;
+  commands: string[];
+  explanation: string;
+  error?: string;
+} | null>(null);
+
+interface OnlinePlayer {
+  name: string;
+  uuid?: string;
+}
+const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
+// 🔧 請修改為你的 Cloudflare Worker 實際地址
 const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/api/parse-command";
 
+// 從實例資訊中取得 MC 版本
 const mcVersion = computed(() => {
   return instanceInfo.value?.info?.version || "未知";
 });
 
+// ping 配置
 const pingConfig = computed(() => ({
   ip: instanceInfo.value?.config?.pingConfig?.ip || "",
   port: instanceInfo.value?.config?.pingConfig?.port || 25565
 }));
 
+// 取得線上玩家
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) {
     message.warning("未配置服务器 IP");
@@ -294,11 +400,14 @@ const fetchPlayers = async () => {
     );
     const data = await res.json();
     if (data.online && data.players?.list) {
-      onlinePlayers.value = data.players.list.map((p: any) => p.name_raw || p.name);
+      onlinePlayers.value = data.players.list.map((p: any) => ({
+        name: p.name_raw || p.name,
+        uuid: p.uuid
+      }));
     } else {
       onlinePlayers.value = [];
       if (!data.online) message.warning("服务器离线");
-      else message.info("服务器未公开玩家列表");
+      else if (data.players?.list?.length === 0) message.info("暂无在线玩家");
     }
   } catch (err) {
     console.error(err);
@@ -308,21 +417,24 @@ const fetchPlayers = async () => {
   }
 };
 
-const openAiModal = () => {
-  showAiModal.value = true;
-  nlInput.value = "";
-  fetchPlayers();
-};
-
+// 點擊玩家名插入到輸入框
 const insertPlayerName = (name: string) => {
   nlInput.value += ` ${name} `;
 };
 
+// 打開 AI 窗口
+const openAiModal = () => {
+  showAiModal.value = true;
+  nlInput.value = "";
+  fetchPlayers(); // 自動加載玩家列表
+};
+
+// 解析自然語言
 const parseCommand = async () => {
   const text = nlInput.value.trim();
   if (!text) return;
   if (!isRunning.value) {
-    message.warning("实例未运行");
+    message.warning("实例未运行，无法发送指令");
     return;
   }
   isParsing.value = true;
@@ -348,6 +460,7 @@ const parseCommand = async () => {
   }
 };
 
+// 執行指令
 const executeCommands = async () => {
   if (!aiResult.value?.commands?.length) return;
   isExecuting.value = true;
@@ -375,7 +488,7 @@ const cancelExecution = () => {
 </script>
 
 <template>
-  <!-- 内部终端视图 -->
+  <!-- 內部終端視圖 (inner) -->
   <div v-if="innerTerminalType">
     <div class="mb-24">
       <BetweenMenus>
@@ -401,7 +514,10 @@ const cancelExecution = () => {
                 </a-tag>
               </span>
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
-              <span v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1" class="ml-16">
+              <span
+                v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1"
+                class="ml-16"
+              >
                 <a-tooltip>
                   <template #title>{{ t("TXT_CODE_4a37ec9c") }}</template>
                   <LaptopOutlined />
@@ -412,15 +528,33 @@ const cancelExecution = () => {
           </div>
         </template>
         <template #right>
-          <!-- 原有操作按钮组 -->
           <div v-if="!isPhone">
-            <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
-              <a-button v-if="item.noConfirm" class="ml-8" :class="item.class ? item.class : ''" :danger="item.type === 'danger'" :disabled="isOpenInstanceLoading" @click="item.click">
+            <template
+              v-for="item in [...quickOperations, ...instanceOperations]"
+              :key="item.title"
+            >
+              <a-button
+                v-if="item.noConfirm"
+                class="ml-8"
+                :class="item.class ? item.class : ''"
+                :danger="item.type === 'danger'"
+                :disabled="isOpenInstanceLoading"
+                @click="item.click"
+              >
                 <component :is="item.icon" />
                 {{ item.title }}
               </a-button>
-              <a-popconfirm v-else :key="item.title" :title="t('TXT_CODE_276756b2')" @confirm="item.click">
-                <a-button class="ml-8" :danger="item.type === 'danger'" :class="item.class ? item.class : ''">
+              <a-popconfirm
+                v-else
+                :key="item.title"
+                :title="t('TXT_CODE_276756b2')"
+                @confirm="item.click"
+              >
+                <a-button
+                  class="ml-8"
+                  :danger="item.type === 'danger'"
+                  :class="item.class ? item.class : ''"
+                >
                   <component :is="item.icon" />
                   {{ item.title }}
                 </a-button>
@@ -430,7 +564,11 @@ const cancelExecution = () => {
           <a-dropdown v-else>
             <template #overlay>
               <a-menu>
-                <a-menu-item v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title" @click="item.click">
+                <a-menu-item
+                  v-for="item in [...quickOperations, ...instanceOperations]"
+                  :key="item.title"
+                  @click="item.click"
+                >
                   <component :is="item.icon" />
                   <span class="ml-8">{{ item.title }}</span>
                 </a-menu-item>
@@ -451,8 +589,13 @@ const cancelExecution = () => {
           <a-radio-button value="warn">WARN</a-radio-button>
           <a-radio-button value="error">ERROR</a-radio-button>
         </a-radio-group>
-        <!-- 简洁的 AI 按钮（圆形、无文字、透明背景） -->
-        <a-button class="ai-trigger-btn" shape="circle" :disabled="!isRunning || !isConnect" @click="openAiModal">
+        <!-- AI 按鈕：透明圓形 -->
+        <a-button
+          class="ai-trigger-btn"
+          shape="circle"
+          :disabled="!isRunning || !isConnect"
+          @click="openAiModal"
+        >
           <template #icon><RobotOutlined /></template>
         </a-button>
       </div>
@@ -471,14 +614,15 @@ const cancelExecution = () => {
     />
   </div>
 
-  <!-- 外部卡片视图 -->
+  <!-- 外部卡片視圖 (非 inner) -->
   <CardPanel v-else class="containerWrapper" style="height: 100%">
     <template #title>
       <CloudServerOutlined />
       <span class="ml-8"> {{ getInstanceName }} </span>
     </template>
-    <template #operator>
-    </template>
+
+    <template #operator> </template>
+
     <template #body>
       <div class="mb-6 status-bar-flex">
         <div class="status-left">
@@ -487,7 +631,12 @@ const cancelExecution = () => {
             <a-radio-button value="warn">WARN</a-radio-button>
             <a-radio-button value="error">ERROR</a-radio-button>
           </a-radio-group>
-          <a-button class="ai-trigger-btn" shape="circle" :disabled="!isRunning || !isConnect" @click="openAiModal">
+          <a-button
+            class="ai-trigger-btn"
+            shape="circle"
+            :disabled="!isRunning || !isConnect"
+            @click="openAiModal"
+          >
             <template #icon><RobotOutlined /></template>
           </a-button>
         </div>
@@ -506,68 +655,76 @@ const cancelExecution = () => {
     </template>
   </CardPanel>
 
-  <!-- AI 指令窗口（简约原生风格） -->
+  <!-- AI 自然語言轉指令窗口（簡約風格） -->
   <a-modal
     v-model:open="showAiModal"
-    title="自然语言转指令"
+    title="自然语言转 Minecraft 指令"
     :footer="null"
-    :width="600"
+    :width="620"
     destroy-on-close
   >
     <div class="ai-modal-simple">
       <!-- 版本提示 -->
-      <a-space class="mb-12" align="center">
-        <a-tag color="processing">MC {{ mcVersion }}</a-tag>
-        <span class="text-secondary">AI 将根据此版本生成指令</span>
-      </a-space>
+      <div class="version-hint">
+        <a-tag color="processing">Minecraft {{ mcVersion }}</a-tag>
+        <span class="text-muted">AI 将根据此版本生成指令</span>
+      </div>
 
-      <!-- 输入区域 -->
+      <!-- 輸入區 -->
       <a-textarea
         v-model:value="nlInput"
-        placeholder="描述你想执行的操作..."
+        placeholder="描述你想执行的操作，例如：把 Tom 传送到我身边，再给他一把钻石剑"
         :rows="3"
         :disabled="isParsing"
         allow-clear
+        class="nl-textarea"
       />
 
-      <!-- 操作按钮 -->
-      <div class="mt-8 flex-between">
+      <!-- 操作欄 -->
+      <div class="action-bar">
         <a-button
           type="primary"
           :loading="isParsing"
           :disabled="!nlInput.trim() || isParsing"
           @click="parseCommand"
         >
-          <SendOutlined /> 解析
+          <SendOutlined /> 解析指令
         </a-button>
+        <a-button :loading="isLoadingPlayers" @click="fetchPlayers">
+          <ReloadOutlined /> 刷新玩家
+        </a-button>
+      </div>
 
-        <!-- 玩家快速插入 -->
-        <a-popover title="在线玩家" trigger="click">
-          <template #content>
-            <div v-if="onlinePlayers.length > 0" class="player-tags-list">
-              <a-tag
-                v-for="player in onlinePlayers"
-                :key="player"
-                color="blue"
-                @click="insertPlayerName(player)"
-                class="clickable-tag"
-              >
-                <UserOutlined /> {{ player }}
-              </a-tag>
-            </div>
-            <a-empty v-else description="暂无玩家" />
-            <a-button size="small" type="link" :loading="isLoadingPlayers" @click="fetchPlayers">刷新列表</a-button>
-          </template>
-          <a-button><UserOutlined /> 插入玩家</a-button>
-        </a-popover>
+      <!-- 線上玩家列表 -->
+      <div class="player-section">
+        <div class="section-title">
+          <UserOutlined />
+          <span>在线玩家（点击名字快速插入）</span>
+        </div>
+        <div v-if="onlinePlayers.length > 0" class="player-list">
+          <div
+            v-for="player in onlinePlayers"
+            :key="player.uuid || player.name"
+            class="player-item"
+            @click="insertPlayerName(player.name)"
+          >
+            <a-avatar
+              :src="`https://minotar.net/avatar/${player.name}/32`"
+              :size="28"
+              shape="circle"
+            />
+            <span class="player-name">{{ player.name }}</span>
+          </div>
+        </div>
+        <a-empty v-else description="暂无在线玩家" :image-style="{ height: '40px' }" />
       </div>
     </div>
   </a-modal>
 
-  <!-- 二次确认弹窗 -->
+  <!-- 二次確認彈窗 -->
   <a-modal
     v-model:open="confirmVisible"
-    title="确认执行"
+    title="确认执行指令"
     :confirm-loading="isExecuting"
     @ok="executeCommands"
     @cancel="cancelExecution"
@@ -576,7 +733,7 @@ const cancelExecution = () => {
   >
     <div v-if="aiResult">
       <p><strong>解释：</strong>{{ aiResult.explanation || "无" }}</p>
-      <p><strong>指令：</strong></p>
+      <p><strong>指令预览：</strong></p>
       <ul>
         <li v-for="cmd in aiResult.commands" :key="cmd"><code>{{ cmd }}</code></li>
       </ul>
@@ -585,7 +742,7 @@ const cancelExecution = () => {
 </template>
 
 <style lang="scss" scoped>
-/* 原有样式完整保留 */
+/* 原有樣式完整保留 */
 .error-card {
   position: absolute;
   inset: 0;
@@ -633,12 +790,13 @@ const cancelExecution = () => {
   align-items: center;
 }
 
-/* 新增 AI 按钮样式：无背景、无边框、仅图标 */
+/* 新增 AI 按鈕樣式 (透明圓形) */
 .ai-trigger-btn {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   color: var(--color-text-secondary);
+  margin-left: 8px;
   &:hover {
     color: var(--color-primary);
   }
@@ -647,31 +805,70 @@ const cancelExecution = () => {
   }
 }
 
-/* AI 模态框内部简约布局 */
+/* AI 窗口簡約內部佈局 */
 .ai-modal-simple {
-  .mb-12 { margin-bottom: 12px; }
-  .mt-8 { margin-top: 8px; }
-  .text-secondary { color: var(--color-text-secondary); font-size: 12px; }
-  .flex-between {
+  .version-hint {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    .text-muted {
+      color: var(--color-text-secondary);
+      font-size: 13px;
+    }
+  }
+  .nl-textarea {
+    margin-bottom: 16px;
+  }
+  .action-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 20px;
   }
-  .player-tags-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-bottom: 8px;
-  }
-  .clickable-tag {
-    cursor: pointer;
-    &:hover {
-      opacity: 0.8;
+  .player-section {
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--color-text-secondary);
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .player-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      .player-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border: 1px solid var(--border-color-base);
+        border-radius: 6px;
+        background: var(--color-bg-container);
+        cursor: pointer;
+        transition: all 0.2s;
+        &:hover {
+          border-color: var(--color-primary);
+          background: var(--color-primary-bg);
+        }
+        .player-name {
+          font-size: 14px;
+          line-height: 28px;
+        }
+      }
+    }
+    .ant-empty {
+      margin: 10px 0;
     }
   }
 }
-
-.ml-12 {
-  margin-left: 12px;
-}
+.ml-16 { margin-left: 16px; }
+.ml-8 { margin-left: 8px; }
+.mb-10 { margin-bottom: 10px; }
+.mb-6 { margin-bottom: 6px; }
+.mb-24 { margin-bottom: 24px; }
+.ml-12 { margin-left: 12px; }
+.mr-12 { margin-right: 12px; }
 </style>
