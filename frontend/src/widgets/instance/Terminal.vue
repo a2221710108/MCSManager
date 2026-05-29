@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from "vue";
+import { ref, computed, nextTick } from "vue";
 import CardPanel from "@/components/CardPanel.vue";
 import { openMarketDialog, openRenewalDialog } from "@/components/fc";
 import TerminalCore from "@/components/TerminalCore.vue";
@@ -42,7 +42,6 @@ import {
   SendOutlined,
   UserOutlined,
   ReloadOutlined,
-  CheckOutlined
 } from "@ant-design/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
 import prettyBytes, { type Options as PrettyOptions } from "pretty-bytes";
@@ -427,7 +426,7 @@ const openAiModal = () => {
 const handleSendCommand = async (cmd: string) => {
   try {
     await sendCommand(cmd);
-    message.success(`已發送：${cmd}`);
+    message.success(`已发送：${cmd}`);
   } catch (err: any) {
     message.error("指令发送失败: " + err.message);
   }
@@ -625,29 +624,45 @@ const parseCommand = async () => {
     </template>
   </CardPanel>
 
-  <!-- AI 自然語言轉換窗口 (整合結果與發送) -->
+  <!-- AI 自然語言轉換窗口（原生 UI） -->
   <a-modal
     v-model:open="showAiModal"
     title="自然语言转 Minecraft 指令"
     :footer="null"
-    :width="620"
+    :width="580"
     destroy-on-close
   >
-    <div class="ai-modal-simple">
-      <!-- 版本提示 -->
-      <div class="version-hint">
+    <div class="ai-modal-container">
+      <!-- 版本信息 -->
+      <a-space class="version-info">
         <a-tag color="processing">Minecraft {{ mcVersion }}</a-tag>
         <span class="text-muted">AI 将根据此版本生成指令</span>
-      </div>
+      </a-space>
 
-      <a-textarea
+      <!-- 輸入框 -->
+      <a-input
         v-model:value="nlInput"
-        placeholder="描述你想执行的操作，例如：把 Tom 传送到我身边，再给他一把钻石剑"
-        :rows="3"
+        placeholder="描述你想执行的操作，例如：把玩家 Tom 传送到 0 64 0，再给他一个钻石剑"
         :disabled="isParsing"
         allow-clear
-        class="nl-textarea"
       />
+
+      <!-- 操作按鈕行 -->
+      <a-space :size="12" class="action-row">
+        <a-button
+          type="primary"
+          :loading="isParsing"
+          :disabled="!nlInput.trim() || isParsing"
+          @click="parseCommand"
+        >
+          <template #icon><SendOutlined /></template>
+          解析
+        </a-button>
+        <a-button :loading="isLoadingPlayers" @click="fetchPlayers">
+          <template #icon><ReloadOutlined /></template>
+          刷新玩家
+        </a-button>
+      </a-space>
 
       <!-- 錯誤提示 -->
       <a-alert
@@ -656,68 +671,74 @@ const parseCommand = async () => {
         :message="aiError"
         show-icon
         closable
-        class="error-alert"
         @close="aiError = ''"
       />
 
-      <!-- AI 回傳的指令與解釋 (直接顯示在下方) -->
-      <div v-if="aiCommands.length > 0" class="ai-result-section">
-        <div class="explanation-box">
-          <strong>解釋：</strong>{{ aiExplanation }}
-        </div>
-        <div class="command-list">
-          <div v-for="cmd in aiCommands" :key="cmd" class="command-item">
-            <code class="command-text">{{ cmd }}</code>
-            <a-button
-              type="primary"
-              size="small"
-              :disabled="!isConnect"
-              @click="handleSendCommand(cmd)"
-            >
-              <SendOutlined /> 發送
-            </a-button>
-          </div>
-        </div>
-      </div>
+      <!-- AI 解析結果卡片 -->
+      <a-card
+        v-if="aiCommands.length > 0"
+        size="small"
+        title="AI 解析结果"
+        class="result-card"
+      >
+        <template #extra>
+          <a-tag color="blue">{{ aiCommands.length }} 条指令</a-tag>
+        </template>
 
-      <!-- 操作欄 (解析按鈕 + 玩家刷新) -->
-      <div class="action-bar">
-        <a-button
-          type="primary"
-          :loading="isParsing"
-          :disabled="!nlInput.trim() || isParsing"
-          @click="parseCommand"
+        <a-typography-paragraph type="secondary">
+          {{ aiExplanation }}
+        </a-typography-paragraph>
+
+        <a-list :data-source="aiCommands" :split="false" size="small">
+          <template #renderItem="{ item }">
+            <a-list-item>
+              <div class="command-item">
+                <code class="command-code">{{ item }}</code>
+                <a-button
+                  type="link"
+                  size="small"
+                  :disabled="!isConnect"
+                  @click="handleSendCommand(item)"
+                >
+                  <template #icon><SendOutlined /></template>
+                  执行
+                </a-button>
+              </div>
+            </a-list-item>
+          </template>
+        </a-list>
+      </a-card>
+
+      <!-- 線上玩家卡片 -->
+      <a-card size="small" title="在线玩家" class="player-card">
+        <template #extra>
+          <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers">
+            <ReloadOutlined />
+          </a-button>
+        </template>
+
+        <a-list
+          v-if="onlinePlayers.length > 0"
+          :data-source="onlinePlayers"
+          :grid="{ gutter: 8, column: 3 }"
+          :split="false"
         >
-          <SendOutlined /> 解析指令
-        </a-button>
-        <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers">
-          <ReloadOutlined /> 重新整理
-        </a-button>
-      </div>
-
-      <!-- 在線玩家列表 -->
-      <div class="player-section">
-        <div class="section-title">
-          <UserOutlined />
-          <span>在线玩家（点击名字快速插入）</span>
-        </div>
-        <div v-if="onlinePlayers.length > 0" class="player-list">
-          <div
-            v-for="player in onlinePlayers"
-            :key="player.uuid || player.name"
-            class="player-item"
-            @click="insertPlayerName(player.name)"
-          >
-            <a-avatar
-              :src="`https://minotar.net/avatar/${player.name}/32`"
-              :size="28"
-              shape="circle"
-            />
-            <span class="player-name">{{ player.name }}</span>
-          </div>
-        </div>
+          <template #renderItem="{ item: player }">
+            <a-list-item>
+              <a-button type="text" block @click="insertPlayerName(player.name)">
+                <a-avatar
+                  :src="`https://minotar.net/avatar/${player.name}/32`"
+                  :size="20"
+                  shape="circle"
+                  class="player-avatar"
+                />
+                {{ player.name }}
+              </a-button>
+            </a-list-item>
+          </template>
+        </a-list>
         <a-empty v-else description="暂无在线玩家" :image-style="{ height: '40px' }" />
-      </div>
+      </a-card>
     </div>
   </a-modal>
 </template>
@@ -771,100 +792,74 @@ const parseCommand = async () => {
   align-items: center;
 }
 
-/* AI 窗口簡約內部佈局 */
-.ai-modal-simple {
-  .version-hint {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-    .text-muted {
-      color: var(--color-text-secondary);
-      font-size: 13px;
-    }
+/* AI 視窗容器 */
+.ai-modal-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.version-info {
+  display: flex;
+  align-items: center;
+}
+
+.text-muted {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.action-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* 結果卡片 */
+.result-card {
+  :deep(.ant-card-head) {
+    min-height: 36px;
+    padding: 0 12px;
   }
-  .nl-textarea {
-    margin-bottom: 16px;
-  }
-  .error-alert {
-    margin-bottom: 16px;
-  }
-  .action-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 16px;
-    margin-bottom: 20px;
-  }
-  .player-section {
-    .section-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--color-text-secondary);
-      font-size: 13px;
-      margin-bottom: 12px;
-    }
-    .player-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      .player-item {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 12px;
-        border: 1px solid var(--border-color-base);
-        border-radius: 6px;
-        background: var(--color-bg-container);
-        cursor: pointer;
-        transition: all 0.2s;
-        &:hover {
-          border-color: var(--color-primary);
-          background: var(--color-primary-bg);
-        }
-        .player-name {
-          font-size: 14px;
-          line-height: 28px;
-        }
-      }
-    }
-  }
-  /* 結果展示區 */
-  .ai-result-section {
-    margin-top: 16px;
-    border: 1px solid var(--border-color-base);
-    border-radius: 6px;
+  :deep(.ant-card-body) {
     padding: 12px;
-    background: var(--color-bg-container);
-    .explanation-box {
-      margin-bottom: 12px;
-      color: var(--color-text-secondary);
-      font-size: 14px;
-    }
-    .command-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .command-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    .command-text {
-      background: #1e1e1e;
-      color: #d4d4d4;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 13px;
-      flex: 1;
-      word-break: break-all;
-    }
   }
 }
 
+.command-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+
+.command-code {
+  background: #f5f5f5;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 13px;
+  flex: 1;
+  word-break: break-all;
+  color: #000;
+}
+
+/* 玩家卡片 */
+.player-card {
+  :deep(.ant-card-head) {
+    min-height: 36px;
+    padding: 0 12px;
+  }
+  :deep(.ant-card-body) {
+    padding: 8px;
+  }
+}
+
+.player-avatar {
+  margin-right: 6px;
+}
+
+/* 通用工具類 */
 .ml-16 { margin-left: 16px; }
 .ml-8 { margin-left: 8px; }
 .mb-10 { margin-bottom: 10px; }
