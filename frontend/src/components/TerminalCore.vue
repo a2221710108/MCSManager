@@ -5,7 +5,13 @@ import { useXhrPollError } from "@/hooks/useXhrPollError";
 import { t } from "@/lang/i18n";
 import { getInstanceOutputLog } from "@/services/apis/instance";
 import { useLayoutContainerStore } from "@/stores/useLayoutContainerStore";
-import { CodeOutlined, DeleteOutlined, LoadingOutlined, InfoCircleOutlined } from "@ant-design/icons-vue";
+import {
+  CodeOutlined,
+  DeleteOutlined,
+  LoadingOutlined,
+  InfoCircleOutlined,
+  RobotOutlined
+} from "@ant-design/icons-vue";
 import { Terminal } from "@xterm/xterm";
 import { message } from "ant-design-vue";
 import { onMounted, ref } from "vue";
@@ -19,9 +25,13 @@ const props = defineProps<{
   useTerminalHook: UseTerminalHook;
 }>();
 
+const emit = defineEmits<{
+  (e: "open-ai"): void;
+}>();
+
 const { containerState } = useLayoutContainerStore();
 
-// --- 新增：靜態日誌視圖狀態 ---
+// --- 靜態日誌視圖狀態 ---
 const isStaticView = ref(false);
 const staticLogContent = ref("");
 const isLogLoading = ref(false);
@@ -48,11 +58,9 @@ const {
 
 const instanceId = props.instanceId;
 const daemonId = props.daemonId;
-
 const terminalDomId = `terminal-window-${getRandomId()}`;
 const socketError = ref<Error>();
 const { isXhrPollError, xhrPollErrorReason } = useXhrPollError(socketError);
-
 let term: Terminal | undefined;
 let inputRef = ref<HTMLElement | null>(null);
 
@@ -83,7 +91,6 @@ const showLogView = (content: string, loading: boolean) => {
   staticLogContent.value = content;
   isLogLoading.value = loading;
 };
-
 const showDefaultView = () => {
   isStaticView.value = false;
 };
@@ -96,21 +103,17 @@ defineExpose({
 events.on("opened", () => {
   message.success(t("TXT_CODE_e13abbb1"));
 });
-
 events.on("stopped", () => {
   message.success(t("TXT_CODE_efb6d377"));
 });
-
 events.on("error", (error: Error) => {
   socketError.value = error;
 });
-
 events.once("detail", async () => {
   try {
     const { value } = await getInstanceOutputLog().execute({
       params: { uuid: instanceId || "", daemonId: daemonId || "" }
     });
-
     if (value) {
       if (state.value?.config?.terminalOption?.haveColor) {
         term?.write(encodeConsoleColor(value));
@@ -131,17 +134,15 @@ onMounted(async () => {
       await setUpTerminal({ instanceId, daemonId });
     }
     term = await initTerminal();
-
     if (term) {
       term.parser.registerOscHandler(11, () => true);
       term.parser.registerOscHandler(10, () => true);
-
       const core = (term as any)._core;
       if (core && core.coreService) {
         const originalTriggerData = core.coreService.triggerDataEvent.bind(core.coreService);
         core.coreService.triggerDataEvent = (data: string) => {
-          if (data.includes('\x1b[') && data.endsWith('R')) {
-            return; 
+          if (data.includes("\x1b[") && data.endsWith("R")) {
+            return;
           }
           originalTriggerData(data);
         };
@@ -207,27 +208,38 @@ onMounted(async () => {
           <template #prefix>
             <CodeOutlined style="font-size: 18px" />
           </template>
+          <template #suffix>
+            <a-button
+              class="ai-suffix-btn"
+              shape="circle"
+              size="small"
+              :disabled="!isConnect"
+              @click.stop="emit('open-ai')"
+            >
+              <template #icon>
+                <RobotOutlined />
+              </template>
+            </a-button>
+          </template>
         </a-input>
       </div>
     </div>
-
     <div v-if="isStaticView" class="static-log-view-wrapper">
       <div class="terminal-wrapper global-card-container-shadow">
         <a-spin :spinning="isLogLoading">
           <div class="static-log-content" :style="{ height: props.height, minHeight: props.height }">
             <pre v-if="staticLogContent">{{ staticLogContent }}</pre>
             <div v-else-if="!isLogLoading" class="flex-center flex-column empty-box">
-              <InfoCircleOutlined style="font-size: 32px;" />
+              <InfoCircleOutlined style="font-size: 32px" />
               <p class="mt-10">{{ t("暫無相關信息") }}</p>
             </div>
           </div>
         </a-spin>
       </div>
-      <div class="command-input" style="visibility: hidden;">
+      <div class="command-input" style="visibility: hidden">
         <a-input disabled />
       </div>
     </div>
-
     <div v-if="socketError" class="error-card">
       <div class="error-card-container">
         <a-typography-title :level="5">{{ $t("TXT_CODE_6929b0b2") }}</a-typography-title>
@@ -239,7 +251,7 @@ onMounted(async () => {
         </div>
         <a-typography-title :level="5">{{ $t("TXT_CODE_9c95b60f") }}</a-typography-title>
         <a-typography-paragraph>
-          <pre style="font-size: 12px"><code>{{ socketError?.message||"" }}</code></pre>
+          <pre style="font-size: 12px"><code>{{ socketError?.message || "" }}</code></pre>
           <div v-if="isXhrPollError" style="font-size: 12px">
             <span> {{ xhrPollErrorReason }}</span>
           </div>
@@ -271,20 +283,16 @@ onMounted(async () => {
 </template>
 
 <style lang="scss" scoped>
-/* 完全沿用原版數值，僅針對多視圖進行結構優化 */
-
 .console-wrapper {
   position: relative;
   height: 100%;
   width: 100%;
-
-  /* 確保切換視圖時佈局穩定 */
-  .realtime-terminal-container, .static-log-view-wrapper {
+  .realtime-terminal-container,
+  .static-log-view-wrapper {
     display: flex;
     flex-direction: column;
     width: 100%;
   }
-
   .terminal-loading {
     z-index: 12;
     position: absolute;
@@ -292,8 +300,6 @@ onMounted(async () => {
     left: 50%;
     transform: translate(-50%, -50%);
   }
-
-  /* 原版按鈕組樣式 */
   .terminal-button-group {
     z-index: 11;
     margin-right: 20px;
@@ -301,7 +307,10 @@ onMounted(async () => {
     padding-left: 50px;
     border-radius: 6px;
     color: #fff;
-    &:hover ul { transition: all 1s; opacity: 0.8; }
+    &:hover ul {
+      transition: all 1s;
+      opacity: 0.8;
+    }
     ul {
       display: flex;
       opacity: 0;
@@ -312,29 +321,26 @@ onMounted(async () => {
         margin-left: 5px;
         border-radius: 6px;
         font-size: 20px;
-        &:hover { background-color: #3e3e3e; }
+        &:hover {
+          background-color: #3e3e3e;
+        }
       }
     }
   }
-
-  /* 原版終端包裝樣式 */
   .terminal-wrapper {
     border: 1px solid var(--card-border-color);
     position: relative;
     background-color: #1e1e1e;
-    padding: 8px; /* 原版 padding */
+    padding: 8px;
     border-radius: 6px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    margin-bottom: 12px; /* 原版間距 */
-
+    margin-bottom: 12px;
     .terminal-container {
       height: 100%;
     }
   }
-
-  /* 靜態日誌內容區：使用與終端一致的樣式 */
   .static-log-content {
     overflow-y: auto;
     padding: 4px 8px;
@@ -344,25 +350,26 @@ onMounted(async () => {
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-all;
-    
     pre {
       margin: 0;
       color: inherit;
       background: transparent;
       border: none;
     }
-
-    /* 滾動條美化 */
-    &::-webkit-scrollbar { width: 8px; }
-    &::-webkit-scrollbar-track { background: #1e1e1e; }
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+    &::-webkit-scrollbar-track {
+      background: #1e1e1e;
+    }
     &::-webkit-scrollbar-thumb {
       background: #333;
       border-radius: 4px;
-      &:hover { background: #444; }
+      &:hover {
+        background: #444;
+      }
     }
   }
-
-  /* 原版指令輸入框樣式 */
   .command-input {
     position: relative;
     .history {
@@ -383,18 +390,28 @@ onMounted(async () => {
           cursor: pointer;
         }
       }
-      &::-webkit-scrollbar { width: 0 !important; height: 0 !important; }
+      &::-webkit-scrollbar {
+        width: 0 !important;
+        height: 0 !important;
+      }
     }
   }
 }
-
-/* 輔助樣式 */
-.flex-center { display: flex; align-items: center; justify-content: center; }
-.flex-column { flex-direction: column; }
-.empty-box { height: 100%; opacity: 0.4; }
-.mt-10 { margin-top: 10px; }
-
-/* 錯誤卡片完全保留原版 */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.flex-column {
+  flex-direction: column;
+}
+.empty-box {
+  height: 100%;
+  opacity: 0.4;
+}
+.mt-10 {
+  margin-top: 10px;
+}
 .error-card {
   position: absolute;
   inset: 0;
@@ -411,6 +428,17 @@ onMounted(async () => {
     border-radius: 4px;
     padding: 12px;
     box-shadow: 0px 0px 2px var(--color-gray-7);
+  }
+}
+
+/* AI 按鈕樣式（放在輸入框 suffix 中） */
+.ai-suffix-btn {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--color-primary) !important;
+  &:disabled {
+    color: var(--color-text-disabled) !important;
   }
 }
 </style>
