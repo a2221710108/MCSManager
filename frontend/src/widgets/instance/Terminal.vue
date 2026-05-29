@@ -693,93 +693,123 @@ const parseCommand = async () => {
     destroy-on-close
   >
     <div class="ai-modal-container">
-      <!-- 版本信息 (僅指令模式) -->
-      <div v-if="aiMode === 'command'" class="version-info">
-        <a-tag color="processing">Minecraft {{ mcVersion }}</a-tag>
-        <span class="text-muted">AI 将根据此版本生成指令</span>
-      </div>
-
-      <!-- 輸入框 (兩種模式皆有) -->
-      <a-input
-        v-model:value="nlInput"
-        :placeholder="aiMode === 'command' ? '描述你想执行的操作...' : '输入日志内容再次分析'"
-        :disabled="isParsing"
-        allow-clear
-      />
-
-      <!-- 操作按鈕行 -->
-      <div class="action-buttons">
-        <a-button
-          type="primary"
-          :loading="isParsing"
-          :disabled="!nlInput.trim() || isParsing"
-          @click="aiMode === 'command' ? parseCommand() : analyzeLog(nlInput)"
-        >
-          <template #icon><SendOutlined /></template>
-          {{ aiMode === 'command' ? '解析' : '分析' }}
-        </a-button>
-        <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers">
-          <ReloadOutlined /> 重新整理
-        </a-button>
-      </div>
-
-      <!-- 錯誤提示 -->
-      <a-alert
-        v-if="aiError"
-        type="error"
-        :message="aiError"
-        show-icon
-        closable
-        @close="aiError = ''"
-      />
-
-      <!-- 指令模式结果展示 -->
-      <div v-if="aiMode === 'command' && aiCommands.length > 0" class="result-section">
-        <div class="explanation-text">{{ aiExplanation }}</div>
-        <div class="command-list">
-          <div v-for="cmd in aiCommands" :key="cmd" class="command-item">
-            <code>{{ cmd }}</code>
-            <a-button @click="handleSendCommand(cmd)" :disabled="!isConnect">
-              <template #icon><SendOutlined /></template>
-              发送
-            </a-button>
-          </div>
+      <!-- 指令模式：完整 UI -->
+      <template v-if="aiMode === 'command'">
+        <!-- 版本信息 -->
+        <div class="version-info">
+          <a-tag color="processing">Minecraft {{ mcVersion }}</a-tag>
+          <span class="text-muted">AI 将根据此版本生成指令</span>
         </div>
-      </div>
 
-      <!-- 分析模式结果展示 -->
-      <div v-if="aiMode === 'analyze_log' && (logAnalysis || logSuggestions.length > 0)" class="result-section">
-        <div class="log-analysis-text">{{ logAnalysis }}</div>
-        <div v-if="logSuggestions.length > 0" class="command-list" style="margin-top: 12px">
-          <div class="section-subtitle">建议指令：</div>
-          <div v-for="cmd in logSuggestions" :key="cmd" class="command-item">
-            <code>{{ cmd }}</code>
-            <a-button @click="handleSendSuggestion(cmd)" :disabled="!isConnect">
-              <template #icon><SendOutlined /></template>
-              发送
-            </a-button>
-          </div>
-        </div>
-      </div>
+        <!-- 輸入框 -->
+        <a-input
+          v-model:value="nlInput"
+          placeholder="描述你想执行的操作，例如：把玩家 Tom 传送到 0 64 0，再给他一个钻石剑"
+          :disabled="isParsing"
+          allow-clear
+        />
 
-      <!-- 玩家列表 -->
-      <div class="player-section">
-        <div class="player-header">
-          <span><UserOutlined /> 在线玩家（点击名字快速插入）</span>
-        </div>
-        <div v-if="onlinePlayers.length > 0" class="player-items">
-          <div
-            v-for="player in onlinePlayers"
-            :key="player.uuid || player.name"
-            class="player-item"
-            @click="insertPlayerName(player.name)"
+        <!-- 操作按鈕行 -->
+        <div class="action-buttons">
+          <a-button
+            type="primary"
+            :loading="isParsing"
+            :disabled="!nlInput.trim() || isParsing"
+            @click="parseCommand"
           >
-            <a-avatar :src="`https://minotar.net/avatar/${player.name}/32`" :size="28" shape="circle" />
-            <span>{{ player.name }}</span>
+            <template #icon><SendOutlined /></template>
+            解析
+          </a-button>
+          <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers">
+            <ReloadOutlined /> 重新整理
+          </a-button>
+        </div>
+
+        <!-- 錯誤提示 -->
+        <a-alert
+          v-if="aiError"
+          type="error"
+          :message="aiError"
+          show-icon
+          closable
+          @close="aiError = ''"
+        />
+
+        <!-- 指令結果 -->
+        <div v-if="aiCommands.length > 0" class="result-section">
+          <div class="explanation-text">{{ aiExplanation }}</div>
+          <div class="command-list">
+            <div v-for="cmd in aiCommands" :key="cmd" class="command-item">
+              <code>{{ cmd }}</code>
+              <a-button @click="handleSendCommand(cmd)" :disabled="!isConnect">
+                <template #icon><SendOutlined /></template>
+                发送
+              </a-button>
+            </div>
           </div>
         </div>
-        <a-empty v-else description="暂无在线玩家" :image-style="{ height: '40px' }" />
-      </div>
+
+        <!-- 玩家列表 -->
+        <div class="player-section">
+          <div class="player-header">
+            <span><UserOutlined /> 在线玩家（点击名字快速插入）</span>
+          </div>
+          <div v-if="onlinePlayers.length > 0" class="player-items">
+            <div
+              v-for="player in onlinePlayers"
+              :key="player.uuid || player.name"
+              class="player-item"
+              @click="insertPlayerName(player.name)"
+            >
+              <a-avatar :src="`https://minotar.net/avatar/${player.name}/32`" :size="28" shape="circle" />
+              <span>{{ player.name }}</span>
+            </div>
+          </div>
+          <a-empty v-else description="暂无在线玩家" :image-style="{ height: '40px' }" />
+        </div>
+      </template>
+
+      <!-- 分析模式：极简布局，只保留结果和关闭按钮 -->
+      <template v-else-if="aiMode === 'analyze_log'">
+        <!-- 加载状态 -->
+        <div v-if="isParsing" class="flex-center" style="padding: 40px 0;">
+          <a-spin tip="正在分析日志..." />
+        </div>
+
+        <!-- 分析结果 -->
+        <div v-else class="analysis-simple-layout">
+          <!-- 错误提示 -->
+          <a-alert
+            v-if="aiError"
+            type="error"
+            :message="aiError"
+            show-icon
+            class="mb-16"
+          />
+
+          <!-- 分析文本 -->
+          <div v-if="logAnalysis" class="analysis-result-box">
+            <div class="disclaimer-text">AI 的答案僅供參考</div>
+            <div class="analysis-content">{{ logAnalysis }}</div>
+          </div>
+
+          <!-- 建议指令 (可选) -->
+          <div v-if="logSuggestions.length > 0" class="suggestions-box">
+            <div class="section-title">建议指令</div>
+            <div v-for="cmd in logSuggestions" :key="cmd" class="suggestion-item">
+              <code>{{ cmd }}</code>
+              <a-button size="small" @click="handleSendSuggestion(cmd)" :disabled="!isConnect">
+                发送
+              </a-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 关闭按钮（固定在底部） -->
+        <div class="analysis-close-bar">
+          <a-button @click="showAiModal = false">关闭</a-button>
+        </div>
+      </template>
     </div>
   </a-modal>
 </template>
@@ -868,22 +898,6 @@ const parseCommand = async () => {
   font-size: 14px;
 }
 
-.log-analysis-text {
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: var(--color-bg-container);
-  border: 1px solid var(--border-color-base);
-  border-radius: 4px;
-  padding: 12px;
-  color: var(--color-text);
-}
-
-.section-subtitle {
-  color: var(--color-text-secondary);
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-
 .command-list {
   display: flex;
   flex-direction: column;
@@ -952,6 +966,75 @@ const parseCommand = async () => {
     font-size: 14px;
     line-height: 28px;
   }
+}
+
+/* ---------- 分析模式專用樣式 ---------- */
+.analysis-simple-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.disclaimer-text {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-style: italic;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.analysis-result-box {
+  background: var(--color-bg-container);
+  border: 1px solid var(--border-color-base);
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.analysis-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.suggestions-box {
+  margin-top: 8px;
+}
+
+.section-title {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+
+  code {
+    background: #f5f5f5;
+    border: 1px solid #d9d9d9;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #000;
+  }
+}
+
+.analysis-close-bar {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color-base);
+}
+
+.mb-16 {
+  margin-bottom: 16px;
 }
 
 /* 通用工具類 */
