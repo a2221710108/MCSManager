@@ -27,12 +27,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "open-ai"): void;
-  (e: "analyze-log", logText: string): void;   // 新增：日志分析事件
+  (e: "analyze-log", logText: string): void;
 }>();
 
 const { containerState } = useLayoutContainerStore();
 
-// --- 静態日誌視圖狀態 ---
+// --- 靜態日誌視圖狀態 ---
 const isStaticView = ref(false);
 const staticLogContent = ref("");
 const isLogLoading = ref(false);
@@ -129,7 +129,7 @@ const refreshPage = () => {
   window.location.reload();
 };
 
-// ---------- 新增：文字選取與懸浮按鈕 ----------
+// ---------- 新增：文字選取與懸浮按鈕（右侧定位）----------
 const showFloatBtn = ref(false);
 const floatBtnPos = ref({ x: 0, y: 0 });
 const selectedText = ref("");
@@ -142,11 +142,18 @@ const handleTextSelection = () => {
   if (text && selection?.rangeCount) {
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
-    // 按鈕置於選取文字上方中央
-    floatBtnPos.value = {
-      x: rect.left + rect.width / 2 - 30,
-      y: rect.top - 35,
-    };
+    // 按鈕放在選取範圍的右側，垂直方向對齊選取範圍頂部
+    let x = rect.right + 8;   // 右側偏移 8px
+    let y = rect.top;
+
+    // 若右側空間不夠（按鈕寬度約 70px），則放到左側
+    if (x + 70 > window.innerWidth) {
+      x = rect.left - 70;
+    }
+    // 避免超出視窗頂部
+    if (y < 0) y = 4;
+
+    floatBtnPos.value = { x, y };
     selectedText.value = text;
     showFloatBtn.value = true;
   } else {
@@ -159,7 +166,7 @@ const handleAnalyze = () => {
   showFloatBtn.value = false;
   window.getSelection()?.removeAllRanges();
 };
-// ------------------------------------------
+// ------------------------------------------------
 
 onMounted(async () => {
   try {
@@ -241,7 +248,7 @@ onMounted(async () => {
           <template #prefix>
             <CodeOutlined style="font-size: 18px" />
           </template>
-          <!-- AI 按钮（指令生成）放在后缀中 -->
+          <!-- AI 按鈕（指令生成）在輸入框後綴中 -->
           <template #suffix>
             <a-button
               class="ai-suffix-btn"
@@ -258,6 +265,7 @@ onMounted(async () => {
         </a-input>
       </div>
     </div>
+
     <!-- 靜態日誌視圖 -->
     <div v-if="isStaticView" class="static-log-view-wrapper">
       <div class="terminal-wrapper global-card-container-shadow">
@@ -275,7 +283,8 @@ onMounted(async () => {
           </div>
         </a-spin>
       </div>
-      <!-- 懸浮分析按鈕 -->
+
+      <!-- 懸浮分析按鈕（右侧定位） -->
       <div
         v-if="showFloatBtn"
         class="float-ai-btn"
@@ -285,10 +294,12 @@ onMounted(async () => {
         <RobotOutlined />
         分析
       </div>
+
       <div class="command-input" style="visibility: hidden">
         <a-input disabled />
       </div>
     </div>
+
     <!-- 錯誤卡片 -->
     <div v-if="socketError" class="error-card">
       <div class="error-card-container">
@@ -333,7 +344,7 @@ onMounted(async () => {
 </template>
 
 <style lang="scss" scoped>
-/* 原有样式完整保留 */
+/* 原有樣式完整保留 */
 .console-wrapper {
   position: relative;
   height: 100%;
@@ -493,7 +504,7 @@ onMounted(async () => {
   }
 }
 
-/* 新增懸浮分析按鈕 */
+/* 懸浮分析按鈕（右侧定位，可懸停） */
 .float-ai-btn {
   position: fixed;
   z-index: 1000;
