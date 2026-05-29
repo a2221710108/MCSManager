@@ -359,9 +359,14 @@ const nlInput = ref("");
 const isParsing = ref(false);
 const aiError = ref("");
 
-// AI 回傳的結果
+// 指令模式結果
 const aiCommands = ref<string[]>([]);
 const aiExplanation = ref("");
+
+// 分析模式狀態
+const aiMode = ref<"command" | "analyze_log">("command");
+const logAnalysis = ref("");
+const logSuggestions = ref<string[]>([]);
 
 interface OnlinePlayer {
   name: string;
@@ -371,7 +376,8 @@ const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
 // ⚠️ 請修改為你自己的 Cloudflare Worker 地址
-const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
+const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/api/parse-command";
+const ANALYZE_LOG_WORKER_URL = "https://your-log-analyzer.workers.dev/api/analyze-log"; // 改成你自己的
 
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 
@@ -414,6 +420,7 @@ const insertPlayerName = (name: string) => {
 };
 
 const openAiModal = () => {
+  aiMode.value = "command";
   showAiModal.value = true;
   nlInput.value = "";
   aiError.value = "";
@@ -422,7 +429,48 @@ const openAiModal = () => {
   fetchPlayers();
 };
 
-// 發送單條指令
+// 新增：打開分析模式 (由 TerminalCore 觸發)
+const openAiWithLog = (logText: string) => {
+  aiMode.value = "analyze_log";
+  showAiModal.value = true;
+  aiError.value = "";
+  logAnalysis.value = "";
+  logSuggestions.value = [];
+  // 直接發送分析請求
+  analyzeLog(logText);
+};
+
+// 新增：分析日誌函數
+const analyzeLog = async (logText: string) => {
+  isParsing.value = true;
+  aiError.value = "";
+  logAnalysis.value = "";
+  logSuggestions.value = [];
+
+  try {
+    const response = await fetch(ANALYZE_LOG_WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: logText })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+
+    if (data.success) {
+      logAnalysis.value = data.analysis || "";
+      logSuggestions.value = data.suggestions || [];
+    } else {
+      aiError.value = data.error || "分析失败";
+    }
+  } catch (err: any) {
+    console.error(err);
+    aiError.value = "AI 服务连接失败，请稍后重试";
+  } finally {
+    isParsing.value = false;
+  }
+};
+
+// 發送單條指令（指令模式）
 const handleSendCommand = async (cmd: string) => {
   try {
     await sendCommand(cmd);
@@ -432,7 +480,17 @@ const handleSendCommand = async (cmd: string) => {
   }
 };
 
-// 解析自然語言
+// 分析模式發送建議指令
+const handleSendSuggestion = async (cmd: string) => {
+  try {
+    await sendCommand(cmd);
+    message.success(`已发送：${cmd}`);
+  } catch (err: any) {
+    message.error("指令发送失败: " + err.message);
+  }
+};
+
+// 解析自然語言（指令模式）
 const parseCommand = async () => {
   const text = nlInput.value.trim();
   if (!text) return;
@@ -578,7 +636,7 @@ const parseCommand = async () => {
       </div>
     </div>
 
-    <!-- TerminalCore 內含 AI 按鈕，emit 'open-ai' -->
+    <!-- TerminalCore 內含 AI 按鈕，emit 'open-ai' 和 'analyze-log' -->
     <TerminalCore
       v-if="instanceId && daemonId"
       ref="terminalCoreRef"
@@ -587,6 +645,7 @@ const parseCommand = async () => {
       :daemon-id="daemonId"
       :height="card.height"
       @open-ai="openAiModal"
+      @analyze-log="openAiWithLog"
     />
   </div>
 
@@ -620,29 +679,30 @@ const parseCommand = async () => {
         :daemon-id="daemonId"
         :height="card.height"
         @open-ai="openAiModal"
+        @analyze-log="openAiWithLog"
       />
     </template>
   </CardPanel>
 
-  <!-- AI 自然語言轉換窗口（舒適佈局） -->
+  <!-- AI 窗口 (根據模式顯示不同內容) -->
   <a-modal
     v-model:open="showAiModal"
-    title="自然语言转 Minecraft 指令"
+    :title="aiMode === 'command' ? '自然语言转 Minecraft 指令' : 'AI 日志分析'"
     :footer="null"
     :width="580"
     destroy-on-close
   >
     <div class="ai-modal-container">
-      <!-- 版本信息 -->
-      <div class="version-info">
+      <!-- 版本信息 (僅指令模式) -->
+      <div v-if="aiMode === 'command'" class="version-info">
         <a-tag color="processing">Minecraft {{ mcVersion }}</a-tag>
         <span class="text-muted">AI 将根据此版本生成指令</span>
       </div>
 
-      <!-- 輸入框 -->
+      <!-- 輸入框 (兩種模式皆有) -->
       <a-input
         v-model:value="nlInput"
-        placeholder="描述你想执行的操作，例如：把玩家 Tom 传送到 0 64 0，再给他一个钻石剑"
+        :placeholder="aiMode === 'command' ? '描述你想执行的操作...' : '输入日志内容再次分析'"
         :disabled="isParsing"
         allow-clear
       />
@@ -653,10 +713,10 @@ const parseCommand = async () => {
           type="primary"
           :loading="isParsing"
           :disabled="!nlInput.trim() || isParsing"
-          @click="parseCommand"
+          @click="aiMode === 'command' ? parseCommand() : analyzeLog(nlInput)"
         >
           <template #icon><SendOutlined /></template>
-          解析
+          {{ aiMode === 'command' ? '解析' : '分析' }}
         </a-button>
         <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers">
           <ReloadOutlined /> 重新整理
@@ -673,8 +733,8 @@ const parseCommand = async () => {
         @close="aiError = ''"
       />
 
-      <!-- AI 解析結果區塊 -->
-      <div v-if="aiCommands.length > 0" class="result-section">
+      <!-- 指令模式结果展示 -->
+      <div v-if="aiMode === 'command' && aiCommands.length > 0" class="result-section">
         <div class="explanation-text">{{ aiExplanation }}</div>
         <div class="command-list">
           <div v-for="cmd in aiCommands" :key="cmd" class="command-item">
@@ -687,7 +747,22 @@ const parseCommand = async () => {
         </div>
       </div>
 
-      <!-- 玩家列表區塊 -->
+      <!-- 分析模式结果展示 -->
+      <div v-if="aiMode === 'analyze_log' && (logAnalysis || logSuggestions.length > 0)" class="result-section">
+        <div class="log-analysis-text">{{ logAnalysis }}</div>
+        <div v-if="logSuggestions.length > 0" class="command-list" style="margin-top: 12px">
+          <div class="section-subtitle">建议指令：</div>
+          <div v-for="cmd in logSuggestions" :key="cmd" class="command-item">
+            <code>{{ cmd }}</code>
+            <a-button @click="handleSendSuggestion(cmd)" :disabled="!isConnect">
+              <template #icon><SendOutlined /></template>
+              发送
+            </a-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 玩家列表 -->
       <div class="player-section">
         <div class="player-header">
           <span><UserOutlined /> 在线玩家（点击名字快速插入）</span>
@@ -699,11 +774,7 @@ const parseCommand = async () => {
             class="player-item"
             @click="insertPlayerName(player.name)"
           >
-            <a-avatar
-              :src="`https://minotar.net/avatar/${player.name}/32`"
-              :size="28"
-              shape="circle"
-            />
+            <a-avatar :src="`https://minotar.net/avatar/${player.name}/32`" :size="28" shape="circle" />
             <span>{{ player.name }}</span>
           </div>
         </div>
@@ -762,7 +833,7 @@ const parseCommand = async () => {
   align-items: center;
 }
 
-/* AI 窗口容器 (加大間距) */
+/* AI 窗口容器 */
 .ai-modal-container {
   display: flex;
   flex-direction: column;
@@ -786,7 +857,7 @@ const parseCommand = async () => {
   align-items: center;
 }
 
-/* 解析結果區塊 (增加內部間距) */
+/* 結果區塊 */
 .result-section {
   margin-top: 4px;
 }
@@ -795,6 +866,22 @@ const parseCommand = async () => {
   color: var(--color-text-secondary);
   margin-bottom: 12px;
   font-size: 14px;
+}
+
+.log-analysis-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--color-bg-container);
+  border: 1px solid var(--border-color-base);
+  border-radius: 4px;
+  padding: 12px;
+  color: var(--color-text);
+}
+
+.section-subtitle {
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+  font-size: 13px;
 }
 
 .command-list {
@@ -821,11 +908,11 @@ const parseCommand = async () => {
   }
 
   .ant-btn {
-    flex-shrink: 0; /* 防止按鈕壓縮 */
+    flex-shrink: 0;
   }
 }
 
-/* 玩家列表區塊 (增加間距) */
+/* 玩家區塊 */
 .player-section {
   margin-top: 8px;
 }
