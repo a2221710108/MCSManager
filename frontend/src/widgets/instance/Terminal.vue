@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from "vue";
+import { ref, computed, nextTick, onMounted } from "vue";
 import CardPanel from "@/components/CardPanel.vue";
 import { openMarketDialog, openRenewalDialog } from "@/components/fc";
 import TerminalCore from "@/components/TerminalCore.vue";
@@ -359,6 +359,7 @@ const nlInput = ref("");
 const isParsing = ref(false);
 const isExecuting = ref(false);
 const confirmVisible = ref(false);
+const aiError = ref("");
 const aiResult = ref<{
   success: boolean;
   commands: string[];
@@ -382,6 +383,33 @@ const pingConfig = computed(() => ({
   ip: instanceInfo.value?.config?.pingConfig?.ip || "",
   port: instanceInfo.value?.config?.pingConfig?.port || 25565
 }));
+
+// --------------------------------------------------
+// localStorage 輔助，解決切換頁面後結果消失的問題
+// --------------------------------------------------
+const aiPendingKey = computed(() => `ai_pending_${instanceId}`);
+
+const saveAiResult = (result: typeof aiResult.value) => {
+  if (!instanceId) return;
+  localStorage.setItem(aiPendingKey.value, JSON.stringify(result));
+};
+
+const clearAiResult = () => {
+  if (!instanceId) return;
+  localStorage.removeItem(aiPendingKey.value);
+};
+
+const loadAiResult = () => {
+  if (!instanceId) return null;
+  const raw = localStorage.getItem(aiPendingKey.value);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+// --------------------------------------------------
 
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) {
@@ -419,6 +447,7 @@ const insertPlayerName = (name: string) => {
 const openAiModal = () => {
   showAiModal.value = true;
   nlInput.value = "";
+  aiError.value = "";
   fetchPlayers();
 };
 
@@ -426,10 +455,11 @@ const parseCommand = async () => {
   const text = nlInput.value.trim();
   if (!text) return;
   if (!isRunning.value) {
-    message.warning("实例未运行，无法发送指令");
+    aiError.value = "实例未运行，无法发送指令";
     return;
   }
   isParsing.value = true;
+  aiError.value = "";
   try {
     const response = await fetch(WORKER_URL, {
       method: "POST",
@@ -439,14 +469,16 @@ const parseCommand = async () => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     aiResult.value = data;
+
     if (data.success && data.commands?.length > 0) {
+      saveAiResult(data);          // ✅ 存入 localStorage
       confirmVisible.value = true;
     } else {
-      message.error(data.error || "无法解析该指令");
+      aiError.value = data.error || "无法解析该指令，请尝试更清晰的描述";
     }
   } catch (err: any) {
     console.error(err);
-    message.error("AI 服务连接失败");
+    aiError.value = "AI 服务连接失败，请稍后重试";
   } finally {
     isParsing.value = false;
   }
@@ -470,12 +502,23 @@ const executeCommands = async () => {
     aiResult.value = null;
     nlInput.value = "";
     showAiModal.value = false;
+    clearAiResult();              // ✅ 清除 localStorage
   }
 };
 
 const cancelExecution = () => {
   confirmVisible.value = false;
+  clearAiResult();               // ✅ 清除 localStorage
 };
+
+// 頁面掛載時，檢查是否有之前未處理的 AI 指令
+onMounted(() => {
+  const pending = loadAiResult();
+  if (pending && pending.success && pending.commands?.length > 0) {
+    aiResult.value = pending;
+    confirmVisible.value = true;
+  }
+});
 </script>
 
 <template>
@@ -586,7 +629,7 @@ const cancelExecution = () => {
       </div>
     </div>
 
-    <!-- 直接使用 TerminalCore，AI 按鈕已內建於其指令輸入框右側 -->
+    <!-- TerminalCore 內含 AI 按鈕，emit 'open-ai' -->
     <TerminalCore
       v-if="instanceId && daemonId"
       ref="terminalCoreRef"
@@ -641,7 +684,6 @@ const cancelExecution = () => {
     destroy-on-close
   >
     <div class="ai-modal-simple">
-      <!-- 版本提示 -->
       <div class="version-hint">
         <a-tag color="processing">Minecraft {{ mcVersion }}</a-tag>
         <span class="text-muted">AI 将根据此版本生成指令</span>
@@ -654,6 +696,17 @@ const cancelExecution = () => {
         :disabled="isParsing"
         allow-clear
         class="nl-textarea"
+      />
+
+      <!-- 錯誤提示（放在這裡） -->
+      <a-alert
+        v-if="aiError"
+        type="error"
+        :message="aiError"
+        show-icon
+        closable
+        class="error-alert"
+        @close="aiError = ''"
       />
 
       <div class="action-bar">
@@ -777,6 +830,9 @@ const cancelExecution = () => {
     }
   }
   .nl-textarea {
+    margin-bottom: 16px;
+  }
+  .error-alert {
     margin-bottom: 16px;
   }
   .action-bar {
