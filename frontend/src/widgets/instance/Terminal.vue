@@ -67,7 +67,7 @@ const {
   isGlobalTerminal,
   isDockerMode,
   clearTerminal,
-  sendCommand,   // 确保 useTerminal 暴露出该方法
+  sendCommand,
   isConnect
 } = terminalHook;
 
@@ -79,7 +79,7 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// -------------------- 日誌過濾功能（原封不動）--------------------
+// --- 日誌過濾功能（原封不動）---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
@@ -140,7 +140,7 @@ const handleTabChange = async () => {
   }
 };
 
-// -------------------- 實例操作邏輯（原封不動）--------------------
+// --- 原有實例操作邏輯 ---
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 const toOpenInstance = async () => {
   clearTerminal();
@@ -359,7 +359,12 @@ const nlInput = ref("");
 const isParsing = ref(false);
 const isExecuting = ref(false);
 const confirmVisible = ref(false);
-const aiResult = ref<{ success: boolean; commands: string[]; explanation: string; error?: string } | null>(null);
+const aiResult = ref<{
+  success: boolean;
+  commands: string[];
+  explanation: string;
+  error?: string;
+} | null>(null);
 
 interface OnlinePlayer {
   name: string;
@@ -369,7 +374,7 @@ const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
 // ⚠️ 請修改為你自己的 Cloudflare Worker 地址
-const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
+const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/api/parse-command";
 
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 
@@ -474,7 +479,7 @@ const cancelExecution = () => {
 </script>
 
 <template>
-  <!-- 內部終端視圖 (innerTerminalType) -->
+  <!-- 內部終端視圖 -->
   <div v-if="innerTerminalType">
     <div class="mb-24">
       <BetweenMenus>
@@ -575,35 +580,25 @@ const cancelExecution = () => {
           <a-radio-button value="warn">WARN</a-radio-button>
           <a-radio-button value="error">ERROR</a-radio-button>
         </a-radio-group>
-        <!-- AI 按鈕已移至 TerminalCore 容器內右側，此處不再放置 -->
       </div>
       <div class="status-right">
         <TerminalTags :tags="terminalTopTags" />
       </div>
     </div>
 
-    <!-- 終端容器 + AI 浮動按鈕 -->
-    <div class="terminal-wrapper">
-      <TerminalCore
-        v-if="instanceId && daemonId"
-        ref="terminalCoreRef"
-        :use-terminal-hook="terminalHook"
-        :instance-id="instanceId"
-        :daemon-id="daemonId"
-        :height="card.height"
-      />
-      <a-button
-        class="ai-float-btn"
-        shape="circle"
-        :disabled="!isRunning || !isConnect"
-        @click="openAiModal"
-      >
-        <template #icon><RobotOutlined /></template>
-      </a-button>
-    </div>
+    <!-- 直接使用 TerminalCore，AI 按鈕已內建於其指令輸入框右側 -->
+    <TerminalCore
+      v-if="instanceId && daemonId"
+      ref="terminalCoreRef"
+      :use-terminal-hook="terminalHook"
+      :instance-id="instanceId"
+      :daemon-id="daemonId"
+      :height="card.height"
+      @open-ai="openAiModal"
+    />
   </div>
 
-  <!-- 外部卡片視圖 (非 innerTerminalType) -->
+  <!-- 外部卡片視圖 -->
   <CardPanel v-else class="containerWrapper" style="height: 100%">
     <template #title>
       <CloudServerOutlined />
@@ -625,24 +620,15 @@ const cancelExecution = () => {
           <TerminalTags :tags="terminalTopTags" />
         </div>
       </div>
-      <div class="terminal-wrapper">
-        <TerminalCore
-          v-if="instanceId && daemonId"
-          ref="terminalCoreRef"
-          :use-terminal-hook="terminalHook"
-          :instance-id="instanceId"
-          :daemon-id="daemonId"
-          :height="card.height"
-        />
-        <a-button
-          class="ai-float-btn"
-          shape="circle"
-          :disabled="!isRunning || !isConnect"
-          @click="openAiModal"
-        >
-          <template #icon><RobotOutlined /></template>
-        </a-button>
-      </div>
+      <TerminalCore
+        v-if="instanceId && daemonId"
+        ref="terminalCoreRef"
+        :use-terminal-hook="terminalHook"
+        :instance-id="instanceId"
+        :daemon-id="daemonId"
+        :height="card.height"
+        @open-ai="openAiModal"
+      />
     </template>
   </CardPanel>
 
@@ -661,7 +647,6 @@ const cancelExecution = () => {
         <span class="text-muted">AI 将根据此版本生成指令</span>
       </div>
 
-      <!-- 自然語言輸入框 -->
       <a-textarea
         v-model:value="nlInput"
         placeholder="描述你想执行的操作，例如：把 Tom 传送到我身边，再给他一把钻石剑"
@@ -671,7 +656,6 @@ const cancelExecution = () => {
         class="nl-textarea"
       />
 
-      <!-- 操作與刷新按鈕 -->
       <div class="action-bar">
         <a-button
           type="primary"
@@ -686,7 +670,6 @@ const cancelExecution = () => {
         </a-button>
       </div>
 
-      <!-- 在線玩家列表（頭像+名字） -->
       <div class="player-section">
         <div class="section-title">
           <UserOutlined />
@@ -712,7 +695,7 @@ const cancelExecution = () => {
     </div>
   </a-modal>
 
-  <!-- 二次確認執行彈窗 -->
+  <!-- 二次確認彈窗 -->
   <a-modal
     v-model:open="confirmVisible"
     title="确认执行指令"
@@ -781,30 +764,7 @@ const cancelExecution = () => {
   align-items: center;
 }
 
-/* 終端容器與 AI 浮動按鈕（優化定位與顏色） */
-.terminal-wrapper {
-  position: relative;
-  height: 100%;
-}
-.ai-float-btn {
-  position: absolute !important;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  color: var(--color-primary) !important;   /* 預設藍色 */
-  &:hover {
-    color: var(--color-primary-hover) !important;
-  }
-  &:disabled {
-    color: var(--color-text-disabled) !important;
-  }
-}
-
-/* AI 窗口內部簡約佈局 */
+/* AI 窗口簡約內部佈局 */
 .ai-modal-simple {
   .version-hint {
     display: flex;
