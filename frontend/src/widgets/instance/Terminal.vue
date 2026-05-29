@@ -41,7 +41,8 @@ import {
   RobotOutlined,
   SendOutlined,
   UserOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  CheckOutlined
 } from "@ant-design/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
 import prettyBytes, { type Options as PrettyOptions } from "pretty-bytes";
@@ -357,15 +358,11 @@ const terminalTopTags = computed<TagInfo[]>(() => {
 const showAiModal = ref(false);
 const nlInput = ref("");
 const isParsing = ref(false);
-const isExecuting = ref(false);
-const confirmVisible = ref(false);
 const aiError = ref("");
-const aiResult = ref<{
-  success: boolean;
-  commands: string[];
-  explanation: string;
-  error?: string;
-} | null>(null);
+
+// AI 回傳的結果
+const aiCommands = ref<string[]>([]);
+const aiExplanation = ref("");
 
 interface OnlinePlayer {
   name: string;
@@ -375,7 +372,7 @@ const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
 // ⚠️ 請修改為你自己的 Cloudflare Worker 地址
-const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
+const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/api/parse-command";
 
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 
@@ -383,33 +380,6 @@ const pingConfig = computed(() => ({
   ip: instanceInfo.value?.config?.pingConfig?.ip || "",
   port: instanceInfo.value?.config?.pingConfig?.port || 25565
 }));
-
-// --------------------------------------------------
-// localStorage 輔助，解決切換頁面後結果消失的問題
-// --------------------------------------------------
-const aiPendingKey = computed(() => `ai_pending_${instanceId}`);
-
-const saveAiResult = (result: typeof aiResult.value) => {
-  if (!instanceId) return;
-  localStorage.setItem(aiPendingKey.value, JSON.stringify(result));
-};
-
-const clearAiResult = () => {
-  if (!instanceId) return;
-  localStorage.removeItem(aiPendingKey.value);
-};
-
-const loadAiResult = () => {
-  if (!instanceId) return null;
-  const raw = localStorage.getItem(aiPendingKey.value);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-};
-// --------------------------------------------------
 
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) {
@@ -448,9 +418,22 @@ const openAiModal = () => {
   showAiModal.value = true;
   nlInput.value = "";
   aiError.value = "";
+  aiCommands.value = [];
+  aiExplanation.value = "";
   fetchPlayers();
 };
 
+// 發送單條指令
+const handleSendCommand = async (cmd: string) => {
+  try {
+    await sendCommand(cmd);
+    message.success(`已發送：${cmd}`);
+  } catch (err: any) {
+    message.error("指令发送失败: " + err.message);
+  }
+};
+
+// 解析自然語言
 const parseCommand = async () => {
   const text = nlInput.value.trim();
   if (!text) return;
@@ -458,8 +441,12 @@ const parseCommand = async () => {
     aiError.value = "实例未运行，无法发送指令";
     return;
   }
+
   isParsing.value = true;
   aiError.value = "";
+  aiCommands.value = [];
+  aiExplanation.value = "";
+
   try {
     const response = await fetch(WORKER_URL, {
       method: "POST",
@@ -468,11 +455,10 @@ const parseCommand = async () => {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    aiResult.value = data;
 
     if (data.success && data.commands?.length > 0) {
-      saveAiResult(data);          // ✅ 存入 localStorage
-      confirmVisible.value = true;
+      aiCommands.value = data.commands;
+      aiExplanation.value = data.explanation || "";
     } else {
       aiError.value = data.error || "无法解析该指令，请尝试更清晰的描述";
     }
@@ -483,42 +469,6 @@ const parseCommand = async () => {
     isParsing.value = false;
   }
 };
-
-const executeCommands = async () => {
-  if (!aiResult.value?.commands?.length) return;
-  isExecuting.value = true;
-  try {
-    for (let i = 0; i < aiResult.value.commands.length; i++) {
-      const cmd = aiResult.value.commands[i];
-      await sendCommand(cmd);
-      if (i < aiResult.value.commands.length - 1) await sleep(300);
-    }
-    message.success("指令已执行");
-  } catch (err: any) {
-    message.error("指令发送失败: " + err.message);
-  } finally {
-    isExecuting.value = false;
-    confirmVisible.value = false;
-    aiResult.value = null;
-    nlInput.value = "";
-    showAiModal.value = false;
-    clearAiResult();              // ✅ 清除 localStorage
-  }
-};
-
-const cancelExecution = () => {
-  confirmVisible.value = false;
-  clearAiResult();               // ✅ 清除 localStorage
-};
-
-// 頁面掛載時，檢查是否有之前未處理的 AI 指令
-onMounted(() => {
-  const pending = loadAiResult();
-  if (pending && pending.success && pending.commands?.length > 0) {
-    aiResult.value = pending;
-    confirmVisible.value = true;
-  }
-});
 </script>
 
 <template>
@@ -675,7 +625,7 @@ onMounted(() => {
     </template>
   </CardPanel>
 
-  <!-- AI 自然語言轉換窗口 -->
+  <!-- AI 自然語言轉換窗口 (整合結果與發送) -->
   <a-modal
     v-model:open="showAiModal"
     title="自然语言转 Minecraft 指令"
@@ -684,6 +634,7 @@ onMounted(() => {
     destroy-on-close
   >
     <div class="ai-modal-simple">
+      <!-- 版本提示 -->
       <div class="version-hint">
         <a-tag color="processing">Minecraft {{ mcVersion }}</a-tag>
         <span class="text-muted">AI 将根据此版本生成指令</span>
@@ -698,7 +649,7 @@ onMounted(() => {
         class="nl-textarea"
       />
 
-      <!-- 錯誤提示（放在這裡） -->
+      <!-- 錯誤提示 -->
       <a-alert
         v-if="aiError"
         type="error"
@@ -709,6 +660,27 @@ onMounted(() => {
         @close="aiError = ''"
       />
 
+      <!-- AI 回傳的指令與解釋 (直接顯示在下方) -->
+      <div v-if="aiCommands.length > 0" class="ai-result-section">
+        <div class="explanation-box">
+          <strong>解釋：</strong>{{ aiExplanation }}
+        </div>
+        <div class="command-list">
+          <div v-for="cmd in aiCommands" :key="cmd" class="command-item">
+            <code class="command-text">{{ cmd }}</code>
+            <a-button
+              type="primary"
+              size="small"
+              :disabled="!isConnect"
+              @click="handleSendCommand(cmd)"
+            >
+              <SendOutlined /> 發送
+            </a-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 操作欄 (解析按鈕 + 玩家刷新) -->
       <div class="action-bar">
         <a-button
           type="primary"
@@ -723,6 +695,7 @@ onMounted(() => {
         </a-button>
       </div>
 
+      <!-- 在線玩家列表 -->
       <div class="player-section">
         <div class="section-title">
           <UserOutlined />
@@ -745,25 +718,6 @@ onMounted(() => {
         </div>
         <a-empty v-else description="暂无在线玩家" :image-style="{ height: '40px' }" />
       </div>
-    </div>
-  </a-modal>
-
-  <!-- 二次確認彈窗 -->
-  <a-modal
-    v-model:open="confirmVisible"
-    title="确认执行指令"
-    :confirm-loading="isExecuting"
-    @ok="executeCommands"
-    @cancel="cancelExecution"
-    ok-text="执行"
-    cancel-text="取消"
-  >
-    <div v-if="aiResult">
-      <p><strong>解释：</strong>{{ aiResult.explanation || "无" }}</p>
-      <p><strong>指令预览：</strong></p>
-      <ul>
-        <li v-for="cmd in aiResult.commands" :key="cmd"><code>{{ cmd }}</code></li>
-      </ul>
     </div>
   </a-modal>
 </template>
@@ -839,6 +793,7 @@ onMounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-top: 16px;
     margin-bottom: 20px;
   }
   .player-section {
@@ -873,6 +828,39 @@ onMounted(() => {
           line-height: 28px;
         }
       }
+    }
+  }
+  /* 結果展示區 */
+  .ai-result-section {
+    margin-top: 16px;
+    border: 1px solid var(--border-color-base);
+    border-radius: 6px;
+    padding: 12px;
+    background: var(--color-bg-container);
+    .explanation-box {
+      margin-bottom: 12px;
+      color: var(--color-text-secondary);
+      font-size: 14px;
+    }
+    .command-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .command-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .command-text {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 13px;
+      flex: 1;
+      word-break: break-all;
     }
   }
 }
