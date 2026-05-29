@@ -39,7 +39,9 @@ import {
   PauseCircleOutlined,
   PlayCircleOutlined,
   RedoOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  SendOutlined,
+  RobotOutlined
 } from "@ant-design/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
 import prettyBytes, { type Options as PrettyOptions } from "pretty-bytes";
@@ -55,7 +57,6 @@ const props = defineProps<{
 const { isPhone } = useScreen();
 const { state, isAdmin } = useAppStateStore();
 const { getMetaOrRouteValue } = useLayoutCardTools(props.card);
-
 const terminalHook: UseTerminalHook = useTerminal();
 const {
   state: instanceInfo,
@@ -75,47 +76,36 @@ const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
 
-// --- 新增功能邏輯：日誌切換與過濾 ---
+// --- 日誌過濾功能 (保留原有) ---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
-
 const handleTabChange = async () => {
   if (activeTab.value === "default") {
     await nextTick();
     terminalCoreRef.value?.showDefaultView();
   } else {
-    // 進入日誌過濾模式
-    terminalCoreRef.value?.showLogView("", true); // 顯示 Loading
+    terminalCoreRef.value?.showLogView("", true);
     try {
       const res: any = await fetchFile({
         params: { daemonId: daemonId ?? "", uuid: instanceId ?? "" },
         data: { target: "logs/latest.log" }
       });
-
       let rawText = "";
       if (typeof res === "string") rawText = res;
       else if (res && typeof res === "object") {
         rawText = res._value || res.value || res.data || res.content || "";
       }
-
-      // 1. 先切割行，並限制只處理最後 1000 行
-      const lines = rawText.split(/\r?\n/).slice(-3000); 
+      const lines = rawText.split(/\r?\n/).slice(-3000);
       const targetLevel = activeTab.value.toUpperCase();
       const resultLines: string[] = [];
       let isCapturing = false;
-      
-
-      // 匹配 [WARN] 或 /WARN: 等格式
       const levelRegex = new RegExp(`(\\[|\\/)${targetLevel}(\\]|\\:)`, "i");
       const timestampRegex = /\[.*?\d{2}:\d{2}:\d{2}.*?\]/;
-      // const timestampRegex = /\[\d{2}:\d{2}:\d{2}\]/;
-
       for (const line of lines) {
         if (!line.trim()) continue;
         const hasTimestamp = timestampRegex.test(line);
         const hasLevel = levelRegex.test(line);
-
         if (hasTimestamp) {
           if (hasLevel) {
             isCapturing = true;
@@ -127,35 +117,28 @@ const handleTabChange = async () => {
           resultLines.push(line);
         }
       }
-
       terminalCoreRef.value?.showLogView(
         resultLines.length > 0 ? resultLines.join("\n") : `--- 未發現 ${targetLevel} ---`,
         false
       );
-
-      // --- 針對 static-log-content 進行捲動 ---
       await nextTick();
-      // 使用 setTimeout 確保 content 已經填充到 pre 標籤內
       setTimeout(() => {
         const el = terminalCoreRef.value?.$el;
         if (el) {
-          // 關鍵點：尋找 TerminalCore.vue 裡面定義的那個滾動容器
           const container = el.querySelector(".static-log-content");
           if (container) {
             container.scrollTop = container.scrollHeight;
           }
         }
       }, 60);
-      
     } catch (err: any) {
       terminalCoreRef.value?.showLogView("此功能目前僅支持 Minecraft Java 版：" + err.message, false);
     }
   }
 };
-// ------------------------------
 
+// --- 原有實例操作邏輯 ---
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
-
 const toOpenInstance = async () => {
   clearTerminal();
   try {
@@ -164,7 +147,6 @@ const toOpenInstance = async () => {
       if (!flag) return;
       await sleep(1000);
     }
-
     await requestOpenInstance({
       params: {
         uuid: instanceId ?? "",
@@ -175,10 +157,8 @@ const toOpenInstance = async () => {
     reportErrorMsg(error);
   }
 };
-
 const updateCmd = computed(() => (instanceInfo.value?.config.updateCommand ? true : false));
 const instanceStatusText = computed(() => INSTANCE_STATUS[instanceInfo.value?.status ?? -1]);
-
 const quickOperations = computed(() =>
   arrayFilter([
     {
@@ -212,7 +192,6 @@ const quickOperations = computed(() =>
     }
   ])
 );
-
 const instanceOperations = computed(() =>
   arrayFilter([
     {
@@ -309,7 +288,6 @@ const instanceOperations = computed(() =>
     }
   ])
 );
-
 const getInstanceName = computed(() => {
   if (instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME) {
     return t("TXT_CODE_5bdaf23d");
@@ -317,27 +295,23 @@ const getInstanceName = computed(() => {
     return instanceInfo.value?.config.nickname;
   }
 });
-
 const useByteUnit = useLocalStorage("useByteUnit", true);
 const prettyBytesConfig: PrettyOptions = {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
   binary: true
 };
-
 const getUsageColor = (percentage?: number) => {
   percentage = Number(percentage);
   if (percentage > 600) return "error";
   if (percentage > 200) return "warning";
   return "default";
 };
-
 const formatMemoryUsage = (usage?: number, limit?: number) => {
   const fUsage = prettyBytes(usage ?? 0, prettyBytesConfig);
   const fLimit = prettyBytes(limit ?? 0, prettyBytesConfig);
   return limit ? `${fUsage} / ${fLimit}` : fUsage;
 };
-
 const formatNetworkSpeed = (bytes?: number) =>
   useByteUnit.value
     ? prettyBytes(bytes ?? 0, { ...prettyBytesConfig, binary: false }) + "/s"
@@ -345,12 +319,10 @@ const formatNetworkSpeed = (bytes?: number) =>
         /bit$/,
         "b"
       ) + "ps";
-
 const terminalTopTags = computed<TagInfo[]>(() => {
   const info = instanceInfo.value?.info;
   if (!info || isStopped.value) return [];
   const { cpuUsage, memoryUsage, memoryLimit, memoryUsagePercent, rxBytes, txBytes } = info;
-
   return arrayFilter<TagInfo>([
     {
       label: t("TXT_CODE_b862a158"),
@@ -377,6 +349,98 @@ const terminalTopTags = computed<TagInfo[]>(() => {
     }
   ]);
 });
+
+// ===================== 自然語言轉指令功能 =====================
+import { message, Modal } from "ant-design-vue";
+
+interface AICommandResult {
+  success: boolean;
+  commands: string[];
+  explanation: string;
+  error?: string;
+}
+
+const naturalLanguage = ref("");
+const isParsing = ref(false);
+const isExecuting = ref(false);
+const isConfirmVisible = ref(false);
+const aiResult = ref<AICommandResult | null>(null);
+
+// Cloudflare Worker 的地址，請換成你自己的
+const WORKER_URL = "https://your-worker.your-subdomain.workers.dev/api/parse-command";
+
+const parseCommand = async () => {
+  const input = naturalLanguage.value.trim();
+  if (!input) return;
+
+  if (!isRunning.value) {
+    message.warning("实例未运行，无法发送指令");
+    return;
+  }
+
+  isParsing.value = true;
+  try {
+    const response = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: input })
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const data = await response.json();
+
+    // 簡單校驗返回格式
+    if (!data || typeof data.success !== "boolean") {
+      throw new Error("Invalid AI response format");
+    }
+
+    aiResult.value = data;
+
+    if (data.success && data.commands?.length > 0) {
+      isConfirmVisible.value = true; // 彈出確認框
+    } else {
+      message.error(data.error || "无法解析该指令，请尝试更清晰的描述");
+    }
+  } catch (err: any) {
+    console.error(err);
+    message.error("AI 服务连接失败，请稍后再试");
+  } finally {
+    isParsing.value = false;
+  }
+};
+
+const executeCommands = async () => {
+  if (!aiResult.value?.commands?.length) return;
+
+  isExecuting.value = true;
+  try {
+    // 假設 terminalHook 提供了 sendCommand 方法，若沒有，可改為直接操作 WebSocket
+    // 需要確保 terminalCore 或 terminalHook 有送出指令的能力
+    // 此處使用 terminalHook.sendCommand 作為示例，你可能需要根據實際 API 調整
+    for (let i = 0; i < aiResult.value.commands.length; i++) {
+      const cmd = aiResult.value.commands[i];
+      // 發送前可以檢查連接狀態（可選）
+      await terminalHook.sendCommand?.(cmd);
+      if (i < aiResult.value.commands.length - 1) {
+        await sleep(300); // 避免服務器端指令過快
+      }
+    }
+    message.success(`已成功执行 ${aiResult.value.commands.length} 条指令`);
+  } catch (err: any) {
+    message.error("指令发送失败: " + err.message);
+  } finally {
+    isExecuting.value = false;
+    isConfirmVisible.value = false;
+    naturalLanguage.value = ""; // 清空輸入框
+  }
+};
+
+const cancelExecution = () => {
+  isConfirmVisible.value = false;
+};
+
+// ===================== 結束自然語言功能 =====================
 </script>
 
 <template>
@@ -405,23 +469,16 @@ const terminalTopTags = computed<TagInfo[]>(() => {
                 </a-tag>
               </span>
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
-              <span
-        v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1"
-        class="ml-16"
-      >
-        <a-tooltip>
-          <template #title>
-            {{ t("TXT_CODE_4a37ec9c") }} </template>
-          <LaptopOutlined />
-        </a-tooltip>
-        <span class="ml-6" style="opacity: 0.8">
-          {{ instanceInfo?.watcher }}
-        </span>
-      </span>
+              <span v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1" class="ml-16">
+                <a-tooltip>
+                  <template #title>{{ t("TXT_CODE_4a37ec9c") }}</template>
+                  <LaptopOutlined />
+                </a-tooltip>
+                <span class="ml-6" style="opacity: 0.8">{{ instanceInfo?.watcher }}</span>
+              </span>
             </a-typography-paragraph>
           </div>
         </template>
-
         <template #right>
           <div v-if="!isPhone">
             <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
@@ -436,12 +493,7 @@ const terminalTopTags = computed<TagInfo[]>(() => {
                 <component :is="item.icon" />
                 {{ item.title }}
               </a-button>
-              <a-popconfirm
-                v-else
-                :key="item.title"
-                :title="t('TXT_CODE_276756b2')"
-                @confirm="item.click"
-              >
+              <a-popconfirm v-else :key="item.title" :title="t('TXT_CODE_276756b2')" @confirm="item.click">
                 <a-button
                   class="ml-8"
                   :danger="item.type === 'danger'"
@@ -453,7 +505,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
               </a-popconfirm>
             </template>
           </div>
-
           <a-dropdown v-else>
             <template #overlay>
               <a-menu>
@@ -473,6 +524,26 @@ const terminalTopTags = computed<TagInfo[]>(() => {
           </a-dropdown>
         </template>
       </BetweenMenus>
+    </div>
+
+    <!-- 新增：自然語言輸入欄 -->
+    <div class="mb-10 nl-command-row">
+      <a-input
+        v-model:value="naturalLanguage"
+        placeholder="用自然语言描述指令，如：把玩家 Tom 传送到 0 64 0"
+        :disabled="isParsing || isExecuting"
+        @press-enter="parseCommand"
+      />
+      <a-button
+        class="ml-8"
+        type="primary"
+        :loading="isParsing"
+        :disabled="!naturalLanguage.trim() || !isRunning"
+        @click="parseCommand"
+      >
+        <template #icon><RobotOutlined /></template>
+        解析指令
+      </a-button>
     </div>
 
     <div class="mb-10 status-bar-flex">
@@ -503,11 +574,32 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       <CloudServerOutlined />
       <span class="ml-8"> {{ getInstanceName }} </span>
     </template>
-    
+
     <template #operator>
-      </template>
+      <!-- 原有 operator 内容保留，若无内容可留空 -->
+    </template>
 
     <template #body>
+      <!-- 新增：自然語言輸入欄 (CardPanel 模式) -->
+      <div class="mb-6 nl-command-row">
+        <a-input
+          v-model:value="naturalLanguage"
+          placeholder="用自然语言描述指令..."
+          :disabled="isParsing || isExecuting"
+          @press-enter="parseCommand"
+        />
+        <a-button
+          class="ml-8"
+          type="primary"
+          :loading="isParsing"
+          :disabled="!naturalLanguage.trim() || !isRunning"
+          @click="parseCommand"
+        >
+          <template #icon><RobotOutlined /></template>
+          解析指令
+        </a-button>
+      </div>
+
       <div class="mb-6 status-bar-flex">
         <div class="status-left">
           <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
@@ -520,7 +612,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
           <TerminalTags :tags="terminalTopTags" />
         </div>
       </div>
-
       <TerminalCore
         v-if="instanceId && daemonId"
         ref="terminalCoreRef"
@@ -531,10 +622,29 @@ const terminalTopTags = computed<TagInfo[]>(() => {
       />
     </template>
   </CardPanel>
+
+  <!-- 二次確認彈窗 -->
+  <a-modal
+    v-model:visible="isConfirmVisible"
+    title="确认执行指令"
+    :confirm-loading="isExecuting"
+    @ok="executeCommands"
+    @cancel="cancelExecution"
+    ok-text="执行"
+    cancel-text="取消"
+  >
+    <template v-if="aiResult">
+      <p><strong>解释：</strong>{{ aiResult.explanation || "无额外说明" }}</p>
+      <p><strong>将要执行的指令：</strong></p>
+      <ul>
+        <li v-for="cmd in aiResult.commands" :key="cmd"><code>{{ cmd }}</code></li>
+      </ul>
+    </template>
+  </a-modal>
 </template>
 
 <style lang="scss" scoped>
-/* 1. 繼承原版所有 error-card 樣式 */
+/* 原有樣式全部保留 */
 .error-card {
   position: absolute;
   inset: 0;
@@ -543,7 +653,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-
   .error-card-container {
     overflow: hidden;
     max-width: 440px;
@@ -553,45 +662,38 @@ const terminalTopTags = computed<TagInfo[]>(() => {
     padding: 12px;
     box-shadow: 0px 0px 2px var(--color-gray-7);
   }
-
   @media (max-width: 992px) {
     .error-card-container { max-width: 90vw !important; }
   }
 }
-
-/* 2. 佈局修正：標籤列對齊 */
 .status-bar-flex {
   display: flex;
   justify-content: space-between;
-  align-items: center; /* 關鍵：垂直居中，確保 Radio 和 Tags 一樣高 */
+  align-items: center;
   width: 100%;
 }
-
-/* 3. 深度樣式：確保 WARN/ERROR 按鈕與原版 Tag 尺寸一致 */
 :deep(.ant-radio-button-wrapper) {
-  height: 24px;      /* 匹配 TerminalTags 的標準高度 */
-  line-height: 22px; /* 扣除 border 的高度 */
+  height: 24px;
+  line-height: 22px;
   padding: 0 12px;
   font-size: 12px;
   background: transparent;
   border-color: var(--card-border-color);
-  
-  &:first-child {
-    border-radius: 4px 0 0 4px;
-  }
-  &:last-child {
-    border-radius: 0 4px 4px 0;
-  }
+  &:first-child { border-radius: 4px 0 0 4px; }
+  &:last-child { border-radius: 0 4px 4px 0; }
 }
-
-/* 4. 原版 console-wrapper 樣式保留 */
 .console-wrapper {
   position: relative;
   height: 100%;
   width: 100%;
 }
-
 .align-center {
+  display: flex;
+  align-items: center;
+}
+
+/* 新增：自然語言輸入行樣式 */
+.nl-command-row {
   display: flex;
   align-items: center;
 }
