@@ -728,12 +728,54 @@ const cancelExecution = () => {
 </template>
 
 <style lang="scss" scoped>
-/* 原有样式保留 */
-.error-card { ... }
-.status-bar-flex { ... }
-// ...其余原有样式
-
-/* AI 指令窗口样式 */
+/* 原有样式完整保留 */
+.error-card {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  .error-card-container {
+    overflow: hidden;
+    max-width: 440px;
+    border: 1px solid var(--color-gray-6) !important;
+    background-color: var(--color-gray-1);
+    border-radius: 4px;
+    padding: 12px;
+    box-shadow: 0px 0px 2px var(--color-gray-7);
+  }
+  @media (max-width: 992px) {
+    .error-card-container { max-width: 90vw !important; }
+  }
+}
+.status-bar-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+:deep(.ant-radio-button-wrapper) {
+  height: 24px;
+  line-height: 22px;
+  padding: 0 12px;
+  font-size: 12px;
+  background: transparent;
+  border-color: var(--card-border-color);
+  &:first-child { border-radius: 4px 0 0 4px; }
+  &:last-child { border-radius: 0 4px 4px 0; }
+}
+.console-wrapper {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+.align-center {
+  display: flex;
+  align-items: center;
+}
+/* 新增 AI 指令窗口样式 */
 .ai-command-modal {
   .input-area {
     display: flex;
