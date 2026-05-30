@@ -794,7 +794,7 @@ const parseCommand = async () => {
               </ul>
             </div>
             <div class="disclaimer-text-muted">
-              <InfoCircleOutlined /> AI 餐廚的診斷與建議僅供參考，請在修改重要檔案前做好備份。
+              <InfoCircleOutlined /> AI 生成的診斷與建議僅供參考，請在修改重要檔案前做好備份。
             </div>
           </div>
           <div class="analysis-action-bar">
