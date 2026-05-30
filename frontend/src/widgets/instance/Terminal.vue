@@ -360,27 +360,34 @@ const showAiModal = ref(false);
 const nlInput = ref("");
 const isParsing = ref(false);
 const aiError = ref("");
+
 // 指令模式結果
 const aiCommands = ref<string[]>([]);
 const aiExplanation = ref("");
+
 // 分析模式狀態
 const aiMode = ref<"command" | "analyze_log">("command");
 const logAnalysis = ref("");
 const logSuggestions = ref<string[]>([]);
+
 interface OnlinePlayer {
   name: string;
   uuid?: string;
 }
 const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
+
 // ⚠️ 請修改為你自己的 Cloudflare Worker 地址
 const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
 const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log";
+
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
+
 const pingConfig = computed(() => ({
   ip: instanceInfo.value?.config?.pingConfig?.ip || "",
   port: instanceInfo.value?.config?.pingConfig?.port || 25565
 }));
+
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) {
     message.warning("未配置服务器 IP");
@@ -409,10 +416,11 @@ const fetchPlayers = async () => {
     isLoadingPlayers.value = false;
   }
 };
-// 插入玩家姓名格式：玩家："Tom" 
+
 const insertPlayerName = (name: string) => {
   nlInput.value += `玩家："${name}" `;
 };
+
 const openAiModal = () => {
   aiMode.value = "command";
   showAiModal.value = true;
@@ -422,7 +430,7 @@ const openAiModal = () => {
   aiExplanation.value = "";
   fetchPlayers();
 };
-// 新增：打開分析模式 (由 TerminalCore 觸發)
+
 const openAiWithLog = (logText: string) => {
   aiMode.value = "analyze_log";
   showAiModal.value = true;
@@ -431,7 +439,7 @@ const openAiWithLog = (logText: string) => {
   logSuggestions.value = [];
   analyzeLog(logText);
 };
-// 新增：分析日誌函數
+
 const analyzeLog = async (logText: string) => {
   isParsing.value = true;
   aiError.value = "";
@@ -458,7 +466,7 @@ const analyzeLog = async (logText: string) => {
     isParsing.value = false;
   }
 };
-// 發送單條指令（指令模式）
+
 const handleSendCommand = async (cmd: string) => {
   try {
     await sendCommand(cmd);
@@ -467,7 +475,7 @@ const handleSendCommand = async (cmd: string) => {
     message.error("指令发送失败: " + err.message);
   }
 };
-// 解析自然語言（指令模式）
+
 const parseCommand = async () => {
   const text = nlInput.value.trim();
   if (!text) return;
@@ -529,10 +537,7 @@ const parseCommand = async () => {
                 </a-tag>
               </span>
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
-              <span
-                v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1"
-                class="ml-16"
-              >
+              <span v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1" class="ml-16">
                 <a-tooltip>
                   <template #title>{{ t("TXT_CODE_4a37ec9c") }}</template>
                   <LaptopOutlined />
@@ -544,10 +549,7 @@ const parseCommand = async () => {
         </template>
         <template #right>
           <div v-if="!isPhone">
-            <template
-              v-for="item in [...quickOperations, ...instanceOperations]"
-              :key="item.title"
-            >
+            <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
               <a-button
                 v-if="item.noConfirm"
                 class="ml-8"
@@ -565,11 +567,7 @@ const parseCommand = async () => {
                 :title="t('TXT_CODE_276756b2')"
                 @confirm="item.click"
               >
-                <a-button
-                  class="ml-8"
-                  :danger="item.type === 'danger'"
-                  :class="item.class ? item.class : ''"
-                >
+                <a-button class="ml-8" :danger="item.type === 'danger'" :class="item.class ? item.class : ''">
                   <component :is="item.icon" />
                   {{ item.title }}
                 </a-button>
@@ -628,9 +626,7 @@ const parseCommand = async () => {
       <CloudServerOutlined />
       <span class="ml-8"> {{ getInstanceName }} </span>
     </template>
-
     <template #operator> </template>
-
     <template #body>
       <div class="mb-6 status-bar-flex">
         <div class="status-left">
@@ -657,7 +653,7 @@ const parseCommand = async () => {
     </template>
   </CardPanel>
 
-  <!-- AI 窗口 (根據模式顯示不同內容) -->
+  <!-- AI 窗口 -->
   <a-modal
     v-model:open="showAiModal"
     :title="aiMode === 'command' ? '自然语言转 Minecraft 指令' : 'AI 日志分析'"
@@ -701,22 +697,14 @@ const parseCommand = async () => {
             </div>
           </div>
           <div v-if="aiError" class="ai-message-wrapper">
-            <a-alert
-              type="error"
-              :message="aiError"
-              show-icon
-              closable
-              @close="aiError = ''"
-            />
+            <a-alert type="error" :message="aiError" show-icon closable @close="aiError = ''" />
           </div>
           <div v-if="aiCommands.length > 0" class="ai-card-panel result-panel animate-fade-in">
             <div class="panel-title-sm">
               <InfoCircleOutlined /> AI 解析思維與步驟
             </div>
-            <div class="explanation-box">
-              {{ aiExplanation }}
-            </div>
-            <div class="panel-title-sm" style="margin-top: 16px;">
+            <div class="explanation-box">{{ aiExplanation }}</div>
+            <div class="panel-title-sm" style="margin-top: 16px">
               <code-outlined /> 產出的控制台指令
             </div>
             <div class="command-output-list">
@@ -724,7 +712,13 @@ const parseCommand = async () => {
                 <div class="cmd-text-wrapper">
                   <code class="terminal-cmd">{{ cmd }}</code>
                 </div>
-                <a-button type="default" size="small" @click="handleSendCommand(cmd)" :disabled="!isConnect" class="cmd-send-btn">
+                <a-button
+                  type="default"
+                  size="small"
+                  @click="handleSendCommand(cmd)"
+                  :disabled="!isConnect"
+                  class="cmd-send-btn"
+                >
                   <template #icon><SendOutlined /></template>
                   執行指令
                 </a-button>
@@ -737,7 +731,13 @@ const parseCommand = async () => {
                 <span class="title-main"><UserOutlined /> 當前在線玩家</span>
                 <span class="title-hint">（點擊名可直接插入）</span>
               </div>
-              <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers" class="refresh-link-btn">
+              <a-button
+                type="link"
+                size="small"
+                :loading="isLoadingPlayers"
+                @click="fetchPlayers"
+                class="refresh-link-btn"
+              >
                 <template #icon><ReloadOutlined /></template>
                 刷新玩家
               </a-button>
@@ -749,7 +749,11 @@ const parseCommand = async () => {
                 class="player-clickable-card"
                 @click="insertPlayerName(player.name)"
               >
-                <a-avatar :src="'https://minotar.net/avatar/' + player.name + '/24'" :size="18" shape="square" />
+                <a-avatar
+                  :src="'https://minotar.net/avatar/' + player.name + '/24'"
+                  :size="18"
+                  shape="square"
+                />
                 <span class="player-name-text">{{ player.name }}</span>
               </div>
             </div>
@@ -787,7 +791,11 @@ const parseCommand = async () => {
                 <bulb-outlined class="icon-warning-theme" /> 建議修復方法
               </div>
               <ul class="suggestion-list-pure">
-                <li v-for="(suggestion, index) in logSuggestions" :key="index" class="suggestion-step-item">
+                <li
+                  v-for="(suggestion, index) in logSuggestions"
+                  :key="index"
+                  class="suggestion-step-item"
+                >
                   <span class="step-badge">{{ index + 1 }}</span>
                   <div class="step-text">{{ suggestion }}</div>
                 </li>
@@ -856,6 +864,8 @@ const parseCommand = async () => {
   display: flex;
   align-items: center;
 }
+
+/* ============================== */
 /* AI 窗口容器 */
 .ai-modal-container {
   display: flex;
@@ -863,120 +873,106 @@ const parseCommand = async () => {
   gap: 20px;
 }
 
-/* ============================== */
 /* 自然语言转换指令 样式 */
-/* ============================== */
 .ai-command-wrapper {
   display: flex;
   flex-direction: column;
   gap: 20px;
   padding: 4px 0;
 }
+
 .ai-card-panel {
-  background: var(--color-bg-container, #ffffff);
-  border: 1px solid var(--border-color-base, #eeeeee);
+  background: var(--color-bg-container);
+  border: 1px solid var(--border-color-base);
   border-radius: 4px;
   padding: 16px;
 }
+
 .bg-panel {
-  background: var(--color-bg-layout, #fafafa);
-  border-color: var(--border-color-split, #e8e8e8);
+  background: var(--color-bg-layout);
+  border-color: var(--border-color-split);
 }
+
 .result-panel {
-  border-left: 1px solid var(--border-color-base, #eeeeee);
+  border-left: 1px solid var(--border-color-base);
 }
+
 .panel-header-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 14px;
 }
-.version-display {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.mc-tag {
-  border-radius: 2px;
-  font-weight: bold;
-}
-.sub-text {
-  color: var(--color-text-secondary, #8c8c8c);
-  font-size: 12px;
-}
-.refresh-link-btn {
-  padding: 0;
-  font-size: 13px;
-}
-.input-form-group {
-  margin-bottom: 14px;
-}
+
+.version-display { display: flex; align-items: center; gap: 10px; }
+.mc-tag { border-radius: 2px; font-weight: bold; }
+.sub-text { color: var(--color-text-secondary); font-size: 12px; }
+.refresh-link-btn { padding: 0; font-size: 13px; }
+
+.input-form-group { margin-bottom: 14px; }
+
 .custom-textarea {
   border-radius: 4px;
   padding: 10px 12px;
   font-size: 14px;
   resize: none;
+  background: var(--color-bg-container);
+  color: var(--color-text);
+  border-color: var(--border-color-base);
+  &::placeholder {
+    color: var(--color-text-secondary);
+  }
 }
-.panel-action-row {
-  width: 100%;
-}
+
+.panel-action-row { width: 100%; }
 .action-submit-btn {
   height: 38px;
   font-size: 14px;
   font-weight: 500;
   border-radius: 4px;
 }
-.ai-message-wrapper {
-  margin: -4px 0;
-}
+
+.ai-message-wrapper { margin: -4px 0; }
+
 .panel-title-sm {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text, #262626);
+  color: var(--color-text);
   margin-bottom: 10px;
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.panel-title-sm.no-margin {
-  margin-bottom: 0;
-}
-.title-main {
-  font-weight: 600;
-}
-.title-hint {
-  font-weight: normal;
-  color: var(--color-text-secondary, #999999);
-  font-size: 11px;
-}
+.panel-title-sm.no-margin { margin-bottom: 0; }
+
+.title-main { font-weight: 600; }
+.title-hint { font-weight: normal; color: var(--color-text-secondary); font-size: 11px; }
+
 .explanation-box {
-  background: var(--color-bg-layout, #f5f5f5);
+  background: var(--color-bg-layout);
   padding: 12px;
   border-radius: 4px;
   font-size: 13px;
-  color: var(--color-text-secondary, #555555);
+  color: var(--color-text-secondary);
   line-height: 1.6;
-  border: 1px solid var(--border-color-split, #e8e8e8);
+  border: 1px solid var(--border-color-split);
 }
-.command-output-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+
+.command-output-list { display: flex; flex-direction: column; gap: 10px; }
+
 .command-output-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: var(--color-bg-layout, #f9f9f9);
-  border: 1px solid var(--border-color-base, #e8e8e8);
+  background: var(--color-bg-layout);
+  border: 1px solid var(--border-color-base);
   padding: 8px 12px;
   border-radius: 4px;
 }
-.cmd-text-wrapper {
-  flex: 1;
-  overflow: hidden;
-}
+
+.cmd-text-wrapper { flex: 1; overflow: hidden; }
+
 .terminal-cmd {
   font-family: monospace, "Courier New", Courier;
   font-size: 13px;
@@ -984,208 +980,118 @@ const parseCommand = async () => {
   word-break: break-all;
   font-weight: 600;
 }
+
 .cmd-send-btn {
   border-radius: 4px;
   flex-shrink: 0;
-  background: #ffffff;
+  background: var(--color-bg-container);
+  color: var(--color-text);
+  border-color: var(--border-color-base);
+  &:disabled {
+    background: var(--color-bg-layout);
+    color: var(--color-text-disabled);
+    border-color: var(--border-color-split);
+  }
 }
+
 .player-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
 }
+
 .player-clickable-card {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border: 1px solid var(--border-color-split, #e8e8e8);
+  border: 1px solid var(--border-color-split);
   border-radius: 4px;
-  background: var(--color-bg-container, #ffffff);
+  background: var(--color-bg-container);
   cursor: pointer;
   transition: all 0.2s ease;
   &:hover {
-    border-color: var(--color-primary, #1890ff);
-    background: var(--color-primary-light, #f0f7ff);
+    border-color: var(--color-primary);
+    background: var(--color-primary-bg);
   }
 }
+
 .player-name-text {
   font-size: 12px;
-  color: var(--color-text, #262626);
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .player-empty-wrapper {
   padding: 16px 0;
   text-align: center;
-  border: 1px dashed var(--border-color-split, #e8e8e8);
+  border: 1px dashed var(--border-color-split);
   border-radius: 4px;
-}
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-in-out;
-}
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  color: var(--color-text-secondary);
 }
 
-/* ============================== */
-/* 🌙 專屬黑暗模式（Dark Mode）適配 - 自然语言转换指令 */
-/* ============================== */
-@media (prefers-color-scheme: dark) {
-  .ai-card-panel {
-    background: var(--color-bg-container, #1f1f1f);
-    border-color: var(--border-color-base, #303030);
-  }
-  .bg-panel {
-    background: var(--color-bg-layout, #141414);
-    border-color: var(--border-color-split, #303030);
-  }
-  .result-panel {
-    border-color: var(--border-color-base, #303030);
-  }
-  .panel-title-sm {
-    color: var(--color-text, #e5e5e5);
-  }
-  .explanation-box {
-    background: var(--color-bg-layout, #141414);
-    border-color: var(--border-color-split, #303030);
-    color: var(--color-text-secondary, #a6a6a6);
-  }
-  .command-output-card {
-    background: var(--color-bg-layout, #141414);
-    border-color: var(--border-color-base, #303030);
-  }
-  .terminal-cmd {
-    color: #ff7db0;
-  }
-  .cmd-send-btn {
-    background: #1f1f1f;
-    border-color: #434343;
-    color: #e5e5e5;
-  }
-  .cmd-send-btn[disabled] {
-    background: #141414;
-    border-color: #303030;
-    color: #434343;
-  }
-  .player-clickable-card {
-    background: var(--color-bg-container, #1f1f1f);
-    border-color: var(--border-color-split, #303030);
-  }
-  .player-clickable-card:hover {
-    background: var(--color-primary-dark, #113c66);
-    border-color: var(--color-primary, #1890ff);
-  }
-  .player-name-text {
-    color: var(--color-text, #e5e5e5);
-  }
-}
-:deep(.dark) .ai-card-panel, :deep([data-theme='dark']) .ai-card-panel {
-  background: var(--color-bg-container, #1f1f1f);
-  border-color: var(--border-color-base, #303030);
-}
-:deep(.dark) .bg-panel, :deep([data-theme='dark']) .bg-panel {
-  background: var(--color-bg-layout, #141414);
-  border-color: var(--border-color-split, #303030);
-}
-:deep(.dark) .result-panel, :deep([data-theme='dark']) .result-panel {
-  border-color: var(--border-color-base, #303030);
-}
-:deep(.dark) .panel-title-sm, :deep([data-theme='dark']) .panel-title-sm {
-  color: var(--color-text, #e5e5e5);
-}
-:deep(.dark) .explanation-box, :deep([data-theme='dark']) .explanation-box {
-  background: var(--color-bg-layout, #141414);
-  border-color: var(--border-color-split, #303030);
-  color: var(--color-text-secondary, #a6a6a6);
-}
-:deep(.dark) .command-output-card, :deep([data-theme='dark']) .command-output-card {
-  background: var(--color-bg-layout, #141414);
-  border-color: var(--border-color-base, #303030);
-}
-:deep(.dark) .terminal-cmd, :deep([data-theme='dark']) .terminal-cmd {
-  color: #ff7db0;
-}
-:deep(.dark) .cmd-send-btn, :deep([data-theme='dark']) .cmd-send-btn {
-  background: #1f1f1f;
-  border-color: #434343;
-  color: #e5e5e5;
-}
-:deep(.dark) .cmd-send-btn[disabled], :deep([data-theme='dark']) .cmd-send-btn[disabled] {
-  background: #141414;
-  border-color: #303030;
-  color: #434343;
-}
-:deep(.dark) .player-clickable-card, :deep([data-theme='dark']) .player-clickable-card {
-  background: var(--color-bg-container, #1f1f1f);
-  border-color: var(--border-color-split, #303030);
-}
-:deep(.dark) .player-clickable-card:hover, :deep([data-theme='dark']) .player-clickable-card:hover {
-  background: var(--color-primary-dark, #113c66);
-  border-color: var(--color-primary, #1890ff);
-}
-:deep(.dark) .player-name-text, :deep([data-theme='dark']) .player-name-text {
-  color: var(--color-text, #e5e5e5);
-}
-
-/* ============================== */
 /* 日志分析 样式 */
-/* ============================== */
 .ai-analysis-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
   padding: 4px 0;
 }
+
 .analysis-loading-wrapper {
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 60px 0;
 }
+
 .analysis-main-layout {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.analysis-alert {
-  border-radius: 4px;
-}
-.analysis-report-card {
-  background: var(--color-bg-container, #ffffff);
-  border: 1px solid var(--border-color-base, #eeeeee);
-  border-radius: 4px;
-  padding: 18px;
-}
+
+.analysis-alert { border-radius: 4px; }
+
+.analysis-report-card,
 .suggestions-report-card {
-  background: var(--color-bg-layout, #fafafa);
-  border: 1px solid var(--border-color-split, #e8e8e8);
+  background: var(--color-bg-container);
+  border: 1px solid var(--border-color-base);
   border-radius: 4px;
   padding: 18px;
 }
+
+.suggestions-report-card {
+  background: var(--color-bg-layout);
+  border-color: var(--border-color-split);
+}
+
 .card-header-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-text, #262626);
+  color: var(--color-text);
   margin-bottom: 14px;
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid var(--border-color-split, #f0f0f0);
+  border-bottom: 1px solid var(--border-color-split);
   padding-bottom: 8px;
 }
+
 .icon-warning-theme {
   color: var(--color-warning, #faad14);
 }
+
 .analysis-text-content {
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--color-text, #262626);
+  color: var(--color-text);
   font-size: 13.5px;
   line-height: 1.7;
 }
+
 .suggestion-list-pure {
   list-style: none;
   padding: 0;
@@ -1194,34 +1100,38 @@ const parseCommand = async () => {
   flex-direction: column;
   gap: 12px;
 }
+
 .suggestion-step-item {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   padding: 4px 0;
 }
+
 .step-badge {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
-  background: var(--color-text-secondary, #8c8c8c);
-  color: #ffffff;
+  background: var(--color-text-secondary);
+  color: #fff;
   font-size: 11px;
   font-weight: bold;
   border-radius: 2px;
   flex-shrink: 0;
   margin-top: 2px;
 }
+
 .step-text {
   font-size: 13px;
-  color: var(--color-text, #262626);
+  color: var(--color-text);
   line-height: 1.5;
   flex: 1;
 }
+
 .disclaimer-text-muted {
-  color: var(--color-text-secondary, #8c8c8c);
+  color: var(--color-text-secondary);
   font-size: 12px;
   text-align: center;
   padding: 8px 0;
@@ -1230,94 +1140,39 @@ const parseCommand = async () => {
   justify-content: center;
   gap: 6px;
 }
+
 .analysis-action-bar {
   display: flex;
   justify-content: flex-end;
   padding-top: 14px;
-  border-top: 1px solid var(--border-color-split, #f0f0f0);
+  border-top: 1px solid var(--border-color-split);
 }
+
 .close-panel-btn {
   border-radius: 4px;
   min-width: 100px;
 }
+
+/* 深色模式下指令颜色微调（保持可读性） */
+@media (prefers-color-scheme: dark) {
+  .terminal-cmd { color: #ff7db0; }
+}
+:deep(.dark) .terminal-cmd,
+:deep([data-theme='dark']) .terminal-cmd {
+  color: #ff7db0;
+}
+
+/* 动画 */
 .animate-fade-in {
-  animation: fadeIn 0.25s ease-in-out;
+  animation: fadeIn 0.3s ease-in-out;
 }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(2px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ============================== */
-/* 🌙 專屬黑暗模式（Dark Mode）適配 - 日志分析 */
-/* ============================== */
-@media (prefers-color-scheme: dark) {
-  .analysis-report-card {
-    background: var(--color-bg-container, #1f1f1f);
-    border-color: var(--border-color-base, #303030);
-  }
-  .suggestions-report-card {
-    background: var(--color-bg-layout, #141414);
-    border-color: var(--border-color-split, #303030);
-  }
-  .card-header-title {
-    color: var(--color-text, #e5e5e5);
-    border-bottom-color: var(--border-color-split, #303030);
-  }
-  .analysis-text-content, .step-text {
-    color: var(--color-text, #d4d4d4);
-  }
-  .step-badge {
-    background: var(--color-text-secondary, #434343);
-    color: #a6a6a6;
-  }
-  .disclaimer-text-muted {
-    color: var(--color-text-secondary, #737373);
-  }
-  .analysis-action-bar {
-    border-top-color: var(--border-color-split, #303030);
-  }
-}
-:deep(.dark) .analysis-report-card,
-:deep([data-theme='dark']) .analysis-report-card {
-  background: var(--color-bg-container, #1f1f1f);
-  border-color: var(--border-color-base, #303030);
-}
-:deep(.dark) .suggestions-report-card,
-:deep([data-theme='dark']) .suggestions-report-card {
-  background: var(--color-bg-layout, #141414);
-  border-color: var(--border-color-split, #303030);
-}
-:deep(.dark) .card-header-title,
-:deep([data-theme='dark']) .card-header-title {
-  color: var(--color-text, #e5e5e5);
-  border-bottom-color: var(--border-color-split, #303030);
-}
-:deep(.dark) .analysis-text-content,
-:deep(.dark) .step-text,
-:deep([data-theme='dark']) .analysis-text-content,
-:deep([data-theme='dark']) .step-text {
-  color: var(--color-text, #d4d4d4);
-}
-:deep(.dark) .step-badge,
-:deep([data-theme='dark']) .step-badge {
-  background: var(--color-text-secondary, #434343);
-  color: #a6a6a6;
-}
-:deep(.dark) .disclaimer-text-muted,
-:deep([data-theme='dark']) .disclaimer-text-muted {
-  color: var(--color-text-secondary, #737373);
-}
-:deep(.dark) .analysis-action-bar,
-:deep([data-theme='dark']) .analysis-action-bar {
-  border-top-color: var(--border-color-split, #303030);
-}
-
-/* ============================== */
-.mb-16 {
-  margin-bottom: 16px;
-}
 /* 通用工具类 */
+.mb-16 { margin-bottom: 16px; }
 .ml-16 { margin-left: 16px; }
 .ml-8 { margin-left: 8px; }
 .mb-10 { margin-bottom: 10px; }
