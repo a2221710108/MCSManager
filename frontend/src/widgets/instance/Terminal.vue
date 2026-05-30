@@ -376,8 +376,8 @@ const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
 // ⚠️ 請修改為你自己的 Cloudflare Worker 地址
-const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
-const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log"; // 改成你自己的
+const WORKER_URL = "https://snowy-wildflower-31a1.leolu55165088.workers.dev/api/parse-command";
+const ANALYZE_LOG_WORKER_URL = "https://your-log-analyzer.workers.dev/api/analyze-log"; // 改成你自己的
 
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 
@@ -472,16 +472,6 @@ const analyzeLog = async (logText: string) => {
 
 // 發送單條指令（指令模式）
 const handleSendCommand = async (cmd: string) => {
-  try {
-    await sendCommand(cmd);
-    message.success(`已发送：${cmd}`);
-  } catch (err: any) {
-    message.error("指令发送失败: " + err.message);
-  }
-};
-
-// 分析模式發送建議指令
-const handleSendSuggestion = async (cmd: string) => {
   try {
     await sendCommand(cmd);
     message.success(`已发送：${cmd}`);
@@ -793,14 +783,12 @@ const parseCommand = async () => {
             <div class="analysis-content">{{ logAnalysis }}</div>
           </div>
 
-          <!-- 建议指令 (可选) -->
+          <!-- 建议指令 (纯文本展示，无发送按钮) -->
           <div v-if="logSuggestions.length > 0" class="suggestions-box">
             <div class="section-title">建议指令</div>
             <div v-for="cmd in logSuggestions" :key="cmd" class="suggestion-item">
               <code>{{ cmd }}</code>
-              <a-button size="small" @click="handleSendSuggestion(cmd)" :disabled="!isConnect">
-                发送
-              </a-button>
+              <!-- 不再提供发送按钮 -->
             </div>
           </div>
         </div>
@@ -815,7 +803,7 @@ const parseCommand = async () => {
 </template>
 
 <style lang="scss" scoped>
-/* 原有樣式完整保留 */
+/* 原有样式完整保留 */
 .error-card {
   position: absolute;
   inset: 0;
@@ -887,7 +875,7 @@ const parseCommand = async () => {
   align-items: center;
 }
 
-/* 結果區塊 */
+/* 结果区块 */
 .result-section {
   margin-top: 4px;
 }
@@ -926,7 +914,7 @@ const parseCommand = async () => {
   }
 }
 
-/* 玩家區塊 */
+/* 玩家区块 */
 .player-section {
   margin-top: 8px;
 }
@@ -968,7 +956,7 @@ const parseCommand = async () => {
   }
 }
 
-/* ---------- 分析模式專用樣式 ---------- */
+/* ---------- 分析模式专用样式 ---------- */
 .analysis-simple-layout {
   display: flex;
   flex-direction: column;
@@ -1012,7 +1000,6 @@ const parseCommand = async () => {
 .suggestion-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
 
@@ -1037,7 +1024,7 @@ const parseCommand = async () => {
   margin-bottom: 16px;
 }
 
-/* 通用工具類 */
+/* 通用工具类 */
 .ml-16 { margin-left: 16px; }
 .ml-8 { margin-left: 8px; }
 .mb-10 { margin-bottom: 10px; }
