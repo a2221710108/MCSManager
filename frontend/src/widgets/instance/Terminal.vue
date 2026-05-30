@@ -638,7 +638,6 @@ const parseCommand = async () => {
     </template>
   </CardPanel>
   <!-- AI 窗口 (根據模式顯示不同內容) -->
-  <!-- ★ 核心修改：添加 :getContainer="false"，讓 Modal 渲染在組件 DOM 內而非 body 下 -->
   <a-modal
     v-model:open="showAiModal"
     :title="aiMode === 'command' ? '自然语言转 Minecraft 指令' : 'AI 日志分析'"
@@ -775,13 +774,13 @@ const parseCommand = async () => {
             />
             <div v-if="logAnalysis" class="analysis-report-card">
               <div class="card-header-title">
-                <ReconciliationOutlined /> AI 崩潰與異常診斷報告
+                <ReconciliationOutlined /> AI 崩溃与异常诊断报告
               </div>
               <div class="analysis-text-content">{{ logAnalysis }}</div>
             </div>
             <div v-if="logSuggestions.length > 0" class="suggestions-report-card">
               <div class="card-header-title">
-                <BulbOutlined class="icon-warning-theme" /> 建議修復方法
+                <BulbOutlined class="icon-warning-theme" /> 建议修复方法
               </div>
               <ul class="suggestion-list-pure">
                 <li
@@ -795,7 +794,7 @@ const parseCommand = async () => {
               </ul>
             </div>
             <div class="disclaimer-text-muted">
-              <InfoCircleOutlined /> AI 產出的診斷與建議僅供參考，請在修改重要檔案前做好備份。
+              <InfoCircleOutlined /> AI 产出的诊断与建议仅供参考，请在修改重要档案前做好备份。
             </div>
           </div>
           <div class="analysis-action-bar">
@@ -809,7 +808,7 @@ const parseCommand = async () => {
   </a-modal>
 </template>
 <style lang="scss" scoped>
-/* 原有样式保留，并适配主题 */
+/* 原有样式保留 */
 .error-card {
   position: absolute;
   inset: 0;
@@ -862,35 +861,42 @@ const parseCommand = async () => {
   display: flex;
   align-items: center;
 }
-/* AI 窗口容器 */
+
+/* ============================================================ */
+/* ★★ 核心修改：AI Modal 全部样式改用 MCSM 真实主题策略 ★★ */
+/* 文字 → var(--text-color)  背景/边框 → rgba() 半透明  次要 → opacity */
+/* ============================================================ */
+
+/* AI 窗口容器 — 设置全局文字颜色继承链 */
 .ai-modal-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  color: var(--text-color);
 }
-/* ============================== */
-/* 自然语言转换指令 样式 */
-/* ============================== */
+
 .ai-command-wrapper {
   display: flex;
   flex-direction: column;
   gap: 20px;
   padding: 4px 0;
 }
-/* 使用主题变量替代硬编码颜色 */
+
+/* ★ 所有卡片面板：rgba 半透明背景 + 半透明边框 */
 .ai-card-panel {
-  background: var(--color-bg-container, #ffffff);
-  border: 1px solid var(--border-color-base, #eeeeee);
-  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.08);
+  border: 1px solid rgba(128, 128, 128, 0.15);
+  border-radius: 12px;
   padding: 16px;
 }
 .bg-panel {
-  background: var(--color-bg-layout, #fafafa);
-  border-color: var(--border-color-split, #e8e8e8);
+  background: rgba(128, 128, 128, 0.06);
+  border-color: rgba(128, 128, 128, 0.12);
 }
 .result-panel {
-  border-left: 1px solid var(--border-color-base, #eeeeee);
+  border-color: rgba(128, 128, 128, 0.15);
 }
+
 .panel-header-bar {
   display: flex;
   justify-content: space-between;
@@ -906,9 +912,11 @@ const parseCommand = async () => {
   border-radius: 2px;
   font-weight: bold;
 }
+/* ★ 次要提示文字：用 opacity 而非独立颜色变量 */
 .sub-text {
-  color: var(--color-text-secondary, #8c8c8c);
+  color: var(--text-color);
   font-size: 12px;
+  opacity: 0.6;
 }
 .refresh-link-btn {
   padding: 0;
@@ -935,10 +943,11 @@ const parseCommand = async () => {
 .ai-message-wrapper {
   margin: -4px 0;
 }
+/* ★ 所有标题文字：var(--text-color) */
 .panel-title-sm {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text, #262626);
+  color: var(--text-color);
   margin-bottom: 10px;
   display: flex;
   align-items: center;
@@ -949,53 +958,65 @@ const parseCommand = async () => {
 }
 .title-main {
   font-weight: 600;
+  color: var(--text-color);
 }
 .title-hint {
   font-weight: normal;
-  color: var(--color-text-secondary, #999999);
+  color: var(--text-color);
   font-size: 11px;
+  opacity: 0.6;
 }
+/* ★ 解释内容：rgba 半透明背景 + opacity 控制次要感 */
 .explanation-box {
-  background: var(--color-bg-layout, #f5f5f5);
+  background: rgba(128, 128, 128, 0.06);
   padding: 12px;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 13px;
-  color: var(--color-text-secondary, #555555);
+  color: var(--text-color);
+  opacity: 0.7;
   line-height: 1.6;
-  border: 1px solid var(--border-color-split, #e8e8e8);
+  border: 1px solid rgba(128, 128, 128, 0.12);
 }
 .command-output-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+/* ★ 指令卡片：rgba 半透明背景 + 边框 */
 .command-output-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: var(--color-bg-layout, #f9f9f9);
-  border: 1px solid var(--border-color-base, #e8e8e8);
+  background: rgba(128, 128, 128, 0.05);
+  border: 1px solid rgba(128, 128, 128, 0.15);
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+.command-output-card:hover {
+  border-color: #1890ff !important;
+  background: rgba(24, 144, 255, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 .cmd-text-wrapper {
   flex: 1;
   overflow: hidden;
 }
-/* 指令高亮使用主题主色 */
+/* ★ 指令高亮：用 #1890ff Ant Design 主色 */
 .terminal-cmd {
   font-family: monospace, "Courier New", Courier;
   font-size: 13px;
-  color: var(--color-primary, #c41d7f);
+  color: #1890ff;
   word-break: break-all;
   font-weight: 600;
 }
 .cmd-send-btn {
   border-radius: 4px;
   flex-shrink: 0;
-  background: var(--color-bg-container, #ffffff);
 }
+
+/* ★ 玩家网格与卡片 */
 .player-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -1006,19 +1027,20 @@ const parseCommand = async () => {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border: 1px solid var(--border-color-split, #e8e8e8);
-  border-radius: 4px;
-  background: var(--color-bg-container, #ffffff);
+  border: 1px solid rgba(128, 128, 128, 0.15);
+  border-radius: 8px;
+  background: rgba(128, 128, 128, 0.05);
   cursor: pointer;
-  transition: all 0.2s ease;
-  &:hover {
-    border-color: var(--color-primary, #1890ff);
-    background: var(--color-fill-secondary, #f0f7ff);
-  }
+  transition: all 0.3s ease;
+}
+.player-clickable-card:hover {
+  border-color: #1890ff !important;
+  background: rgba(24, 144, 255, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 .player-name-text {
   font-size: 12px;
-  color: var(--color-text, #262626);
+  color: var(--text-color);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1026,9 +1048,10 @@ const parseCommand = async () => {
 .player-empty-wrapper {
   padding: 16px 0;
   text-align: center;
-  border: 1px dashed var(--border-color-split, #e8e8e8);
+  border: 1px dashed rgba(128, 128, 128, 0.2);
   border-radius: 4px;
 }
+
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }
@@ -1042,14 +1065,17 @@ const parseCommand = async () => {
     transform: translateY(0);
   }
 }
-/* ============================== */
-/* 日志分析 样式 */
-/* ============================== */
+
+/* ============================================================ */
+/* ★ 日志分析样式 — 同样改用 var(--text-color) + rgba() 策略 */
+/* ============================================================ */
+
 .ai-analysis-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
   padding: 4px 0;
+  color: var(--text-color);
 }
 .analysis-loading-wrapper {
   display: flex;
@@ -1065,35 +1091,38 @@ const parseCommand = async () => {
 .analysis-alert {
   border-radius: 4px;
 }
+/* ★ 报告卡片：rgba 半透明 */
 .analysis-report-card,
 .suggestions-report-card {
-  background: var(--color-bg-container, #ffffff);
-  border: 1px solid var(--border-color-base, #eeeeee);
-  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.08);
+  border: 1px solid rgba(128, 128, 128, 0.15);
+  border-radius: 12px;
   padding: 18px;
 }
 .suggestions-report-card {
-  background: var(--color-bg-layout, #fafafa);
-  border-color: var(--border-color-split, #e8e8e8);
+  background: rgba(128, 128, 128, 0.06);
+  border-color: rgba(128, 128, 128, 0.12);
 }
+/* ★ 卡片标题：var(--text-color) */
 .card-header-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-text, #262626);
+  color: var(--text-color);
   margin-bottom: 14px;
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid var(--border-color-split, #f0f0f0);
+  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
   padding-bottom: 8px;
 }
 .icon-warning-theme {
   color: var(--color-warning, #faad14);
 }
+/* ★ 分析内容文字：var(--text-color) */
 .analysis-text-content {
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--color-text, #262626);
+  color: var(--text-color);
   font-size: 13.5px;
   line-height: 1.7;
 }
@@ -1111,28 +1140,31 @@ const parseCommand = async () => {
   gap: 12px;
   padding: 4px 0;
 }
+/* ★ 步骤编号：rgba 半透明背景 */
 .step-badge {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
-  background: var(--color-text-secondary, #8c8c8c);
-  color: #ffffff; /* 保持白色高对比 */
+  background: rgba(128, 128, 128, 0.3);
+  color: #ffffff;
   font-size: 11px;
   font-weight: bold;
   border-radius: 2px;
   flex-shrink: 0;
   margin-top: 2px;
 }
+/* ★ 步骤文字：var(--text-color) */
 .step-text {
   font-size: 13px;
-  color: var(--color-text, #262626);
+  color: var(--text-color);
   line-height: 1.5;
   flex: 1;
 }
+/* ★ 免责声明：opacity 控制 */
 .disclaimer-text-muted {
-  color: var(--color-text-secondary, #8c8c8c);
+  color: var(--text-color);
   font-size: 12px;
   text-align: center;
   padding: 8px 0;
@@ -1140,22 +1172,25 @@ const parseCommand = async () => {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  opacity: 0.5;
 }
 .analysis-action-bar {
   display: flex;
   justify-content: flex-end;
   padding-top: 14px;
-  border-top: 1px solid var(--border-color-split, #f0f0f0);
+  border-top: 1px solid rgba(128, 128, 128, 0.15);
 }
 .close-panel-btn {
   border-radius: 4px;
   min-width: 100px;
 }
-/* ============================== */
+
+/* ============================================================ */
+/* 通用工具类 */
+/* ============================================================ */
 .mb-16 {
   margin-bottom: 16px;
 }
-/* 通用工具类 */
 .ml-16 {
   margin-left: 16px;
 }
