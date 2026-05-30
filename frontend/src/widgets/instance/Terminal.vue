@@ -375,7 +375,7 @@ const pingConfig = computed(() => ({
 }));
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) {
-    message.warning("未配置服务器 IP");
+    message.warning("未配置伺服器 IP，請聯絡客戶服務");
     return;
   }
   isLoadingPlayers.value = true;
@@ -391,12 +391,12 @@ const fetchPlayers = async () => {
       }));
     } else {
       onlinePlayers.value = [];
-      if (!data.online) message.warning("服务器离线");
-      else if (data.players?.list?.length === 0) message.info("暂无在线玩家");
+      if (!data.online) message.warning("伺服器離線");
+      else if (data.players?.list?.length === 0) message.info("暫無在線玩家");
     }
   } catch (err) {
     console.error(err);
-    message.error("获取玩家列表失败");
+    message.error("獲取玩家列表失敗，請稍後再試");
   } finally {
     isLoadingPlayers.value = false;
   }
@@ -438,11 +438,11 @@ const analyzeLog = async (logText: string) => {
       logAnalysis.value = data.analysis || "";
       logSuggestions.value = data.suggestions || [];
     } else {
-      aiError.value = data.error || "分析失败";
+      aiError.value = data.error || "分析失敗";
     }
   } catch (err: any) {
     console.error(err);
-    aiError.value = "AI 服务连接失败，请稍后重试";
+    aiError.value = "LazyCloud AI 服務連接失敗，請稍後重試";
   } finally {
     isParsing.value = false;
   }
@@ -450,16 +450,16 @@ const analyzeLog = async (logText: string) => {
 const handleSendCommand = async (cmd: string) => {
   try {
     await sendCommand(cmd);
-    message.success(`已发送：${cmd}`);
+    message.success(`已發送：${cmd}`);
   } catch (err: any) {
-    message.error("指令发送失败: " + err.message);
+    message.error("指令發送失敗: " + err.message);
   }
 };
 const parseCommand = async () => {
   const text = nlInput.value.trim();
   if (!text) return;
   if (!isRunning.value) {
-    aiError.value = "实例未运行，无法发送指令";
+    aiError.value = "伺服器未啟動，無法使用該功能";
     return;
   }
   isParsing.value = true;
@@ -478,11 +478,11 @@ const parseCommand = async () => {
       aiCommands.value = data.commands;
       aiExplanation.value = data.explanation || "";
     } else {
-      aiError.value = data.error || "无法解析该指令，请尝试更清晰的描述";
+      aiError.value = data.error || "無法解析該指令，請嘗試更清晰的描述";
     }
   } catch (err: any) {
     console.error(err);
-    aiError.value = "AI 服务连接失败，请稍后重试";
+    aiError.value = "LazyCloud AI 服務連接失敗，請稍後重試";
   } finally {
     isParsing.value = false;
   }
@@ -640,7 +640,7 @@ const parseCommand = async () => {
   <!-- AI 窗口 (根據模式顯示不同內容) -->
   <a-modal
     v-model:open="showAiModal"
-    :title="aiMode === 'command' ? '自然语言转 Minecraft 指令' : 'AI 日志分析'"
+    :title="aiMode === 'command' ? 'AI Minecraft 指令' : 'AI 錯誤分析'"
     :footer="null"
     :width="580"
     :getContainer="false"
@@ -654,13 +654,13 @@ const parseCommand = async () => {
             <div class="panel-header-bar">
               <div class="version-display">
                 <a-tag color="blue" class="mc-tag">Minecraft {{ mcVersion }}</a-tag>
-                <span class="sub-text">AI 將依此版本環境轉換指令</span>
+                <span class="sub-text">AI 將依此版本環境轉換指令，僅供參考！</span>
               </div>
             </div>
             <div class="input-form-group">
               <a-textarea
                 v-model:value="nlInput"
-                placeholder="描述你想执行的操作，例如：将天气设定为雷雨，把玩家 Tom 传送到 0 64 0"
+                placeholder="描述您想執行的操作，例如：將天氣設定為雷雨，把玩家 Tom 傳送到 0 64 0"
                 :disabled="isParsing"
                 :rows="3"
                 allow-clear
@@ -677,7 +677,7 @@ const parseCommand = async () => {
                 class="action-submit-btn"
               >
                 <template #icon><SendOutlined /></template>
-                開始 AI 解析指令
+                解析指令
               </a-button>
             </div>
           </div>
@@ -692,13 +692,13 @@ const parseCommand = async () => {
           </div>
           <div v-if="aiCommands.length > 0" class="ai-card-panel result-panel animate-fade-in">
             <div class="panel-title-sm">
-              <InfoCircleOutlined /> AI 解析思維與步驟
+              <InfoCircleOutlined /> 指令解釋
             </div>
             <div class="explanation-box">
               {{ aiExplanation }}
             </div>
             <div class="panel-title-sm" style="margin-top: 16px;">
-              <CodeOutlined /> 產出的控制台指令
+              <CodeOutlined /> 指令（執行後無法撤回；如執行失敗，可以嘗試在遊戲內執行）
             </div>
             <div class="command-output-list">
               <div v-for="cmd in aiCommands" :key="cmd" class="command-output-card">
@@ -713,7 +713,7 @@ const parseCommand = async () => {
                   class="cmd-send-btn"
                 >
                   <template #icon><SendOutlined /></template>
-                  執行指令
+                  執行
                 </a-button>
               </div>
             </div>
@@ -722,7 +722,7 @@ const parseCommand = async () => {
             <div class="panel-header-bar">
               <div class="panel-title-sm no-margin">
                 <span class="title-main"><UserOutlined /> 當前在線玩家</span>
-                <span class="title-hint">（點擊名可直接插入）</span>
+                <span class="title-hint">（點擊可直接插入玩家名稱）</span>
               </div>
               <a-button
                 type="link"
@@ -732,7 +732,7 @@ const parseCommand = async () => {
                 class="refresh-link-btn"
               >
                 <template #icon><ReloadOutlined /></template>
-                刷新玩家
+                重新整理
               </a-button>
             </div>
             <div v-if="onlinePlayers.length > 0" class="player-grid">
@@ -760,7 +760,7 @@ const parseCommand = async () => {
       <template v-else-if="aiMode === 'analyze_log'">
         <div class="ai-analysis-container">
           <div v-if="isParsing" class="analysis-loading-wrapper">
-            <a-spin tip="MCSM AI 正在深度分析日誌..." size="large" />
+            <a-spin tip="LazyCloud AI 助手 正在分析日誌..." size="large" />
           </div>
           <div v-else class="analysis-main-layout animate-fade-in">
             <a-alert
@@ -774,13 +774,13 @@ const parseCommand = async () => {
             />
             <div v-if="logAnalysis" class="analysis-report-card">
               <div class="card-header-title">
-                <ReconciliationOutlined /> AI 崩溃与异常诊断报告
+                <ReconciliationOutlined /> AI 分析報告
               </div>
               <div class="analysis-text-content">{{ logAnalysis }}</div>
             </div>
             <div v-if="logSuggestions.length > 0" class="suggestions-report-card">
               <div class="card-header-title">
-                <BulbOutlined class="icon-warning-theme" /> 建议修复方法
+                <BulbOutlined class="icon-warning-theme" /> 建議行動
               </div>
               <ul class="suggestion-list-pure">
                 <li
@@ -794,7 +794,7 @@ const parseCommand = async () => {
               </ul>
             </div>
             <div class="disclaimer-text-muted">
-              <InfoCircleOutlined /> AI 产出的诊断与建议仅供参考，请在修改重要档案前做好备份。
+              <InfoCircleOutlined /> AI 餐廚的診斷與建議僅供參考，請在修改重要檔案前做好備份。
             </div>
           </div>
           <div class="analysis-action-bar">
