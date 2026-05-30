@@ -997,19 +997,21 @@ const parseCommand = async () => {
 }
 
 .suggestion-item {
-  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 6px;
 
   code {
-    display: block;                     /* 块级元素，自动换行 */
     background: #f5f5f5;
     border: 1px solid #d9d9d9;
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 13px;
     color: #000;
-    word-break: break-word;
-    white-space: pre-wrap;              /* 保留文本中的换行和空格 */
-    overflow-wrap: break-word;          /* 长单词断开 */
+    white-space: normal;
+    word-break: break-all;
+    width: 100%;
+    display: block;
   }
 }
 
