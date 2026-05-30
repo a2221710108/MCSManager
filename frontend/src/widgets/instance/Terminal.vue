@@ -675,89 +675,86 @@ const parseCommand = async () => {
   </CardPanel>
 
   <!-- AI 窗口 (根據模式顯示不同內容) -->
-  <a-modal
-    v-model:open="showAiModal"
-    :title="aiMode === 'command' ? '自然语言转 Minecraft 指令' : 'AI 日志分析'"
-    :footer="null"
-    :width="580"
-    destroy-on-close
-  >
-    <div class="ai-modal-container">
-      <!-- 指令模式：完整 UI -->
-      <template v-if="aiMode === 'command'">
-        <!-- 版本信息 -->
-        <div class="version-info">
-          <a-tag color="processing">Minecraft {{ mcVersion }}</a-tag>
-          <span class="text-muted">AI 将根据此版本生成指令</span>
-        </div>
+<template v-if="aiMode === 'command'">
+  <div class="ai-command-container">
+    
+    <div class="ai-header-bar">
+      <div class="version-info">
+        <a-tag color="blue" class="mc-version-tag">Minecraft {{ mcVersion }}</a-tag>
+        <span class="text-muted">AI 將根據此版本生成指令</span>
+      </div>
+      <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers" class="refresh-btn">
+        <template #icon><ReloadOutlined /></template>重新整理玩家
+      </a-button>
+    </div>
 
-        <!-- 輸入框 -->
-        <a-input
-          v-model:value="nlInput"
-          placeholder="描述你想执行的操作，例如：把玩家 Tom 传送到 0 64 0，再给他一个钻石剑"
-          :disabled="isParsing"
-          allow-clear
-        />
-
-        <!-- 操作按鈕行 -->
-        <div class="action-buttons">
-          <a-button
-            type="primary"
-            :loading="isParsing"
-            :disabled="!nlInput.trim() || isParsing"
-            @click="parseCommand"
-          >
+    <div class="ai-input-wrapper">
+      <a-input-search
+        v-model:value="nlInput"
+        placeholder="描述你想执行的操作，例如：把玩家 Tom 传送到 0 64 0，再给他一个钻石剑"
+        :disabled="isParsing"
+        :loading="isParsing"
+        allow-clear
+        size="large"
+        @search="parseCommand"
+      >
+        <template #enterButton>
+          <a-button type="primary" :disabled="!nlInput.trim() || isParsing">
             <template #icon><SendOutlined /></template>
-            解析
+            解析指令
           </a-button>
-          <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers">
-            <ReloadOutlined /> 重新整理
+        </template>
+      </a-input-search>
+    </div>
+
+    <a-alert
+      v-if="aiError"
+      type="error"
+      :message="aiError"
+      show-icon
+      closable
+      class="ai-alert-message"
+      @close="aiError = ''"
+    />
+
+    <div v-if="aiCommands.length > 0" class="result-section">
+      <div class="explanation-text">
+        <info-circle-outlined /> {{ aiExplanation }}
+      </div>
+      <div class="command-list">
+        <div v-for="cmd in aiCommands" :key="cmd" class="command-item">
+          <code class="cmd-code-block">{{ cmd }}</code>
+          <a-button type="primary" ghost size="small" @click="handleSendCommand(cmd)" :disabled="!isConnect">
+            <template #icon><SendOutlined /></template>
+            发送
           </a-button>
         </div>
+      </div>
+    </div>
 
-        <!-- 錯誤提示 -->
-        <a-alert
-          v-if="aiError"
-          type="error"
-          :message="aiError"
-          show-icon
-          closable
-          @close="aiError = ''"
-        />
-
-        <!-- 指令結果 -->
-        <div v-if="aiCommands.length > 0" class="result-section">
-          <div class="explanation-text">{{ aiExplanation }}</div>
-          <div class="command-list">
-            <div v-for="cmd in aiCommands" :key="cmd" class="command-item">
-              <code>{{ cmd }}</code>
-              <a-button @click="handleSendCommand(cmd)" :disabled="!isConnect">
-                <template #icon><SendOutlined /></template>
-                发送
-              </a-button>
-            </div>
-          </div>
+    <div class="player-section">
+      <div class="player-header">
+        <span class="section-title"><UserOutlined /> 在线玩家 <small class="action-tip">(点击名字快速插入)</small></span>
+      </div>
+      
+      <div v-if="onlinePlayers.length > 0" class="player-items">
+        <div
+          v-for="player in onlinePlayers"
+          :key="player.uuid || player.name"
+          class="player-item"
+          @click="insertPlayerName(player.name)"
+        >
+          <a-avatar :src="`https://minotar.net/avatar/${player.name}/24`" :size="20" shape="square" />
+          <span class="player-name">{{ player.name }}</span>
         </div>
+      </div>
+      <div v-else class="player-empty-pure">
+        <span class="text-muted">暂无在线玩家</span>
+      </div>
+    </div>
 
-        <!-- 玩家列表 -->
-        <div class="player-section">
-          <div class="player-header">
-            <span><UserOutlined /> 在线玩家（点击名字快速插入）</span>
-          </div>
-          <div v-if="onlinePlayers.length > 0" class="player-items">
-            <div
-              v-for="player in onlinePlayers"
-              :key="player.uuid || player.name"
-              class="player-item"
-              @click="insertPlayerName(player.name)"
-            >
-              <a-avatar :src="`https://minotar.net/avatar/${player.name}/32`" :size="28" shape="circle" />
-              <span>{{ player.name }}</span>
-            </div>
-          </div>
-          <a-empty v-else description="暂无在线玩家" :image-style="{ height: '40px' }" />
-        </div>
-      </template>
+  </div>
+</template>
 
       <!-- 分析模式：极简布局，只保留结果和关闭按钮 -->
       <template v-else-if="aiMode === 'analyze_log'">
@@ -857,103 +854,158 @@ const parseCommand = async () => {
   gap: 20px;
 }
 
+<style scoped>
+/* ============================== */
+/* 自然语言转换指令 样式 (MCSM 風格優化) */
+/* ============================== */
+
+.ai-command-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px; /* 統一元件垂直間距 */
+}
+
+/* 頂部工具列 */
+.ai-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .version-info {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.mc-version-tag {
+  border-radius: 2px; /* MCSM 偏好硬朗微圓角 */
+  font-weight: 500;
+}
+
 .text-muted {
-  color: var(--color-text-secondary);
+  color: var(--color-text-secondary, #8c8c8c);
+  font-size: 12px;
+}
+
+.refresh-btn {
+  padding: 0;
   font-size: 13px;
 }
 
-.action-buttons {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* 輸入框包裹 */
+.ai-input-wrapper {
+  width: 100%;
 }
 
-/* 结果区块 */
+/* 錯誤提示微調 */
+.ai-alert-message {
+  border-radius: 4px;
+}
+
+/* 結果區塊 */
 .result-section {
-  margin-top: 4px;
+  background: var(--color-bg-layout, #f5f5f5);
+  border: 1px solid var(--border-color-split, #f0f0f0);
+  border-radius: 4px;
+  padding: 12px;
 }
 
 .explanation-text {
-  color: var(--color-text-secondary);
-  margin-bottom: 12px;
-  font-size: 14px;
+  color: var(--color-text, #262626);
+  margin-bottom: 10px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .command-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .command-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-
-  code {
-    background: #f5f5f5;
-    border: 1px solid #d9d9d9;
-    padding: 6px 12px;
-    border-radius: 4px;
-    flex: 1;
-    font-size: 13px;
-    color: #000;
-    word-break: break-all;
-  }
-
-  .ant-btn {
-    flex-shrink: 0;
-  }
+  gap: 12px;
+  background: var(--color-bg-container, #ffffff);
+  padding: 4px 4px 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color-base, #d9d9d9);
 }
 
-/* 玩家区块 */
+.cmd-code-block {
+  font-family: monospace, "Courier New", Courier;
+  font-size: 13px;
+  color: var(--color-success, #52c41a); /* 指令採用終端綠色語意 */
+  word-break: break-all;
+  flex: 1;
+}
+
+/* 玩家區塊 */
 .player-section {
-  margin-top: 8px;
+  border-top: 1px dashed var(--border-color-split, #e8e8e8);
+  padding-top: 12px;
 }
 
 .player-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.section-title {
+  color: var(--color-text, #262626);
   font-size: 13px;
+  font-weight: 500;
+  
+  th, small {
+    font-weight: normal;
+    color: var(--color-text-secondary, #8c8c8c);
+    margin-left: 4px;
+  }
 }
 
 .player-items {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .player-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 12px;
-  border: 1px solid var(--border-color-base);
-  border-radius: 6px;
-  background: var(--color-bg-container);
+  padding: 2px 8px;
+  border: 1px solid var(--border-color-base, #d9d9d9);
+  border-radius: 4px;
+  background: var(--color-bg-container, #ffffff);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 
   &:hover {
-    border-color: var(--color-primary);
-    background: var(--color-primary-bg);
-  }
-
-  span {
-    font-size: 14px;
-    line-height: 28px;
+    border-color: var(--color-primary, #1890ff);
+    background: var(--color-primary-1, #e6f7ff);
+    transform: translateY(-1px);
   }
 }
+
+.player-name {
+  font-size: 12px;
+  line-height: 20px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 輕量化空狀態 */
+.player-empty-pure {
+  padding: 8px 0;
+  text-align: left;
+}
+</style>
 
 /* ---------- 分析模式专用样式 ---------- */
 .analysis-simple-layout {
