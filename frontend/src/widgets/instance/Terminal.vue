@@ -788,40 +788,56 @@ const parseCommand = async () => {
 </template>
 
       <!-- 分析模式 -->
-      <template v-else-if="aiMode === 'analyze_log'">
-        <!-- 加载状态 -->
-        <div v-if="isParsing" class="flex-center" style="padding: 40px 0;">
-          <a-spin tip="正在分析日志..." />
-        </div>
-
-        <!-- 分析结果 -->
-        <div v-else class="analysis-simple-layout">
-          <a-alert
-            v-if="aiError"
-            type="error"
-            :message="aiError"
-            show-icon
-            class="mb-16"
-          />
-          <div v-if="logAnalysis" class="analysis-result-box">
-            <div class="disclaimer-text">AI 的答案僅供參考</div>
-            <div class="analysis-content" style="white-space: pre-wrap;">{{ logAnalysis }}</div>
-          </div>
-          <div v-if="logSuggestions.length > 0" class="suggestions-box">
-            <div class="section-title">建议指令</div>
-            <div v-for="cmd in logSuggestions" :key="cmd" class="suggestion-item">
-              <code>{{ cmd }}</code>
-            </div>
-          </div>
-        </div>
-
-        <!-- 关闭按钮 -->
-        <div class="analysis-close-bar">
-          <a-button @click="showAiModal = false">关闭</a-button>
-        </div>
-      </template>
+<template v-else-if="aiMode === 'analyze_log'">
+  <div class="ai-analysis-container">
+    
+    <div v-if="isParsing" class="analysis-loading-wrapper">
+      <a-spin tip="MCSM AI 正在深度分析日誌..." size="large" />
     </div>
-  </a-modal>
+
+    <div v-else class="analysis-main-layout animate-fade-in">
+      
+      <a-alert
+        v-if="aiError"
+        type="error"
+        :message="aiError"
+        show-icon
+        closable
+        class="analysis-alert"
+        @close="aiError = ''"
+      />
+
+      <div v-if="logAnalysis" class="analysis-report-card">
+        <div class="card-header-title">
+          <reconciliation-outlined /> AI 崩潰與異常診斷報告
+        </div>
+        <div class="analysis-text-content">{{ logAnalysis }}</div>
+      </div>
+
+      <div v-if="logSuggestions.length > 0" class="suggestions-report-card">
+        <div class="card-header-title">
+          <bulb-outlined class="icon-warning-theme" /> 建議修復方法
+        </div>
+        <ul class="suggestion-list-pure">
+          <li v-for="(suggestion, index) in logSuggestions" :key="index" class="suggestion-step-item">
+            <span class="step-badge">{{ index + 1 }}</span>
+            <div class="step-text">{{ suggestion }}</div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="disclaimer-text-muted">
+        <info-circle-outlined /> AI 產出的診斷與建議僅供參考，請在修改重要檔案前做好備份。
+      </div>
+    </div>
+
+    <div class="analysis-action-bar">
+      <a-button type="default" @click="showAiModal = false" class="close-panel-btn">
+        關閉分析窗口
+      </a-button>
+    </div>
+
+  </div>
 </template>
 
 <style lang="scss" scoped>
@@ -1092,62 +1108,146 @@ const parseCommand = async () => {
 /* ============================== */
 /* 日志分析 样式 */
 /* ============================== */
-.analysis-simple-layout {
+.ai-analysis-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* 拉開整體區塊間距，拒絕擁擠 */
+  padding: 4px 0;
+}
+
+/* 載入狀態優化 */
+.analysis-loading-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 0;
+}
+
+.analysis-main-layout {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.disclaimer-text {
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-style: italic;
-  margin-bottom: 8px;
-  text-align: center;
+
+.analysis-alert {
+  border-radius: 4px;
 }
-.analysis-result-box {
-  background: var(--color-bg-container);
-  border: 1px solid var(--border-color-base);
-  border-radius: 6px;
-  padding: 16px;
-  margin-top: 8px;
+
+/* MCSM 原生風格卡片面板 */
+.analysis-report-card, 
+.suggestions-report-card {
+  background: var(--color-bg-container, #ffffff);
+  border: 1px solid var(--border-color-base, #eeeeee);
+  border-radius: 4px;
+  padding: 18px; /* 增加留白，讓大段文字更好閱讀 */
 }
-.analysis-content {
+
+/* 區塊特殊底色：建議修復區採用輕量有溫度的底色 */
+.suggestions-report-card {
+  background: var(--color-bg-layout, #fafafa);
+  border-color: var(--border-color-split, #e8e8e8);
+}
+
+/* 卡片標題樣式 */
+.card-header-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text, #262626);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-color-split, #f0f0f0);
+  padding-bottom: 8px;
+}
+
+.icon-warning-theme {
+  color: var(--color-warning, #faad14);
+}
+
+/* 大段日誌分析文本區 */
+.analysis-text-content {
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--color-text);
-  font-size: 14px;
-  line-height: 1.6;
+  color: var(--color-text, #262626);
+  font-size: 13.5px;
+  line-height: 1.7; /* 增大行高，防止密密麻麻的文字擠壓 */
 }
-.suggestions-box {
-  margin-top: 8px;
+
+/* 建議列表重構：去除 <code> 區塊 */
+.suggestion-list-pure {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.section-title {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  margin-bottom: 8px;
-}
-.suggestion-item {
+
+.suggestion-step-item {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 6px;
-  code {
-    background: #f5f5f5;
-    border: 1px solid #d9d9d9;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 13px;
-    color: #000;
-    white-space: normal;
-    word-break: break-all;
-    width: 100%;
-    display: block;
-  }
+  gap: 12px;
+  padding: 4px 0;
 }
-.analysis-close-bar {
+
+/* 純數位精緻徽章 */
+.step-badge {
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-color-base);
+  width: 18px;
+  height: 18px;
+  background: var(--color-text-secondary, #8c8c8c);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: bold;
+  border-radius: 2px; /* MCSM 硬朗微圓角 */
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-text {
+  font-size: 13px;
+  color: var(--color-text, #262626);
+  line-height: 1.5;
+  flex: 1;
+}
+
+/* 免責聲明輕量化 */
+.disclaimer-text-muted {
+  color: var(--color-text-secondary, #8c8c8c);
+  font-size: 12px;
+  text-align: center;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* 底部操作列分割 */
+.analysis-close-bar,
+.analysis-action-bar {
+  display: flex;
+  justify-content: flex-end; /* 按鈕靠右對齊，符合 MCSM 彈窗操作常規 */
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color-split, #f0f0f0);
+}
+
+.close-panel-btn {
+  border-radius: 4px;
+  min-width: 100px;
+}
+
+/* 動效 */
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 /* ============================== */
 
