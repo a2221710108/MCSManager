@@ -376,7 +376,7 @@ const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
 // ⚠️ 請修改為你自己的 Cloudflare Worker 地址
-const WORKER_URL = "aicommand.lazycloud.one/api/parse-command";
+const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
 const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log"; // 改成你自己的
 
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
@@ -997,20 +997,19 @@ const parseCommand = async () => {
 }
 
 .suggestion-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   margin-bottom: 8px;
 
   code {
+    display: block;                     /* 块级元素，自动换行 */
     background: #f5f5f5;
     border: 1px solid #d9d9d9;
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 13px;
     color: #000;
-    flex: 1;                    /* 关键：让 code 占满剩余空间，正常换行 */
-    word-break: break-all;      /* 防止长指令溢出 */
+    word-break: break-word;
+    white-space: pre-wrap;              /* 保留文本中的换行和空格 */
+    overflow-wrap: break-word;          /* 长单词断开 */
   }
 }
 
