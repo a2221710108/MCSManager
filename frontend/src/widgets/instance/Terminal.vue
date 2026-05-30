@@ -376,7 +376,7 @@ const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
 // ⚠️ 請修改為你自己的 Cloudflare Worker 地址
-const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
+const WORKER_URL = "aicommand.lazycloud.one/api/parse-command";
 const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log"; // 改成你自己的
 
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
@@ -777,10 +777,10 @@ const parseCommand = async () => {
             class="mb-16"
           />
 
-          <!-- 分析文本 -->
+          <!-- 分析文本（保留换行） -->
           <div v-if="logAnalysis" class="analysis-result-box">
             <div class="disclaimer-text">AI 的答案僅供參考</div>
-            <div class="analysis-content">{{ logAnalysis }}</div>
+            <div class="analysis-content" style="white-space: pre-wrap;">{{ logAnalysis }}</div>
           </div>
 
           <!-- 建议指令 (纯文本展示，无发送按钮) -->
@@ -788,7 +788,6 @@ const parseCommand = async () => {
             <div class="section-title">建议指令</div>
             <div v-for="cmd in logSuggestions" :key="cmd" class="suggestion-item">
               <code>{{ cmd }}</code>
-              <!-- 不再提供发送按钮 -->
             </div>
           </div>
         </div>
@@ -1010,6 +1009,8 @@ const parseCommand = async () => {
     border-radius: 4px;
     font-size: 13px;
     color: #000;
+    flex: 1;                    /* 关键：让 code 占满剩余空间，正常换行 */
+    word-break: break-all;      /* 防止长指令溢出 */
   }
 }
 
