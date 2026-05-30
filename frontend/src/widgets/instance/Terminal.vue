@@ -377,7 +377,6 @@ interface OnlinePlayer {
 const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 
-// ⚠️ 請修改為你自己的 Cloudflare Worker 地址
 const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
 const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log";
 
@@ -658,7 +657,7 @@ const parseCommand = async () => {
     v-model:open="showAiModal"
     :title="aiMode === 'command' ? '自然语言转 Minecraft 指令' : 'AI 日志分析'"
     :footer="null"
-    :width="580"
+    :width="640"
     destroy-on-close
   >
     <div class="ai-modal-container">
@@ -865,12 +864,11 @@ const parseCommand = async () => {
   align-items: center;
 }
 
-/* ============================== */
-/* AI 窗口容器 */
 .ai-modal-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  width: 100%;
 }
 
 /* 自然语言转换指令 样式 */
@@ -880,37 +878,30 @@ const parseCommand = async () => {
   gap: 20px;
   padding: 4px 0;
 }
-
 .ai-card-panel {
   background: var(--color-bg-container);
   border: 1px solid var(--border-color-base);
   border-radius: 4px;
   padding: 16px;
 }
-
 .bg-panel {
   background: var(--color-bg-layout);
   border-color: var(--border-color-split);
 }
-
 .result-panel {
   border-left: 1px solid var(--border-color-base);
 }
-
 .panel-header-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 14px;
 }
-
 .version-display { display: flex; align-items: center; gap: 10px; }
 .mc-tag { border-radius: 2px; font-weight: bold; }
 .sub-text { color: var(--color-text-secondary); font-size: 12px; }
 .refresh-link-btn { padding: 0; font-size: 13px; }
-
 .input-form-group { margin-bottom: 14px; }
-
 .custom-textarea {
   border-radius: 4px;
   padding: 10px 12px;
@@ -923,7 +914,6 @@ const parseCommand = async () => {
     color: var(--color-text-secondary);
   }
 }
-
 .panel-action-row { width: 100%; }
 .action-submit-btn {
   height: 38px;
@@ -931,9 +921,7 @@ const parseCommand = async () => {
   font-weight: 500;
   border-radius: 4px;
 }
-
 .ai-message-wrapper { margin: -4px 0; }
-
 .panel-title-sm {
   font-size: 13px;
   font-weight: 600;
@@ -944,10 +932,8 @@ const parseCommand = async () => {
   gap: 6px;
 }
 .panel-title-sm.no-margin { margin-bottom: 0; }
-
 .title-main { font-weight: 600; }
 .title-hint { font-weight: normal; color: var(--color-text-secondary); font-size: 11px; }
-
 .explanation-box {
   background: var(--color-bg-layout);
   padding: 12px;
@@ -957,9 +943,7 @@ const parseCommand = async () => {
   line-height: 1.6;
   border: 1px solid var(--border-color-split);
 }
-
 .command-output-list { display: flex; flex-direction: column; gap: 10px; }
-
 .command-output-card {
   display: flex;
   align-items: center;
@@ -970,9 +954,7 @@ const parseCommand = async () => {
   padding: 8px 12px;
   border-radius: 4px;
 }
-
 .cmd-text-wrapper { flex: 1; overflow: hidden; }
-
 .terminal-cmd {
   font-family: monospace, "Courier New", Courier;
   font-size: 13px;
@@ -980,7 +962,6 @@ const parseCommand = async () => {
   word-break: break-all;
   font-weight: 600;
 }
-
 .cmd-send-btn {
   border-radius: 4px;
   flex-shrink: 0;
@@ -993,13 +974,11 @@ const parseCommand = async () => {
     border-color: var(--border-color-split);
   }
 }
-
 .player-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
 }
-
 .player-clickable-card {
   display: flex;
   align-items: center;
@@ -1015,7 +994,6 @@ const parseCommand = async () => {
     background: var(--color-primary-bg);
   }
 }
-
 .player-name-text {
   font-size: 12px;
   color: var(--color-text);
@@ -1023,7 +1001,6 @@ const parseCommand = async () => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .player-empty-wrapper {
   padding: 16px 0;
   text-align: center;
@@ -1039,22 +1016,18 @@ const parseCommand = async () => {
   gap: 20px;
   padding: 4px 0;
 }
-
 .analysis-loading-wrapper {
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 60px 0;
 }
-
 .analysis-main-layout {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-
 .analysis-alert { border-radius: 4px; }
-
 .analysis-report-card,
 .suggestions-report-card {
   background: var(--color-bg-container);
@@ -1062,12 +1035,10 @@ const parseCommand = async () => {
   border-radius: 4px;
   padding: 18px;
 }
-
 .suggestions-report-card {
   background: var(--color-bg-layout);
   border-color: var(--border-color-split);
 }
-
 .card-header-title {
   font-size: 14px;
   font-weight: 600;
@@ -1079,11 +1050,9 @@ const parseCommand = async () => {
   border-bottom: 1px solid var(--border-color-split);
   padding-bottom: 8px;
 }
-
 .icon-warning-theme {
   color: var(--color-warning, #faad14);
 }
-
 .analysis-text-content {
   white-space: pre-wrap;
   word-break: break-word;
@@ -1091,7 +1060,6 @@ const parseCommand = async () => {
   font-size: 13.5px;
   line-height: 1.7;
 }
-
 .suggestion-list-pure {
   list-style: none;
   padding: 0;
@@ -1100,36 +1068,32 @@ const parseCommand = async () => {
   flex-direction: column;
   gap: 12px;
 }
-
 .suggestion-step-item {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   padding: 4px 0;
 }
-
 .step-badge {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
-  background: var(--color-text-secondary);
-  color: #fff;
+  background: #1f1f1f;           /* 黑色背景 */
+  color: #ffffff;
   font-size: 11px;
   font-weight: bold;
   border-radius: 2px;
   flex-shrink: 0;
   margin-top: 2px;
 }
-
 .step-text {
   font-size: 13px;
   color: var(--color-text);
   line-height: 1.5;
   flex: 1;
 }
-
 .disclaimer-text-muted {
   color: var(--color-text-secondary);
   font-size: 12px;
@@ -1140,22 +1104,29 @@ const parseCommand = async () => {
   justify-content: center;
   gap: 6px;
 }
-
 .analysis-action-bar {
   display: flex;
   justify-content: flex-end;
   padding-top: 14px;
   border-top: 1px solid var(--border-color-split);
 }
-
 .close-panel-btn {
   border-radius: 4px;
   min-width: 100px;
 }
 
-/* 深色模式下指令颜色微调（保持可读性） */
+/* 深色模式下步骤编号改为浅灰色 */
 @media (prefers-color-scheme: dark) {
+  .step-badge {
+    background: #a6a6a6;
+    color: #141414;
+  }
   .terminal-cmd { color: #ff7db0; }
+}
+:deep(.dark) .step-badge,
+:deep([data-theme='dark']) .step-badge {
+  background: #a6a6a6;
+  color: #141414;
 }
 :deep(.dark) .terminal-cmd,
 :deep([data-theme='dark']) .terminal-cmd {
