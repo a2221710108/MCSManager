@@ -912,12 +912,13 @@ const parseCommand = async () => {
   padding: 4px 0;
 }
 
-/* 使用主题变量替代硬编码颜色 */
+/* 核心卡片面板，强制使用主题背景和文字颜色 */
 .ai-card-panel {
   background: var(--color-bg-container, #ffffff);
   border: 1px solid var(--border-color-base, #eeeeee);
   border-radius: 4px;
   padding: 16px;
+  color: var(--color-text, #262626); /* 确保文字跟随主题 */
 }
 
 .bg-panel {
@@ -942,6 +943,7 @@ const parseCommand = async () => {
   gap: 10px;
 }
 
+/* 版本标签保持 Ant Design 的默认配色，但标题文字跟随主题 */
 .mc-tag {
   border-radius: 2px;
   font-weight: bold;
@@ -961,11 +963,18 @@ const parseCommand = async () => {
   margin-bottom: 14px;
 }
 
+/* 输入框强制适配深色模式 */
 .custom-textarea {
   border-radius: 4px;
   padding: 10px 12px;
   font-size: 14px;
   resize: none;
+  background: var(--color-bg-container, #ffffff) !important;
+  color: var(--color-text, #262626) !important;
+  border-color: var(--border-color-base, #d9d9d9) !important;
+  &::placeholder {
+    color: var(--color-text-quaternary, #bfbfbf) !important;
+  }
 }
 
 .panel-action-row {
@@ -983,6 +992,7 @@ const parseCommand = async () => {
   margin: -4px 0;
 }
 
+/* 标题文字 */
 .panel-title-sm {
   font-size: 13px;
   font-weight: 600;
@@ -1007,6 +1017,7 @@ const parseCommand = async () => {
   font-size: 11px;
 }
 
+/* 解析思维说明区域 */
 .explanation-box {
   background: var(--color-bg-layout, #f5f5f5);
   padding: 12px;
@@ -1032,6 +1043,7 @@ const parseCommand = async () => {
   border: 1px solid var(--border-color-base, #e8e8e8);
   padding: 8px 12px;
   border-radius: 4px;
+  color: var(--color-text, #262626); /* 保证文字可见 */
 }
 
 .cmd-text-wrapper {
@@ -1039,19 +1051,21 @@ const parseCommand = async () => {
   overflow: hidden;
 }
 
-/* 指令高亮使用主题主色 */
+/* 命令高亮，但跟随主色 */
 .terminal-cmd {
   font-family: monospace, "Courier New", Courier;
   font-size: 13px;
   color: var(--color-primary, #c41d7f);
   word-break: break-all;
   font-weight: 600;
+  background: none; /* 避免覆盖 */
 }
 
 .cmd-send-btn {
   border-radius: 4px;
   flex-shrink: 0;
   background: var(--color-bg-container, #ffffff);
+  color: var(--color-text, #262626);
 }
 
 .player-grid {
@@ -1068,6 +1082,7 @@ const parseCommand = async () => {
   border: 1px solid var(--border-color-split, #e8e8e8);
   border-radius: 4px;
   background: var(--color-bg-container, #ffffff);
+  color: var(--color-text, #262626);
   cursor: pointer;
   transition: all 0.2s ease;
   &:hover {
@@ -1089,6 +1104,7 @@ const parseCommand = async () => {
   text-align: center;
   border: 1px dashed var(--border-color-split, #e8e8e8);
   border-radius: 4px;
+  color: var(--color-text-secondary, #8c8c8c);
 }
 
 .animate-fade-in {
@@ -1138,6 +1154,7 @@ const parseCommand = async () => {
   border: 1px solid var(--border-color-base, #eeeeee);
   border-radius: 4px;
   padding: 18px;
+  color: var(--color-text, #262626);
 }
 
 .suggestions-report-card {
