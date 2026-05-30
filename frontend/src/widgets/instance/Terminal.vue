@@ -409,7 +409,7 @@ const fetchPlayers = async () => {
     isLoadingPlayers.value = false;
   }
 };
-// 插入玩家姓名格式：玩家："Tom"
+// 插入玩家姓名格式：玩家："Tom" 
 const insertPlayerName = (name: string) => {
   nlInput.value += `玩家："${name}" `;
 };
@@ -651,7 +651,6 @@ const parseCommand = async () => {
       />
     </template>
   </CardPanel>
-
   <!-- AI 窗口 (根據模式顯示不同內容) -->
   <a-modal
     v-model:open="showAiModal"
@@ -744,7 +743,7 @@ const parseCommand = async () => {
                 class="player-clickable-card"
                 @click="insertPlayerName(player.name)"
               >
-                <a-avatar :src="`https://minotar.net/avatar/${player.name}/24`" :size="18" shape="square" />
+                <a-avatar :src="'https://minotar.net/avatar/' + player.name + '/24'" :size="18" shape="square" />
                 <span class="player-name-text">{{ player.name }}</span>
               </div>
             </div>
@@ -754,7 +753,6 @@ const parseCommand = async () => {
           </div>
         </div>
       </template>
-
       <!-- 分析模式 -->
       <template v-else-if="aiMode === 'analyze_log'">
         <div class="ai-analysis-container">
@@ -851,14 +849,12 @@ const parseCommand = async () => {
   display: flex;
   align-items: center;
 }
-
 /* AI 窗口容器 */
 .ai-modal-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
-
 /* ============================== */
 /* 自然语言转换指令 样式 */
 /* ============================== */
@@ -1025,7 +1021,6 @@ const parseCommand = async () => {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 /* ============================== */
 /* 日志分析 样式 */
 /* ============================== */
@@ -1136,7 +1131,178 @@ const parseCommand = async () => {
   min-width: 100px;
 }
 /* ============================== */
-
+/* 深色模式适配 (自然语言转换指令 + 日志分析) */
+/* ============================== */
+@media (prefers-color-scheme: dark) {
+  .ai-card-panel {
+    background: var(--color-bg-container, #1f1f1f);
+    border-color: var(--border-color-base, #303030);
+  }
+  .bg-panel {
+    background: var(--color-bg-layout, #141414);
+    border-color: var(--border-color-split, #303030);
+  }
+  .result-panel {
+    border-left-color: var(--border-color-base, #303030);
+  }
+  .panel-title-sm {
+    color: var(--color-text, #e5e5e5);
+  }
+  .explanation-box {
+    background: var(--color-bg-layout, #141414);
+    border-color: var(--border-color-split, #303030);
+    color: var(--color-text-secondary, #a6a6a6);
+  }
+  .command-output-card {
+    background: var(--color-bg-layout, #141414);
+    border-color: var(--border-color-base, #303030);
+  }
+  .terminal-cmd {
+    color: #ff7db0;
+  }
+  .cmd-send-btn {
+    background: #1f1f1f;
+    border-color: #434343;
+    color: #e5e5e5;
+  }
+  .cmd-send-btn[disabled] {
+    background: #141414;
+    border-color: #303030;
+    color: #434343;
+  }
+  .player-clickable-card {
+    background: var(--color-bg-container, #1f1f1f);
+    border-color: var(--border-color-split, #303030);
+  }
+  .player-clickable-card:hover {
+    background: var(--color-primary-dark, #113c66);
+    border-color: var(--color-primary, #1890ff);
+  }
+  .player-name-text {
+    color: var(--color-text, #e5e5e5);
+  }
+  .analysis-report-card {
+    background: var(--color-bg-container, #1f1f1f);
+    border-color: var(--border-color-base, #303030);
+  }
+  .suggestions-report-card {
+    background: var(--color-bg-layout, #141414);
+    border-color: var(--border-color-split, #303030);
+  }
+  .card-header-title {
+    color: var(--color-text, #e5e5e5);
+    border-bottom-color: var(--border-color-split, #303030);
+  }
+  .analysis-text-content,
+  .step-text {
+    color: var(--color-text, #d4d4d4);
+  }
+  .step-badge {
+    background: var(--color-text-secondary, #a6a6a6);
+    color: #1f1f1f;
+  }
+  .disclaimer-text-muted {
+    color: var(--color-text-secondary, #737373);
+  }
+  .analysis-action-bar {
+    border-top-color: var(--border-color-split, #303030);
+  }
+}
+/* 同步支援 MCSM 手动切换深色主题的 Class */
+:deep(.dark) .ai-card-panel,
+:deep([data-theme='dark']) .ai-card-panel {
+  background: var(--color-bg-container, #1f1f1f);
+  border-color: var(--border-color-base, #303030);
+}
+:deep(.dark) .bg-panel,
+:deep([data-theme='dark']) .bg-panel {
+  background: var(--color-bg-layout, #141414);
+  border-color: var(--border-color-split, #303030);
+}
+:deep(.dark) .result-panel,
+:deep([data-theme='dark']) .result-panel {
+  border-left-color: var(--border-color-base, #303030);
+}
+:deep(.dark) .panel-title-sm,
+:deep([data-theme='dark']) .panel-title-sm {
+  color: var(--color-text, #e5e5e5);
+}
+:deep(.dark) .explanation-box,
+:deep([data-theme='dark']) .explanation-box {
+  background: var(--color-bg-layout, #141414);
+  border-color: var(--border-color-split, #303030);
+  color: var(--color-text-secondary, #a6a6a6);
+}
+:deep(.dark) .command-output-card,
+:deep([data-theme='dark']) .command-output-card {
+  background: var(--color-bg-layout, #141414);
+  border-color: var(--border-color-base, #303030);
+}
+:deep(.dark) .terminal-cmd,
+:deep([data-theme='dark']) .terminal-cmd {
+  color: #ff7db0;
+}
+:deep(.dark) .cmd-send-btn,
+:deep([data-theme='dark']) .cmd-send-btn {
+  background: #1f1f1f;
+  border-color: #434343;
+  color: #e5e5e5;
+}
+:deep(.dark) .cmd-send-btn[disabled],
+:deep([data-theme='dark']) .cmd-send-btn[disabled] {
+  background: #141414;
+  border-color: #303030;
+  color: #434343;
+}
+:deep(.dark) .player-clickable-card,
+:deep([data-theme='dark']) .player-clickable-card {
+  background: var(--color-bg-container, #1f1f1f);
+  border-color: var(--border-color-split, #303030);
+}
+:deep(.dark) .player-clickable-card:hover,
+:deep([data-theme='dark']) .player-clickable-card:hover {
+  background: var(--color-primary-dark, #113c66);
+  border-color: var(--color-primary, #1890ff);
+}
+:deep(.dark) .player-name-text,
+:deep([data-theme='dark']) .player-name-text {
+  color: var(--color-text, #e5e5e5);
+}
+:deep(.dark) .analysis-report-card,
+:deep([data-theme='dark']) .analysis-report-card {
+  background: var(--color-bg-container, #1f1f1f);
+  border-color: var(--border-color-base, #303030);
+}
+:deep(.dark) .suggestions-report-card,
+:deep([data-theme='dark']) .suggestions-report-card {
+  background: var(--color-bg-layout, #141414);
+  border-color: var(--border-color-split, #303030);
+}
+:deep(.dark) .card-header-title,
+:deep([data-theme='dark']) .card-header-title {
+  color: var(--color-text, #e5e5e5);
+  border-bottom-color: var(--border-color-split, #303030);
+}
+:deep(.dark) .analysis-text-content,
+:deep(.dark) .step-text,
+:deep([data-theme='dark']) .analysis-text-content,
+:deep([data-theme='dark']) .step-text {
+  color: var(--color-text, #d4d4d4);
+}
+:deep(.dark) .step-badge,
+:deep([data-theme='dark']) .step-badge {
+  background: var(--color-text-secondary, #a6a6a6);
+  color: #1f1f1f;
+}
+:deep(.dark) .disclaimer-text-muted,
+:deep([data-theme='dark']) .disclaimer-text-muted {
+  color: var(--color-text-secondary, #737373);
+}
+:deep(.dark) .analysis-action-bar,
+:deep([data-theme='dark']) .analysis-action-bar {
+  border-top-color: var(--border-color-split, #303030);
+}
+/* ============================== */
 .mb-16 {
   margin-bottom: 16px;
 }
