@@ -640,7 +640,7 @@ const parseCommand = async () => {
   <!-- AI 窗口 (根據模式顯示不同內容) -->
   <a-modal
     v-model:open="showAiModal"
-    :title="aiMode === 'command' ? 'AI Minecraft 指令' : 'AI 錯誤分析'"
+    :title="aiMode === 'command' ? 'Minecraft 指令轉換 (BETA)' : 'AI 錯誤分析'"
     :footer="null"
     :width="580"
     :getContainer="false"
