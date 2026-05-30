@@ -53,11 +53,9 @@ import { GLOBAL_INSTANCE_NAME } from "../../config/const";
 import { useTerminal, type UseTerminalHook } from "../../hooks/useTerminal";
 import { arrayFilter } from "../../tools/array";
 import { message } from "ant-design-vue";
-
 const props = defineProps<{
   card: LayoutCard;
 }>();
-
 const { isPhone } = useScreen();
 const { state, isAdmin } = useAppStateStore();
 const { getMetaOrRouteValue } = useLayoutCardTools(props.card);
@@ -73,7 +71,6 @@ const {
   sendCommand,
   isConnect
 } = terminalHook;
-
 const instanceId = getMetaOrRouteValue("instanceId");
 const daemonId = getMetaOrRouteValue("daemonId");
 const viewType = getMetaOrRouteValue("viewType", false);
@@ -81,12 +78,10 @@ const innerTerminalType = computed(() => props.card.width === 12 && viewType ===
 const instanceTypeText = computed(
   () => INSTANCE_TYPE_TRANSLATION[instanceInfo.value?.config.type ?? -1]
 );
-
 // --- 日誌過濾功能 ---
 const terminalCoreRef = ref();
 const activeTab = ref("default");
 const { execute: fetchFile } = fileContent();
-
 const handleTabChange = async () => {
   if (activeTab.value === "default") {
     await nextTick();
@@ -143,7 +138,6 @@ const handleTabChange = async () => {
     }
   }
 };
-
 // --- 原有實例操作邏輯 ---
 const { execute: requestOpenInstance, isLoading: isOpenInstanceLoading } = openInstance();
 const toOpenInstance = async () => {
@@ -164,10 +158,8 @@ const toOpenInstance = async () => {
     reportErrorMsg(error);
   }
 };
-
 const updateCmd = computed(() => (instanceInfo.value?.config.updateCommand ? true : false));
 const instanceStatusText = computed(() => INSTANCE_STATUS[instanceInfo.value?.status ?? -1]);
-
 const quickOperations = computed(() =>
   arrayFilter([
     {
@@ -201,7 +193,6 @@ const quickOperations = computed(() =>
     }
   ])
 );
-
 const instanceOperations = computed(() =>
   arrayFilter([
     {
@@ -298,7 +289,6 @@ const instanceOperations = computed(() =>
     }
   ])
 );
-
 const getInstanceName = computed(() => {
   if (instanceInfo.value?.config.nickname === GLOBAL_INSTANCE_NAME) {
     return t("TXT_CODE_5bdaf23d");
@@ -306,27 +296,23 @@ const getInstanceName = computed(() => {
     return instanceInfo.value?.config.nickname;
   }
 });
-
 const useByteUnit = useLocalStorage("useByteUnit", true);
 const prettyBytesConfig: PrettyOptions = {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
   binary: true
 };
-
 const getUsageColor = (percentage?: number) => {
   percentage = Number(percentage);
   if (percentage > 600) return "error";
   if (percentage > 200) return "warning";
   return "default";
 };
-
 const formatMemoryUsage = (usage?: number, limit?: number) => {
   const fUsage = prettyBytes(usage ?? 0, prettyBytesConfig);
   const fLimit = prettyBytes(limit ?? 0, prettyBytesConfig);
   return limit ? `${fUsage} / ${fLimit}` : fUsage;
 };
-
 const formatNetworkSpeed = (bytes?: number) =>
   useByteUnit.value
     ? prettyBytes(bytes ?? 0, { ...prettyBytesConfig, binary: false }) + "/s"
@@ -334,7 +320,6 @@ const formatNetworkSpeed = (bytes?: number) =>
         /bit$/,
         "b"
       ) + "ps";
-
 const terminalTopTags = computed<TagInfo[]>(() => {
   const info = instanceInfo.value?.info;
   if (!info || isStopped.value) return [];
@@ -365,7 +350,6 @@ const terminalTopTags = computed<TagInfo[]>(() => {
     }
   ]);
 });
-
 // ===================== AI 自然語言指令轉換 =====================
 const showAiModal = ref(false);
 const nlInput = ref("");
@@ -376,23 +360,19 @@ const aiExplanation = ref("");
 const aiMode = ref<"command" | "analyze_log">("command");
 const logAnalysis = ref("");
 const logSuggestions = ref<string[]>([]);
-
 interface OnlinePlayer {
   name: string;
   uuid?: string;
 }
 const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
-
 const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
 const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log";
-
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 const pingConfig = computed(() => ({
   ip: instanceInfo.value?.config?.pingConfig?.ip || "",
   port: instanceInfo.value?.config?.pingConfig?.port || 25565
 }));
-
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) {
     message.warning("未配置服务器 IP");
@@ -421,11 +401,9 @@ const fetchPlayers = async () => {
     isLoadingPlayers.value = false;
   }
 };
-
 const insertPlayerName = (name: string) => {
-  nlInput.value += `玩家："${name}" `;
+  nlInput.value += `玩家："${name}"` ;
 };
-
 const openAiModal = () => {
   aiMode.value = "command";
   showAiModal.value = true;
@@ -435,7 +413,6 @@ const openAiModal = () => {
   aiExplanation.value = "";
   fetchPlayers();
 };
-
 const openAiWithLog = (logText: string) => {
   aiMode.value = "analyze_log";
   showAiModal.value = true;
@@ -444,7 +421,6 @@ const openAiWithLog = (logText: string) => {
   logSuggestions.value = [];
   analyzeLog(logText);
 };
-
 const analyzeLog = async (logText: string) => {
   isParsing.value = true;
   aiError.value = "";
@@ -471,7 +447,6 @@ const analyzeLog = async (logText: string) => {
     isParsing.value = false;
   }
 };
-
 const handleSendCommand = async (cmd: string) => {
   try {
     await sendCommand(cmd);
@@ -480,7 +455,6 @@ const handleSendCommand = async (cmd: string) => {
     message.error("指令发送失败: " + err.message);
   }
 };
-
 const parseCommand = async () => {
   const text = nlInput.value.trim();
   if (!text) return;
@@ -514,7 +488,6 @@ const parseCommand = async () => {
   }
 };
 </script>
-
 <template>
   <!-- 內部終端視圖 -->
   <div v-if="innerTerminalType">
@@ -664,13 +637,14 @@ const parseCommand = async () => {
       />
     </template>
   </CardPanel>
-
   <!-- AI 窗口 (根據模式顯示不同內容) -->
+  <!-- ★ 核心修改：添加 :getContainer="false"，讓 Modal 渲染在組件 DOM 內而非 body 下 -->
   <a-modal
     v-model:open="showAiModal"
     :title="aiMode === 'command' ? '自然语言转 Minecraft 指令' : 'AI 日志分析'"
     :footer="null"
     :width="580"
+    :getContainer="false"
     destroy-on-close
   >
     <div class="ai-modal-container">
@@ -783,7 +757,6 @@ const parseCommand = async () => {
           </div>
         </div>
       </template>
-
       <!-- 分析模式 -->
       <template v-else-if="aiMode === 'analyze_log'">
         <div class="ai-analysis-container">
@@ -835,7 +808,6 @@ const parseCommand = async () => {
     </div>
   </a-modal>
 </template>
-
 <style lang="scss" scoped>
 /* 原有样式保留，并适配主题 */
 .error-card {
@@ -861,14 +833,12 @@ const parseCommand = async () => {
     }
   }
 }
-
 .status-bar-flex {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
 }
-
 :deep(.ant-radio-button-wrapper) {
   height: 24px;
   line-height: 22px;
@@ -883,25 +853,21 @@ const parseCommand = async () => {
     border-radius: 0 4px 4px 0;
   }
 }
-
 .console-wrapper {
   position: relative;
   height: 100%;
   width: 100%;
 }
-
 .align-center {
   display: flex;
   align-items: center;
 }
-
 /* AI 窗口容器 */
 .ai-modal-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
-
 /* ============================== */
 /* 自然语言转换指令 样式 */
 /* ============================== */
@@ -911,88 +877,64 @@ const parseCommand = async () => {
   gap: 20px;
   padding: 4px 0;
 }
-
-/* 核心卡片面板，强制使用主题背景和文字颜色 */
+/* 使用主题变量替代硬编码颜色 */
 .ai-card-panel {
   background: var(--color-bg-container, #ffffff);
   border: 1px solid var(--border-color-base, #eeeeee);
   border-radius: 4px;
   padding: 16px;
-  color: var(--color-text, #262626); /* 确保文字跟随主题 */
 }
-
 .bg-panel {
   background: var(--color-bg-layout, #fafafa);
   border-color: var(--border-color-split, #e8e8e8);
 }
-
 .result-panel {
   border-left: 1px solid var(--border-color-base, #eeeeee);
 }
-
 .panel-header-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 14px;
 }
-
 .version-display {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-
-/* 版本标签保持 Ant Design 的默认配色，但标题文字跟随主题 */
 .mc-tag {
   border-radius: 2px;
   font-weight: bold;
 }
-
 .sub-text {
   color: var(--color-text-secondary, #8c8c8c);
   font-size: 12px;
 }
-
 .refresh-link-btn {
   padding: 0;
   font-size: 13px;
 }
-
 .input-form-group {
   margin-bottom: 14px;
 }
-
-/* 输入框强制适配深色模式 */
 .custom-textarea {
   border-radius: 4px;
   padding: 10px 12px;
   font-size: 14px;
   resize: none;
-  background: var(--color-bg-container, #ffffff) !important;
-  color: var(--color-text, #262626) !important;
-  border-color: var(--border-color-base, #d9d9d9) !important;
-  &::placeholder {
-    color: var(--color-text-quaternary, #bfbfbf) !important;
-  }
 }
-
 .panel-action-row {
   width: 100%;
 }
-
 .action-submit-btn {
   height: 38px;
   font-size: 14px;
   font-weight: 500;
   border-radius: 4px;
 }
-
 .ai-message-wrapper {
   margin: -4px 0;
 }
-
-/* 标题文字 */
 .panel-title-sm {
   font-size: 13px;
   font-weight: 600;
@@ -1002,22 +944,17 @@ const parseCommand = async () => {
   align-items: center;
   gap: 6px;
 }
-
 .panel-title-sm.no-margin {
   margin-bottom: 0;
 }
-
 .title-main {
   font-weight: 600;
 }
-
 .title-hint {
   font-weight: normal;
   color: var(--color-text-secondary, #999999);
   font-size: 11px;
 }
-
-/* 解析思维说明区域 */
 .explanation-box {
   background: var(--color-bg-layout, #f5f5f5);
   padding: 12px;
@@ -1027,13 +964,11 @@ const parseCommand = async () => {
   line-height: 1.6;
   border: 1px solid var(--border-color-split, #e8e8e8);
 }
-
 .command-output-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-
 .command-output-card {
   display: flex;
   align-items: center;
@@ -1043,37 +978,29 @@ const parseCommand = async () => {
   border: 1px solid var(--border-color-base, #e8e8e8);
   padding: 8px 12px;
   border-radius: 4px;
-  color: var(--color-text, #262626); /* 保证文字可见 */
 }
-
 .cmd-text-wrapper {
   flex: 1;
   overflow: hidden;
 }
-
-/* 命令高亮，但跟随主色 */
+/* 指令高亮使用主题主色 */
 .terminal-cmd {
   font-family: monospace, "Courier New", Courier;
   font-size: 13px;
   color: var(--color-primary, #c41d7f);
   word-break: break-all;
   font-weight: 600;
-  background: none; /* 避免覆盖 */
 }
-
 .cmd-send-btn {
   border-radius: 4px;
   flex-shrink: 0;
   background: var(--color-bg-container, #ffffff);
-  color: var(--color-text, #262626);
 }
-
 .player-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
 }
-
 .player-clickable-card {
   display: flex;
   align-items: center;
@@ -1082,7 +1009,6 @@ const parseCommand = async () => {
   border: 1px solid var(--border-color-split, #e8e8e8);
   border-radius: 4px;
   background: var(--color-bg-container, #ffffff);
-  color: var(--color-text, #262626);
   cursor: pointer;
   transition: all 0.2s ease;
   &:hover {
@@ -1090,7 +1016,6 @@ const parseCommand = async () => {
     background: var(--color-fill-secondary, #f0f7ff);
   }
 }
-
 .player-name-text {
   font-size: 12px;
   color: var(--color-text, #262626);
@@ -1098,15 +1023,12 @@ const parseCommand = async () => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .player-empty-wrapper {
   padding: 16px 0;
   text-align: center;
   border: 1px dashed var(--border-color-split, #e8e8e8);
   border-radius: 4px;
-  color: var(--color-text-secondary, #8c8c8c);
 }
-
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }
@@ -1120,7 +1042,6 @@ const parseCommand = async () => {
     transform: translateY(0);
   }
 }
-
 /* ============================== */
 /* 日志分析 样式 */
 /* ============================== */
@@ -1130,38 +1051,31 @@ const parseCommand = async () => {
   gap: 20px;
   padding: 4px 0;
 }
-
 .analysis-loading-wrapper {
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 60px 0;
 }
-
 .analysis-main-layout {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-
 .analysis-alert {
   border-radius: 4px;
 }
-
 .analysis-report-card,
 .suggestions-report-card {
   background: var(--color-bg-container, #ffffff);
   border: 1px solid var(--border-color-base, #eeeeee);
   border-radius: 4px;
   padding: 18px;
-  color: var(--color-text, #262626);
 }
-
 .suggestions-report-card {
   background: var(--color-bg-layout, #fafafa);
   border-color: var(--border-color-split, #e8e8e8);
 }
-
 .card-header-title {
   font-size: 14px;
   font-weight: 600;
@@ -1173,11 +1087,9 @@ const parseCommand = async () => {
   border-bottom: 1px solid var(--border-color-split, #f0f0f0);
   padding-bottom: 8px;
 }
-
 .icon-warning-theme {
   color: var(--color-warning, #faad14);
 }
-
 .analysis-text-content {
   white-space: pre-wrap;
   word-break: break-word;
@@ -1185,7 +1097,6 @@ const parseCommand = async () => {
   font-size: 13.5px;
   line-height: 1.7;
 }
-
 .suggestion-list-pure {
   list-style: none;
   padding: 0;
@@ -1194,14 +1105,12 @@ const parseCommand = async () => {
   flex-direction: column;
   gap: 12px;
 }
-
 .suggestion-step-item {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   padding: 4px 0;
 }
-
 .step-badge {
   display: flex;
   align-items: center;
@@ -1216,14 +1125,12 @@ const parseCommand = async () => {
   flex-shrink: 0;
   margin-top: 2px;
 }
-
 .step-text {
   font-size: 13px;
   color: var(--color-text, #262626);
   line-height: 1.5;
   flex: 1;
 }
-
 .disclaimer-text-muted {
   color: var(--color-text-secondary, #8c8c8c);
   font-size: 12px;
@@ -1234,24 +1141,20 @@ const parseCommand = async () => {
   justify-content: center;
   gap: 6px;
 }
-
 .analysis-action-bar {
   display: flex;
   justify-content: flex-end;
   padding-top: 14px;
   border-top: 1px solid var(--border-color-split, #f0f0f0);
 }
-
 .close-panel-btn {
   border-radius: 4px;
   min-width: 100px;
 }
-
 /* ============================== */
 .mb-16 {
   margin-bottom: 16px;
 }
-
 /* 通用工具类 */
 .ml-16 {
   margin-left: 16px;
