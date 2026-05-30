@@ -129,28 +129,24 @@ const refreshPage = () => {
   window.location.reload();
 };
 
-// ---------- 新增：文字選取與懸浮按鈕（右侧定位）----------
+// ---------- 悬浮按钮（鼠标位置右侧 + 边界检查）----------
 const showFloatBtn = ref(false);
 const floatBtnPos = ref({ x: 0, y: 0 });
 const selectedText = ref("");
 
-const handleTextSelection = () => {
-  // 只在靜態視圖下運作
+const handleTextSelection = (event: MouseEvent) => {
   if (!isStaticView.value) return;
   const selection = window.getSelection();
   const text = selection?.toString().trim();
   if (text && selection?.rangeCount) {
-    const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    // 按鈕放在選取範圍的右側，垂直方向對齊選取範圍頂部
-    let x = rect.right + 8;   // 右側偏移 8px
-    let y = rect.top;
+    // 按钮出现在鼠标右侧 8px，垂直对齐鼠标位置
+    let x = event.clientX + 8;
+    let y = event.clientY;
 
-    // 若右側空間不夠（按鈕寬度約 70px），則放到左側
+    // 若右侧空间不足（按钮宽约 70px），则放到鼠标左侧
     if (x + 70 > window.innerWidth) {
-      x = rect.left - 70;
+      x = event.clientX - 70;
     }
-    // 避免超出視窗頂部
     if (y < 0) y = 4;
 
     floatBtnPos.value = { x, y };
@@ -248,7 +244,6 @@ onMounted(async () => {
           <template #prefix>
             <CodeOutlined style="font-size: 18px" />
           </template>
-          <!-- AI 按鈕（指令生成）在輸入框後綴中 -->
           <template #suffix>
             <a-button
               class="ai-suffix-btn"
@@ -273,7 +268,7 @@ onMounted(async () => {
           <div
             class="static-log-content"
             :style="{ height: props.height, minHeight: props.height }"
-            @mouseup="handleTextSelection"
+            @mouseup="handleTextSelection($event)"
           >
             <pre v-if="staticLogContent">{{ staticLogContent }}</pre>
             <div v-else-if="!isLogLoading" class="flex-center flex-column empty-box">
@@ -284,7 +279,7 @@ onMounted(async () => {
         </a-spin>
       </div>
 
-      <!-- 懸浮分析按鈕（右侧定位） -->
+      <!-- 悬浮分析按钮（鼠标位置右侧） -->
       <div
         v-if="showFloatBtn"
         class="float-ai-btn"
@@ -344,7 +339,7 @@ onMounted(async () => {
 </template>
 
 <style lang="scss" scoped>
-/* 原有樣式完整保留 */
+/* 原有样式完整保留 */
 .console-wrapper {
   position: relative;
   height: 100%;
@@ -493,7 +488,7 @@ onMounted(async () => {
   }
 }
 
-/* AI 指令按鈕樣式（放在輸入框 suffix 中） */
+/* AI 指令按鈕樣式 */
 .ai-suffix-btn {
   background: transparent !important;
   border: none !important;
@@ -504,7 +499,7 @@ onMounted(async () => {
   }
 }
 
-/* 懸浮分析按鈕（右侧定位，可懸停） */
+/* 悬浮分析按钮（鼠标位置右侧，悬停变色） */
 .float-ai-btn {
   position: fixed;
   z-index: 1000;
