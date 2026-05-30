@@ -377,7 +377,7 @@ const isLoadingPlayers = ref(false);
 
 // ⚠️ 請修改為你自己的 Cloudflare Worker 地址
 const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
-const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log"; // 改成你自己的
+const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log";
 
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 
@@ -416,7 +416,7 @@ const fetchPlayers = async () => {
 };
 
 const insertPlayerName = (name: string) => {
-  nlInput.value += ` ${name} `;
+  nlInput.value += `${name} `;
 };
 
 const openAiModal = () => {
@@ -436,7 +436,6 @@ const openAiWithLog = (logText: string) => {
   aiError.value = "";
   logAnalysis.value = "";
   logSuggestions.value = [];
-  // 直接發送分析請求
   analyzeLog(logText);
 };
 
@@ -626,7 +625,6 @@ const parseCommand = async () => {
       </div>
     </div>
 
-    <!-- TerminalCore 內含 AI 按鈕，emit 'open-ai' 和 'analyze-log' -->
     <TerminalCore
       v-if="instanceId && daemonId"
       ref="terminalCoreRef"
@@ -675,91 +673,94 @@ const parseCommand = async () => {
   </CardPanel>
 
   <!-- AI 窗口 (根據模式顯示不同內容) -->
-<template v-if="aiMode === 'command'">
-  <div class="ai-command-container">
-    
-    <div class="ai-header-bar">
-      <div class="version-info">
-        <a-tag color="blue" class="mc-version-tag">Minecraft {{ mcVersion }}</a-tag>
-        <span class="text-muted">AI 將根據此版本生成指令</span>
-      </div>
-      <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers" class="refresh-btn">
-        <template #icon><ReloadOutlined /></template>
-        重新整理玩家
-      </a-button>
-    </div>
+  <a-modal
+    v-model:open="showAiModal"
+    :title="aiMode === 'command' ? '自然语言转 Minecraft 指令' : 'AI 日志分析'"
+    :footer="null"
+    :width="580"
+    destroy-on-close
+  >
+    <div class="ai-modal-container">
+      <!-- 指令模式 -->
+      <template v-if="aiMode === 'command'">
+        <div class="ai-command-container">
+          <div class="ai-header-bar">
+            <div class="version-info">
+              <a-tag color="blue" class="mc-version-tag">Minecraft {{ mcVersion }}</a-tag>
+              <span class="text-muted">AI 將根據此版本生成指令</span>
+            </div>
+            <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers" class="refresh-btn">
+              <template #icon><ReloadOutlined /></template>
+              重新整理玩家
+            </a-button>
+          </div>
+          <div class="ai-input-wrapper">
+            <a-input-search
+              v-model:value="nlInput"
+              placeholder="描述你想执行的操作，例如：把玩家 Tom 传送到 0 64 0，再给他一个钻石剑"
+              :disabled="isParsing"
+              :loading="isParsing"
+              allow-clear
+              size="large"
+              @search="parseCommand"
+            >
+              <template #enterButton>
+                <a-button type="primary" :disabled="!nlInput.trim() || isParsing">
+                  <template #icon><SendOutlined /></template>
+                  解析指令
+                </a-button>
+              </template>
+            </a-input-search>
+          </div>
+          <a-alert
+            v-if="aiError"
+            type="error"
+            :message="aiError"
+            show-icon
+            closable
+            class="ai-alert-message"
+            @close="aiError = ''"
+          />
+          <div v-if="aiCommands.length > 0" class="result-section">
+            <div class="explanation-text">
+              <InfoCircleOutlined /> {{ aiExplanation }}
+            </div>
+            <div class="command-list">
+              <div v-for="cmd in aiCommands" :key="cmd" class="command-item">
+                <code class="cmd-code-block">{{ cmd }}</code>
+                <a-button type="primary" ghost size="small" @click="handleSendCommand(cmd)" :disabled="!isConnect">
+                  <template #icon><SendOutlined /></template>
+                  发送
+                </a-button>
+              </div>
+            </div>
+          </div>
+          <div class="player-section">
+            <div class="player-header">
+              <span class="section-title">
+                <UserOutlined /> 在线玩家 <small class="action-tip">(点击名字快速插入)</small>
+              </span>
+            </div>
 
-    <div class="ai-input-wrapper">
-      <a-input-search
-        v-model:value="nlInput"
-        placeholder="描述你想执行的操作，例如：把玩家 Tom 传送到 0 64 0，再给他一个钻石剑"
-        :disabled="isParsing"
-        :loading="isParsing"
-        allow-clear
-        size="large"
-        @search="parseCommand"
-      >
-        <template #enterButton>
-          <a-button type="primary" :disabled="!nlInput.trim() || isParsing">
-            <template #icon><SendOutlined /></template>
-            解析指令
-          </a-button>
-        </template>
-      </a-input-search>
-    </div>
-
-    <a-alert
-      v-if="aiError"
-      type="error"
-      :message="aiError"
-      show-icon
-      closable
-      class="ai-alert-message"
-      @close="aiError = ''"
-    />
-
-    <div v-if="aiCommands.length > 0" class="result-section">
-      <div class="explanation-text">
-        <info-circle-outlined /> {{ aiExplanation }}
-      </div>
-      <div class="command-list">
-        <div v-for="cmd in aiCommands" :key="cmd" class="command-item">
-          <code class="cmd-code-block">{{ cmd }}</code>
-          <a-button type="primary" ghost size="small" @click="handleSendCommand(cmd)" :disabled="!isConnect">
-            <template #icon><SendOutlined /></template>
-            发送
-          </a-button>
+            <div v-if="onlinePlayers.length > 0" class="player-items">
+              <div
+                v-for="player in onlinePlayers"
+                :key="player.uuid || player.name"
+                class="player-item"
+                @click="insertPlayerName(player.name)"
+              >
+                <a-avatar :src="'https://minotar.net/avatar/' + player.name + '/24'" :size="20" shape="square" />
+                <span class="player-name">{{ player.name }}</span>
+              </div>
+            </div>
+            <div v-else class="player-empty-pure">
+              <span class="text-muted">暂无在线玩家</span>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </template>
 
-    <div class="player-section">
-      <div class="player-header">
-        <span class="section-title">
-          <UserOutlined /> 在线玩家 <small class="action-tip">(点击名字快速插入)</small>
-        </span>
-      </div>
-      
-      <div v-if="onlinePlayers.length > 0" class="player-items">
-        <div
-          v-for="player in onlinePlayers"
-          :key="player.uuid || player.name"
-          class="player-item"
-          @click="insertPlayerName(player.name)"
-        >
-          <a-avatar :src="`https://minotar.net/avatar/${player.name}/24`" :size="20" shape="square" />
-          <span class="player-name">{{ player.name }}</span>
-        </div>
-      </div>
-      <div v-else class="player-empty-pure">
-        <span class="text-muted">暂无在线玩家</span>
-      </div>
-    </div>
-
-  </div>
-</template>
-
-      <!-- 分析模式：极简布局，只保留结果和关闭按钮 -->
+      <!-- 分析模式 -->
       <template v-else-if="aiMode === 'analyze_log'">
         <!-- 加载状态 -->
         <div v-if="isParsing" class="flex-center" style="padding: 40px 0;">
@@ -768,7 +769,6 @@ const parseCommand = async () => {
 
         <!-- 分析结果 -->
         <div v-else class="analysis-simple-layout">
-          <!-- 错误提示 -->
           <a-alert
             v-if="aiError"
             type="error"
@@ -776,14 +776,10 @@ const parseCommand = async () => {
             show-icon
             class="mb-16"
           />
-
-          <!-- 分析文本（保留换行） -->
           <div v-if="logAnalysis" class="analysis-result-box">
             <div class="disclaimer-text">AI 的答案僅供參考</div>
             <div class="analysis-content" style="white-space: pre-wrap;">{{ logAnalysis }}</div>
           </div>
-
-          <!-- 建议指令 (纯文本展示，无发送按钮) -->
           <div v-if="logSuggestions.length > 0" class="suggestions-box">
             <div class="section-title">建议指令</div>
             <div v-for="cmd in logSuggestions" :key="cmd" class="suggestion-item">
@@ -792,7 +788,7 @@ const parseCommand = async () => {
           </div>
         </div>
 
-        <!-- 关闭按钮（固定在底部） -->
+        <!-- 关闭按钮 -->
         <div class="analysis-close-bar">
           <a-button @click="showAiModal = false">关闭</a-button>
         </div>
@@ -857,63 +853,48 @@ const parseCommand = async () => {
   gap: 20px;
 }
 
-<style scoped>
 /* ============================== */
-/* 自然语言转换指令 样式 (MCSM 風格優化) */
+/* 自然语言转换指令 样式 */
 /* ============================== */
-
 .ai-command-container {
   display: flex;
   flex-direction: column;
-  gap: 14px; /* 統一元件垂直間距 */
+  gap: 14px;
 }
-
-/* 頂部工具列 */
 .ai-header-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-
 .version-info {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-
 .mc-version-tag {
-  border-radius: 2px; /* MCSM 偏好硬朗微圓角 */
+  border-radius: 2px;
   font-weight: 500;
 }
-
 .text-muted {
   color: var(--color-text-secondary, #8c8c8c);
   font-size: 12px;
 }
-
 .refresh-btn {
   padding: 0;
   font-size: 13px;
 }
-
-/* 輸入框包裹 */
 .ai-input-wrapper {
   width: 100%;
 }
-
-/* 錯誤提示微調 */
 .ai-alert-message {
   border-radius: 4px;
 }
-
-/* 結果區塊 */
 .result-section {
   background: var(--color-bg-layout, #f5f5f5);
   border: 1px solid var(--border-color-split, #f0f0f0);
   border-radius: 4px;
   padding: 12px;
 }
-
 .explanation-text {
   color: var(--color-text, #262626);
   margin-bottom: 10px;
@@ -922,13 +903,11 @@ const parseCommand = async () => {
   align-items: center;
   gap: 6px;
 }
-
 .command-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-
 .command-item {
   display: flex;
   align-items: center;
@@ -939,43 +918,35 @@ const parseCommand = async () => {
   border-radius: 4px;
   border: 1px solid var(--border-color-base, #d9d9d9);
 }
-
 .cmd-code-block {
   font-family: monospace, "Courier New", Courier;
   font-size: 13px;
-  color: var(--color-success, #52c41a); /* 指令採用終端綠色語意 */
+  color: var(--color-success, #52c41a);
   word-break: break-all;
   flex: 1;
 }
-
-/* 玩家區塊 */
 .player-section {
   border-top: 1px dashed var(--border-color-split, #e8e8e8);
   padding-top: 12px;
 }
-
 .player-header {
   margin-bottom: 8px;
 }
-
 .section-title {
   color: var(--color-text, #262626);
   font-size: 13px;
   font-weight: 500;
-  
-  th, small {
+  small, th {
     font-weight: normal;
     color: var(--color-text-secondary, #8c8c8c);
     margin-left: 4px;
   }
 }
-
 .player-items {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-
 .player-item {
   display: inline-flex;
   align-items: center;
@@ -986,14 +957,12 @@ const parseCommand = async () => {
   background: var(--color-bg-container, #ffffff);
   cursor: pointer;
   transition: all 0.15s ease;
-
   &:hover {
     border-color: var(--color-primary, #1890ff);
     background: var(--color-primary-1, #e6f7ff);
     transform: translateY(-1px);
   }
 }
-
 .player-name {
   font-size: 12px;
   line-height: 20px;
@@ -1002,21 +971,20 @@ const parseCommand = async () => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* 輕量化空狀態 */
 .player-empty-pure {
   padding: 8px 0;
   text-align: left;
 }
-</style>
+/* ============================== */
 
-/* ---------- 分析模式专用样式 ---------- */
+/* ============================== */
+/* 日志分析 样式 */
+/* ============================== */
 .analysis-simple-layout {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-
 .disclaimer-text {
   color: var(--color-text-secondary);
   font-size: 13px;
@@ -1024,7 +992,6 @@ const parseCommand = async () => {
   margin-bottom: 8px;
   text-align: center;
 }
-
 .analysis-result-box {
   background: var(--color-bg-container);
   border: 1px solid var(--border-color-base);
@@ -1032,7 +999,6 @@ const parseCommand = async () => {
   padding: 16px;
   margin-top: 8px;
 }
-
 .analysis-content {
   white-space: pre-wrap;
   word-break: break-word;
@@ -1040,22 +1006,18 @@ const parseCommand = async () => {
   font-size: 14px;
   line-height: 1.6;
 }
-
 .suggestions-box {
   margin-top: 8px;
 }
-
 .section-title {
   font-size: 14px;
   color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
-
 .suggestion-item {
   display: flex;
   align-items: flex-start;
   margin-bottom: 6px;
-
   code {
     background: #f5f5f5;
     border: 1px solid #d9d9d9;
@@ -1069,13 +1031,13 @@ const parseCommand = async () => {
     display: block;
   }
 }
-
 .analysis-close-bar {
   display: flex;
   justify-content: center;
   padding-top: 8px;
   border-top: 1px solid var(--border-color-base);
 }
+/* ============================== */
 
 .mb-16 {
   margin-bottom: 16px;
