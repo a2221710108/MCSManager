@@ -734,7 +734,9 @@ const parseCommand = async () => {
 
     <div class="player-section">
       <div class="player-header">
-        <span class="section-title"><UserOutlined /> 在线玩家 <small class="action-tip">(点击名字快速插入)</small></span>
+        <span class="section-title">
+          <UserOutlined /> 在线玩家 <small class="action-tip">(点击名字快速插入)</small>
+        </span>
       </div>
       
       <div v-if="onlinePlayers.length > 0" class="player-items">
