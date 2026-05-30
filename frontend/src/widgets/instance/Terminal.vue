@@ -360,33 +360,27 @@ const showAiModal = ref(false);
 const nlInput = ref("");
 const isParsing = ref(false);
 const aiError = ref("");
-
 // 指令模式結果
 const aiCommands = ref<string[]>([]);
 const aiExplanation = ref("");
-
 // 分析模式狀態
 const aiMode = ref<"command" | "analyze_log">("command");
 const logAnalysis = ref("");
 const logSuggestions = ref<string[]>([]);
-
 interface OnlinePlayer {
   name: string;
   uuid?: string;
 }
 const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
-
+// ⚠️ 請修改為你自己的 Cloudflare Worker 地址
 const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
 const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log";
-
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
-
 const pingConfig = computed(() => ({
   ip: instanceInfo.value?.config?.pingConfig?.ip || "",
   port: instanceInfo.value?.config?.pingConfig?.port || 25565
 }));
-
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) {
     message.warning("未配置服务器 IP");
@@ -415,11 +409,10 @@ const fetchPlayers = async () => {
     isLoadingPlayers.value = false;
   }
 };
-
+// 插入玩家姓名格式：玩家："Tom"
 const insertPlayerName = (name: string) => {
   nlInput.value += `玩家："${name}" `;
 };
-
 const openAiModal = () => {
   aiMode.value = "command";
   showAiModal.value = true;
@@ -429,7 +422,7 @@ const openAiModal = () => {
   aiExplanation.value = "";
   fetchPlayers();
 };
-
+// 新增：打開分析模式 (由 TerminalCore 觸發)
 const openAiWithLog = (logText: string) => {
   aiMode.value = "analyze_log";
   showAiModal.value = true;
@@ -438,7 +431,7 @@ const openAiWithLog = (logText: string) => {
   logSuggestions.value = [];
   analyzeLog(logText);
 };
-
+// 新增：分析日誌函數
 const analyzeLog = async (logText: string) => {
   isParsing.value = true;
   aiError.value = "";
@@ -465,7 +458,7 @@ const analyzeLog = async (logText: string) => {
     isParsing.value = false;
   }
 };
-
+// 發送單條指令（指令模式）
 const handleSendCommand = async (cmd: string) => {
   try {
     await sendCommand(cmd);
@@ -474,7 +467,7 @@ const handleSendCommand = async (cmd: string) => {
     message.error("指令发送失败: " + err.message);
   }
 };
-
+// 解析自然語言（指令模式）
 const parseCommand = async () => {
   const text = nlInput.value.trim();
   if (!text) return;
@@ -536,7 +529,10 @@ const parseCommand = async () => {
                 </a-tag>
               </span>
               <a-tag v-if="instanceTypeText" color="purple"> {{ instanceTypeText }} </a-tag>
-              <span v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1" class="ml-16">
+              <span
+                v-if="isAdmin && instanceInfo?.watcher && instanceInfo?.watcher > 1"
+                class="ml-16"
+              >
                 <a-tooltip>
                   <template #title>{{ t("TXT_CODE_4a37ec9c") }}</template>
                   <LaptopOutlined />
@@ -548,7 +544,10 @@ const parseCommand = async () => {
         </template>
         <template #right>
           <div v-if="!isPhone">
-            <template v-for="item in [...quickOperations, ...instanceOperations]" :key="item.title">
+            <template
+              v-for="item in [...quickOperations, ...instanceOperations]"
+              :key="item.title"
+            >
               <a-button
                 v-if="item.noConfirm"
                 class="ml-8"
@@ -566,7 +565,11 @@ const parseCommand = async () => {
                 :title="t('TXT_CODE_276756b2')"
                 @confirm="item.click"
               >
-                <a-button class="ml-8" :danger="item.type === 'danger'" :class="item.class ? item.class : ''">
+                <a-button
+                  class="ml-8"
+                  :danger="item.type === 'danger'"
+                  :class="item.class ? item.class : ''"
+                >
                   <component :is="item.icon" />
                   {{ item.title }}
                 </a-button>
@@ -593,7 +596,6 @@ const parseCommand = async () => {
         </template>
       </BetweenMenus>
     </div>
-
     <div class="mb-10 status-bar-flex">
       <div class="status-left">
         <a-radio-group v-model:value="activeTab" size="small" @change="handleTabChange">
@@ -606,7 +608,6 @@ const parseCommand = async () => {
         <TerminalTags :tags="terminalTopTags" />
       </div>
     </div>
-
     <TerminalCore
       v-if="instanceId && daemonId"
       ref="terminalCoreRef"
@@ -618,7 +619,6 @@ const parseCommand = async () => {
       @analyze-log="openAiWithLog"
     />
   </div>
-
   <!-- 外部卡片視圖 -->
   <CardPanel v-else class="containerWrapper" style="height: 100%">
     <template #title>
@@ -652,12 +652,12 @@ const parseCommand = async () => {
     </template>
   </CardPanel>
 
-  <!-- AI 窗口 -->
+  <!-- AI 窗口 (根據模式顯示不同內容) -->
   <a-modal
     v-model:open="showAiModal"
     :title="aiMode === 'command' ? '自然语言转 Minecraft 指令' : 'AI 日志分析'"
     :footer="null"
-    :width="640"
+    :width="580"
     destroy-on-close
   >
     <div class="ai-modal-container">
@@ -696,14 +696,22 @@ const parseCommand = async () => {
             </div>
           </div>
           <div v-if="aiError" class="ai-message-wrapper">
-            <a-alert type="error" :message="aiError" show-icon closable @close="aiError = ''" />
+            <a-alert
+              type="error"
+              :message="aiError"
+              show-icon
+              closable
+              @close="aiError = ''"
+            />
           </div>
           <div v-if="aiCommands.length > 0" class="ai-card-panel result-panel animate-fade-in">
             <div class="panel-title-sm">
               <InfoCircleOutlined /> AI 解析思維與步驟
             </div>
-            <div class="explanation-box">{{ aiExplanation }}</div>
-            <div class="panel-title-sm" style="margin-top: 16px">
+            <div class="explanation-box">
+              {{ aiExplanation }}
+            </div>
+            <div class="panel-title-sm" style="margin-top: 16px;">
               <code-outlined /> 產出的控制台指令
             </div>
             <div class="command-output-list">
@@ -711,13 +719,7 @@ const parseCommand = async () => {
                 <div class="cmd-text-wrapper">
                   <code class="terminal-cmd">{{ cmd }}</code>
                 </div>
-                <a-button
-                  type="default"
-                  size="small"
-                  @click="handleSendCommand(cmd)"
-                  :disabled="!isConnect"
-                  class="cmd-send-btn"
-                >
+                <a-button type="default" size="small" @click="handleSendCommand(cmd)" :disabled="!isConnect" class="cmd-send-btn">
                   <template #icon><SendOutlined /></template>
                   執行指令
                 </a-button>
@@ -730,13 +732,7 @@ const parseCommand = async () => {
                 <span class="title-main"><UserOutlined /> 當前在線玩家</span>
                 <span class="title-hint">（點擊名可直接插入）</span>
               </div>
-              <a-button
-                type="link"
-                size="small"
-                :loading="isLoadingPlayers"
-                @click="fetchPlayers"
-                class="refresh-link-btn"
-              >
+              <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers" class="refresh-link-btn">
                 <template #icon><ReloadOutlined /></template>
                 刷新玩家
               </a-button>
@@ -748,11 +744,7 @@ const parseCommand = async () => {
                 class="player-clickable-card"
                 @click="insertPlayerName(player.name)"
               >
-                <a-avatar
-                  :src="'https://minotar.net/avatar/' + player.name + '/24'"
-                  :size="18"
-                  shape="square"
-                />
+                <a-avatar :src="`https://minotar.net/avatar/${player.name}/24`" :size="18" shape="square" />
                 <span class="player-name-text">{{ player.name }}</span>
               </div>
             </div>
@@ -790,11 +782,7 @@ const parseCommand = async () => {
                 <bulb-outlined class="icon-warning-theme" /> 建議修復方法
               </div>
               <ul class="suggestion-list-pure">
-                <li
-                  v-for="(suggestion, index) in logSuggestions"
-                  :key="index"
-                  class="suggestion-step-item"
-                >
+                <li v-for="(suggestion, index) in logSuggestions" :key="index" class="suggestion-step-item">
                   <span class="step-badge">{{ index + 1 }}</span>
                   <div class="step-text">{{ suggestion }}</div>
                 </li>
@@ -864,14 +852,16 @@ const parseCommand = async () => {
   align-items: center;
 }
 
+/* AI 窗口容器 */
 .ai-modal-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  width: 100%;
 }
 
+/* ============================== */
 /* 自然语言转换指令 样式 */
+/* ============================== */
 .ai-command-wrapper {
   display: flex;
   flex-direction: column;
@@ -879,17 +869,17 @@ const parseCommand = async () => {
   padding: 4px 0;
 }
 .ai-card-panel {
-  background: var(--color-bg-container);
-  border: 1px solid var(--border-color-base);
+  background: var(--color-bg-container, #ffffff);
+  border: 1px solid var(--border-color-base, #eeeeee);
   border-radius: 4px;
   padding: 16px;
 }
 .bg-panel {
-  background: var(--color-bg-layout);
-  border-color: var(--border-color-split);
+  background: var(--color-bg-layout, #fafafa);
+  border-color: var(--border-color-split, #e8e8e8);
 }
 .result-panel {
-  border-left: 1px solid var(--border-color-base);
+  border-left: 1px solid var(--border-color-base, #eeeeee);
 }
 .panel-header-bar {
   display: flex;
@@ -897,64 +887,92 @@ const parseCommand = async () => {
   align-items: center;
   margin-bottom: 14px;
 }
-.version-display { display: flex; align-items: center; gap: 10px; }
-.mc-tag { border-radius: 2px; font-weight: bold; }
-.sub-text { color: var(--color-text-secondary); font-size: 12px; }
-.refresh-link-btn { padding: 0; font-size: 13px; }
-.input-form-group { margin-bottom: 14px; }
+.version-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mc-tag {
+  border-radius: 2px;
+  font-weight: bold;
+}
+.sub-text {
+  color: var(--color-text-secondary, #8c8c8c);
+  font-size: 12px;
+}
+.refresh-link-btn {
+  padding: 0;
+  font-size: 13px;
+}
+.input-form-group {
+  margin-bottom: 14px;
+}
 .custom-textarea {
   border-radius: 4px;
   padding: 10px 12px;
   font-size: 14px;
   resize: none;
-  background: var(--color-bg-container);
-  color: var(--color-text);
-  border-color: var(--border-color-base);
-  &::placeholder {
-    color: var(--color-text-secondary);
-  }
 }
-.panel-action-row { width: 100%; }
+.panel-action-row {
+  width: 100%;
+}
 .action-submit-btn {
   height: 38px;
   font-size: 14px;
   font-weight: 500;
   border-radius: 4px;
 }
-.ai-message-wrapper { margin: -4px 0; }
+.ai-message-wrapper {
+  margin: -4px 0;
+}
 .panel-title-sm {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text, #262626);
   margin-bottom: 10px;
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.panel-title-sm.no-margin { margin-bottom: 0; }
-.title-main { font-weight: 600; }
-.title-hint { font-weight: normal; color: var(--color-text-secondary); font-size: 11px; }
+.panel-title-sm.no-margin {
+  margin-bottom: 0;
+}
+.title-main {
+  font-weight: 600;
+}
+.title-hint {
+  font-weight: normal;
+  color: var(--color-text-secondary, #999999);
+  font-size: 11px;
+}
 .explanation-box {
-  background: var(--color-bg-layout);
+  background: var(--color-bg-layout, #f5f5f5);
   padding: 12px;
   border-radius: 4px;
   font-size: 13px;
-  color: var(--color-text-secondary);
+  color: var(--color-text-secondary, #555555);
   line-height: 1.6;
-  border: 1px solid var(--border-color-split);
+  border: 1px solid var(--border-color-split, #e8e8e8);
 }
-.command-output-list { display: flex; flex-direction: column; gap: 10px; }
+.command-output-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .command-output-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: var(--color-bg-layout);
-  border: 1px solid var(--border-color-base);
+  background: var(--color-bg-layout, #f9f9f9);
+  border: 1px solid var(--border-color-base, #e8e8e8);
   padding: 8px 12px;
   border-radius: 4px;
 }
-.cmd-text-wrapper { flex: 1; overflow: hidden; }
+.cmd-text-wrapper {
+  flex: 1;
+  overflow: hidden;
+}
 .terminal-cmd {
   font-family: monospace, "Courier New", Courier;
   font-size: 13px;
@@ -965,14 +983,7 @@ const parseCommand = async () => {
 .cmd-send-btn {
   border-radius: 4px;
   flex-shrink: 0;
-  background: var(--color-bg-container);
-  color: var(--color-text);
-  border-color: var(--border-color-base);
-  &:disabled {
-    background: var(--color-bg-layout);
-    color: var(--color-text-disabled);
-    border-color: var(--border-color-split);
-  }
+  background: #ffffff;
 }
 .player-grid {
   display: grid;
@@ -984,19 +995,19 @@ const parseCommand = async () => {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border: 1px solid var(--border-color-split);
+  border: 1px solid var(--border-color-split, #e8e8e8);
   border-radius: 4px;
-  background: var(--color-bg-container);
+  background: var(--color-bg-container, #ffffff);
   cursor: pointer;
   transition: all 0.2s ease;
   &:hover {
-    border-color: var(--color-primary);
-    background: var(--color-primary-bg);
+    border-color: var(--color-primary, #1890ff);
+    background: var(--color-primary-light, #f0f7ff);
   }
 }
 .player-name-text {
   font-size: 12px;
-  color: var(--color-text);
+  color: var(--color-text, #262626);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1004,12 +1015,20 @@ const parseCommand = async () => {
 .player-empty-wrapper {
   padding: 16px 0;
   text-align: center;
-  border: 1px dashed var(--border-color-split);
+  border: 1px dashed var(--border-color-split, #e8e8e8);
   border-radius: 4px;
-  color: var(--color-text-secondary);
+}
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
+/* ============================== */
 /* 日志分析 样式 */
+/* ============================== */
 .ai-analysis-container {
   display: flex;
   flex-direction: column;
@@ -1027,27 +1046,29 @@ const parseCommand = async () => {
   flex-direction: column;
   gap: 16px;
 }
-.analysis-alert { border-radius: 4px; }
+.analysis-alert {
+  border-radius: 4px;
+}
 .analysis-report-card,
 .suggestions-report-card {
-  background: var(--color-bg-container);
-  border: 1px solid var(--border-color-base);
+  background: var(--color-bg-container, #ffffff);
+  border: 1px solid var(--border-color-base, #eeeeee);
   border-radius: 4px;
   padding: 18px;
 }
 .suggestions-report-card {
-  background: var(--color-bg-layout);
-  border-color: var(--border-color-split);
+  background: var(--color-bg-layout, #fafafa);
+  border-color: var(--border-color-split, #e8e8e8);
 }
 .card-header-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text, #262626);
   margin-bottom: 14px;
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid var(--border-color-split);
+  border-bottom: 1px solid var(--border-color-split, #f0f0f0);
   padding-bottom: 8px;
 }
 .icon-warning-theme {
@@ -1056,7 +1077,7 @@ const parseCommand = async () => {
 .analysis-text-content {
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--color-text);
+  color: var(--color-text, #262626);
   font-size: 13.5px;
   line-height: 1.7;
 }
@@ -1080,7 +1101,7 @@ const parseCommand = async () => {
   justify-content: center;
   width: 18px;
   height: 18px;
-  background: #1f1f1f;           /* 黑色背景 */
+  background: var(--color-text-secondary, #8c8c8c);
   color: #ffffff;
   font-size: 11px;
   font-weight: bold;
@@ -1090,12 +1111,12 @@ const parseCommand = async () => {
 }
 .step-text {
   font-size: 13px;
-  color: var(--color-text);
+  color: var(--color-text, #262626);
   line-height: 1.5;
   flex: 1;
 }
 .disclaimer-text-muted {
-  color: var(--color-text-secondary);
+  color: var(--color-text-secondary, #8c8c8c);
   font-size: 12px;
   text-align: center;
   padding: 8px 0;
@@ -1108,42 +1129,18 @@ const parseCommand = async () => {
   display: flex;
   justify-content: flex-end;
   padding-top: 14px;
-  border-top: 1px solid var(--border-color-split);
+  border-top: 1px solid var(--border-color-split, #f0f0f0);
 }
 .close-panel-btn {
   border-radius: 4px;
   min-width: 100px;
 }
+/* ============================== */
 
-/* 深色模式下步骤编号改为浅灰色 */
-@media (prefers-color-scheme: dark) {
-  .step-badge {
-    background: #a6a6a6;
-    color: #141414;
-  }
-  .terminal-cmd { color: #ff7db0; }
+.mb-16 {
+  margin-bottom: 16px;
 }
-:deep(.dark) .step-badge,
-:deep([data-theme='dark']) .step-badge {
-  background: #a6a6a6;
-  color: #141414;
-}
-:deep(.dark) .terminal-cmd,
-:deep([data-theme='dark']) .terminal-cmd {
-  color: #ff7db0;
-}
-
-/* 动画 */
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-in-out;
-}
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 /* 通用工具类 */
-.mb-16 { margin-bottom: 16px; }
 .ml-16 { margin-left: 16px; }
 .ml-8 { margin-left: 8px; }
 .mb-10 { margin-bottom: 10px; }
