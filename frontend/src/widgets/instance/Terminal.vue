@@ -684,7 +684,8 @@ const parseCommand = async () => {
         <span class="text-muted">AI 將根據此版本生成指令</span>
       </div>
       <a-button type="link" size="small" :loading="isLoadingPlayers" @click="fetchPlayers" class="refresh-btn">
-        <template #icon><ReloadOutlined /></template>重新整理玩家
+        <template #icon><ReloadOutlined /></template>
+        重新整理玩家
       </a-button>
     </div>
 
