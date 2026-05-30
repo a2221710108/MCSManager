@@ -367,7 +367,7 @@ interface OnlinePlayer {
 const onlinePlayers = ref<OnlinePlayer[]>([]);
 const isLoadingPlayers = ref(false);
 const WORKER_URL = "https://aicommand.lazycloud.one/api/parse-command";
-const ANALYZE_LOG_WORKER_URL = "https://royal-limit-ac63.leolu55165088.workers.dev/api/analyze-log";
+const ANALYZE_LOG_WORKER_URL = "https://ailog.lazycloud.one/api/analyze-log";
 const mcVersion = computed(() => instanceInfo.value?.info?.version || "未知");
 const pingConfig = computed(() => ({
   ip: instanceInfo.value?.config?.pingConfig?.ip || "",
