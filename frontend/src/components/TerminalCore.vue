@@ -139,16 +139,10 @@ const handleTextSelection = (event: MouseEvent) => {
   const selection = window.getSelection();
   const text = selection?.toString().trim();
   if (text && selection?.rangeCount) {
-    // 按钮出现在鼠标右侧 8px，垂直对齐鼠标位置
     let x = event.clientX + 8;
     let y = event.clientY;
-
-    // 若右侧空间不足（按钮宽约 70px），则放到鼠标左侧
-    if (x + 70 > window.innerWidth) {
-      x = event.clientX - 70;
-    }
+    if (x + 70 > window.innerWidth) x = event.clientX - 70;
     if (y < 0) y = 4;
-
     floatBtnPos.value = { x, y };
     selectedText.value = text;
     showFloatBtn.value = true;
@@ -279,7 +273,7 @@ onMounted(async () => {
         </a-spin>
       </div>
 
-      <!-- 悬浮分析按钮（鼠标位置右侧） -->
+      <!-- 悬浮分析按钮（颜色已调整） -->
       <div
         v-if="showFloatBtn"
         class="float-ai-btn"
@@ -499,7 +493,7 @@ onMounted(async () => {
   }
 }
 
-/* 悬浮分析按钮（鼠标位置右侧，悬停变色） */
+/* 悬浮分析按钮（默认蓝色，悬停时稍暗） */
 .float-ai-btn {
   position: fixed;
   z-index: 1000;
@@ -515,7 +509,7 @@ onMounted(async () => {
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   user-select: none;
   &:hover {
-    background: var(--color-primary-hover);
+    background: #1677cc;  /* 比默认蓝色稍暗 */
   }
 }
 </style>
