@@ -41,39 +41,53 @@ let playersChartInstance: ECharts | undefined;
 
 const BACKEND_API = "https://chart.lazycloud.one/api/stats";
 
+// --- 動態獲取當前最新的主題顏色 ---
+const getThemeColors = () => {
+  // 實時檢測 html 或 body 上是否有 dark 類別
+  const isDark = document.documentElement.className.includes("dark") || document.body.className.includes("dark");
+  
+  return {
+    textColor: isDark ? "rgba(255, 255, 255, 0.65)" : "rgba(0, 0, 0, 0.65)",
+    lineColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)",
+    tooltipBg: isDark ? "#1f1f1f" : "#ffffff",
+    tooltipBorder: isDark ? "#303030" : "#f0f0f0"
+  };
+};
+
 // --- 提取 MCSM 原生的基礎配置並修正主題色彩 ---
-const getBaseLineOption = (title: string, config: { yMax?: any; showLegend?: boolean } = {}): any => {
-  const isDarkMode = document.documentElement.className.includes("dark");
-  // 使用 MCSM 的 CSS 變數，若不存在則使用高相容性的 RGBA
-  const textColor = isDarkMode ? "rgba(255, 255, 255, 0.85)" : "rgba(0, 0, 0, 0.85)";
-  const lineColor = isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.05)";
+const getBaseLineOption = (title: string, config: { yMax?: any; showLegend?: boolean; isIntegerOnly?: boolean } = {}): any => {
+  const theme = getThemeColors();
 
   return {
     grid: { top: config.showLegend ? 45 : 35, bottom: 25, left: 55, right: 15, show: false },
     tooltip: { 
       trigger: "axis",
-      backgroundColor: isDarkMode ? "#1f1f1f" : "#ffffff",
-      borderColor: isDarkMode ? "#303030" : "#f0f0f0",
-      textStyle: { color: textColor }
+      backgroundColor: theme.tooltipBg,
+      borderColor: theme.tooltipBorder,
+      textStyle: { color: theme.textColor }
     },
     legend: {
       show: config.showLegend ?? false,
       top: 5,
-      textStyle: { color: textColor }
+      textStyle: { color: theme.textColor }
     },
     xAxis: {
       type: "category",
       boundaryGap: false,
-      axisLabel: { color: textColor },
-      axisLine: { lineStyle: { color: lineColor } },
+      axisLabel: { color: theme.textColor },
+      axisLine: { lineStyle: { color: theme.lineColor } },
       data: [] as any[]
     },
     yAxis: {
       type: "value",
       min: 0,
-      max: config.yMax, // 移除固定 100，交由參數決定或自動縮放
-      splitLine: { lineStyle: { color: lineColor } },
-      axisLabel: { color: textColor }
+      max: config.yMax,
+      minInterval: config.isIntegerOnly ? 1 : undefined, // 強制最少間隔為 1，防止人數出現小數點
+      splitLine: { lineStyle: { color: theme.lineColor } },
+      axisLabel: { 
+        color: theme.textColor,
+        formatter: config.isIntegerOnly ? (val: number) => Math.floor(val).toString() : undefined // 強制鋸掉人數小數
+      }
     },
     series: [] as any[]
   };
@@ -82,12 +96,12 @@ const getBaseLineOption = (title: string, config: { yMax?: any; showLegend?: boo
 // 異步獲取 LazyCloud 後端數據
 const loadChartData = async () => {
   // ==================== 偵錯階段：永遠固定一個實例 ID ====================
-  const debugInstanceId = "09d3e8a93640468daa974a67bb1d04fc"; 
+  const debugInstanceId = "你的固定實例UUID放這裡"; 
   // ====================================================================
 
   isLoadingData.value = true;
   const until = Math.floor(Date.now() / 1000);
-  const since = until - selectedRange.value; // 根據用戶選擇的時間範圍計算
+  const since = until - selectedRange.value;
 
   try {
     const res = await fetch(`${BACKEND_API}?instance_id=${debugInstanceId}&since=${since}&until=${until}&limit=1000`);
@@ -146,7 +160,7 @@ const initECharts = (time: string[], cpu: any[], ramUsed: any[], ramTotal: any[]
     { offset: 1, color: "rgba(155, 89, 182, 0)" }
   ]);
 
-  // 1. CPU 使用率 (不設 max，自動適配 Linux 多核心破100%的情況)
+  // 1. CPU 使用率
   const cpuDom = document.getElementById("mcsmCpuChart");
   if (cpuDom) {
     cpuChartInstance = init(cpuDom);
@@ -188,7 +202,7 @@ const initECharts = (time: string[], cpu: any[], ramUsed: any[], ramTotal: any[]
         color: "rgba(231, 76, 60, 0.7)",
         smooth: true,
         symbol: "none",
-        lineStyle: { width: 1.5, type: "dashed" }, // 虛線代表限制上限
+        lineStyle: { width: 1.5, type: "dashed" },
         data: ramTotal
       }
     ];
@@ -208,18 +222,18 @@ const initECharts = (time: string[], cpu: any[], ramUsed: any[], ramTotal: any[]
     netChartInstance.setOption(opt);
   }
 
-  // 4. 在線人數 (包含懸停玩家名稱的名單提示)
+  // 4. 在線人數 (整合整數限制與 Tooltip 玩家清單)
   const playersDom = document.getElementById("mcsmPlayersChart");
   if (playersDom) {
     playersChartInstance = init(playersDom);
-    const opt = getBaseLineOption(t("在線人數"));
+    // 傳入 isIntegerOnly: true，確保刻度不出現小數點
+    const opt = getBaseLineOption(t("在線人數"), { isIntegerOnly: true });
     opt.xAxis.data = time;
     
     // 客製化玩家人數的 Tooltip 顯示資訊
     opt.tooltip.formatter = (params: any[]) => {
       const p = params[0];
       const dataIndex = p.dataIndex;
-      // 從全域暫存中拿到當前時間節點的完整數據紀錄
       const record = globalMetricsData[dataIndex];
       let namesStr = t("無在線玩家");
       
@@ -228,9 +242,9 @@ const initECharts = (time: string[], cpu: any[], ramUsed: any[], ramTotal: any[]
       }
       
       return `
-        <div style="font-size:13px; line-height:1.8;">
+        <div style="font-size:13px; line-height:1.8; color: inherit;">
           <b>${p.name}</b><br/>
-          <span style="color:${p.color};">●</span> ${p.seriesName}: <b>${p.value}</b> 人<br/>
+          <span style="color:${p.color};">●</span> ${p.seriesName}: <b>${Math.floor(p.value)}</b> 人<br/>
           <span style="color:#1677ff;">●</span> ${t("玩家列表")}: <span style="word-break:break-all; white-space:normal; max-width:200px; display:inline-block; vertical-align:top;">${namesStr}</span>
         </div>
       `;
@@ -240,8 +254,8 @@ const initECharts = (time: string[], cpu: any[], ramUsed: any[], ramTotal: any[]
       name: t("在線人數"),
       type: "line",
       color: "rgb(241, 196, 15)",
-      step: "end", // 階梯折線圖
-      symbol: "circle", // 顯示圓點以便精確點選節點
+      step: "end",
+      symbol: "circle",
       symbolSize: 4,
       data: players
     }];
@@ -331,7 +345,6 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 頂層封裝，確保內部文字全體繼承系統切換的主題色 */
 .monitor-wrapper {
   padding: 4px;
   color: inherit !important;
@@ -391,7 +404,6 @@ defineExpose({ openDialog });
   height: 250px;
 }
 
-/* 響應式：手機或小螢幕改為單行 */
 @media (max-width: 768px) {
   .charts-grid {
     grid-template-columns: 1fr;
