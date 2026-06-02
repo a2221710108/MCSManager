@@ -103,7 +103,7 @@ const refreshInstanceInfo = async () => {
   });
 };
 
-// 將按鈕依據功能分組，並保留原本的 condition 權限過濾
+// 保持按鈕分組邏輯不變
 const categorizedBtns = computed(() => {
   if (!instanceInfo.value) return [];
 
@@ -112,7 +112,7 @@ const categorizedBtns = computed(() => {
       groupName: t("基礎管理"),
       items: arrayFilter([
         {
-          title: t("TXT_CODE_d07742fe"), // 配置文件
+          title: t("TXT_CODE_d07742fe"),
           icon: ControlOutlined,
           condition: () => !isGlobalTerminal.value && !!serverConfigFiles.value && serverConfigFiles.value?.length > 0,
           click: (): void => {
@@ -123,7 +123,7 @@ const categorizedBtns = computed(() => {
           }
         },
         {
-          title: t("TXT_CODE_ae533703"), // 檔案管理
+          title: t("TXT_CODE_ae533703"),
           icon: FolderOpenOutlined,
           click: () => { toPage({ path: "/instances/terminal/files" }); },
           condition: () => state.settings.canFileManager || isAdmin.value
@@ -136,7 +136,7 @@ const categorizedBtns = computed(() => {
         },
         {
           title: t("統計圖表"),
-          icon: BarChartOutlined, // 優化為圖表專用圖標
+          icon: BarChartOutlined,
           click: () => { chartDialog.value?.openDialog(); },
           condition: () => state.settings.canFileManager || isAdmin.value
         }
@@ -163,7 +163,7 @@ const categorizedBtns = computed(() => {
         },
         {
           title: t("快捷指令"),
-          icon: ThunderboltOutlined, // 採用原註解建議的閃電圖標
+          icon: ThunderboltOutlined,
           click: async () => {
             if (!terminalHook.isConnect.value) {
               try {
@@ -178,7 +178,7 @@ const categorizedBtns = computed(() => {
           condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
         },
         {
-          title: t("TXT_CODE_40241d8e"), // Minecraft 設定 (Ping/MOTD等)
+          title: t("TXT_CODE_40241d8e"),
           icon: ControlOutlined,
           click: () => { mcSettingsDialog.value?.openDialog(); },
           condition: () => isAdmin.value && (instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false)
@@ -219,18 +219,18 @@ const categorizedBtns = computed(() => {
       groupName: t("進階與高級設定"),
       items: arrayFilter([
         {
-          title: t("TXT_CODE_656a85d8"), // Steam Rcon 設定
+          title: t("TXT_CODE_656a85d8"),
           icon: BuildOutlined,
           click: () => { rconSettingsDialog.value?.openDialog(); },
           condition: () => instanceInfo.value?.config.type.includes(TYPE_STEAM_SERVER_UNIVERSAL) ?? false
         },
         {
-          title: t("TXT_CODE_d23631cb"), // 終端機設定
+          title: t("TXT_CODE_d23631cb"),
           icon: CodeOutlined,
           click: () => { terminalConfigDialog.value?.openDialog(); }
         },
         {
-          title: t("TXT_CODE_b7d026f8"), // 排程任務
+          title: t("TXT_CODE_b7d026f8"),
           icon: FieldTimeOutlined,
           condition: () => !isGlobalTerminal.value,
           click: () => {
@@ -241,18 +241,18 @@ const categorizedBtns = computed(() => {
           }
         },
         {
-          title: t("TXT_CODE_d341127b"), // 事件配置
+          title: t("TXT_CODE_d341127b"),
           icon: DashboardOutlined,
           click: () => { eventConfigDialog.value?.openDialog(); }
         },
         {
-          title: t("TXT_CODE_4f34fc28"), // 實例詳細設定 (管理員)
+          title: t("TXT_CODE_4f34fc28"),
           icon: AppstoreAddOutlined,
           condition: () => isAdmin.value,
           click: () => { instanceDetailsDialog.value?.openDialog(); }
         },
         {
-          title: t("TXT_CODE_4f34fc28"), // 實例基礎設定 (Docker普通用戶)
+          title: t("TXT_CODE_4f34fc28"),
           icon: AppstoreAddOutlined,
           condition: () => !isAdmin.value && instanceInfo.value?.config.processType === "docker" && state.settings.allowChangeCmd,
           click: () => { instanceFundamentalDetailDialog.value?.openDialog(); }
@@ -261,7 +261,6 @@ const categorizedBtns = computed(() => {
     }
   ];
 
-  // 過濾掉內部沒有任何可用按鈕的分組
   return groups.filter(g => g.items.length > 0);
 });
 
@@ -278,7 +277,10 @@ watch(instanceInfo, (cfg, oldCfg) => {
     <template #body>
       <div class="scroll-container">
         <div v-for="group in categorizedBtns" :key="group.groupName" class="category-group">
-          <div class="category-title">{{ group.groupName }}</div>
+          <div class="category-header">
+            <span class="category-title">{{ group.groupName }}</span>
+            <div class="category-line"></div>
+          </div>
           
           <ResponsiveLayoutGroup class="function-btns-container" :items="group.items">
             <template #default="{ item }">
@@ -332,24 +334,41 @@ watch(instanceInfo, (cfg, oldCfg) => {
 }
 
 .category-group {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 
   &:last-child {
     margin-bottom: 0;
   }
 }
 
+/* --- 借鑑 Java 組件的高階深淺色適配手法 --- */
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 .category-title {
   font-size: 13px;
-  // 使用 Ant Design 原生變數，自動適應 MCSManager 的深淺色主題
-  color: var(--color-text-secondary, rgba(0, 0, 0, 0.45));
-  margin-bottom: 10px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  
+  /* 核心技巧：不寫死顏色，繼承 mcsm 當前文字基色並透過不透明度實現「淡字」效果 */
+  color: inherit !important;
+  opacity: 0.45; 
+}
+
+.category-line {
+  flex: 1;
+  height: 1px;
+  /* 核心技巧：分隔線使用 10% 的環境文字色疊加，深色變淡白線，淺色變淡黑線 */
+  background: currentColor;
+  opacity: 0.1;
 }
 
 .function-btns-container {
-  // 移除原本的 position: absolute 防止多個分組重疊
   position: relative;
   width: 100%;
 }
