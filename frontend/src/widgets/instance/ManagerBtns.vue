@@ -25,7 +25,9 @@ import {
   HistoryOutlined,
   GlobalOutlined,
   SaveOutlined,
-  CloudDownloadOutlined
+  CloudDownloadOutlined,
+  BarChartOutlined,
+  ThunderboltOutlined
 } from "@ant-design/icons-vue";
 import { computed, ref, watch } from "vue";
 import type { RouteLocationPathRaw } from "vue-router";
@@ -101,241 +103,166 @@ const refreshInstanceInfo = async () => {
   });
 };
 
-// 定義按鈕分類（順序即顯示順序）
-const categoryOrder = ["基本管理", "終端與連線", "Minecraft 功能", "備份與分析"];
-
-// 原始按鈕定義，添加 category 屬性
-const btns = computed(() => {
+// 將按鈕依據功能分組，並保留原本的 condition 權限過濾
+const categorizedBtns = computed(() => {
   if (!instanceInfo.value) return [];
-  return arrayFilter([
-    // ---------- 基本管理 ----------
-    {
-      title: t("TXT_CODE_d07742fe"),
-      icon: ControlOutlined,
-      category: "基本管理",
-      condition: () => {
-        return (
-          !isGlobalTerminal.value &&
-          !!serverConfigFiles.value &&
-          serverConfigFiles.value?.length > 0
-        );
-      },
-      click: (): void => {
-        toPage({
-          path: "/instances/terminal/serverConfig",
-          query: {
-            type: instanceInfo.value?.config.type
-          }
-        });
-      }
-    },
-    {
-      title: t("TXT_CODE_ae533703"),
-      icon: FolderOpenOutlined,
-      category: "基本管理",
-      click: () => {
-        toPage({ path: "/instances/terminal/files" });
-      },
-      condition: () => state.settings.canFileManager || isAdmin.value
-    },
-    {
-      title: t("TXT_CODE_b7d026f8"),
-      icon: FieldTimeOutlined,
-      category: "基本管理",
-      condition: () => !isGlobalTerminal.value,
-      click: () => {
-        toPage({
-          path: "/instances/schedule",
-          query: {
-            instanceId,
-            daemonId
-          }
-        });
-      }
-    },
-    {
-      title: t("TXT_CODE_d341127b"),
-      icon: DashboardOutlined,
-      category: "基本管理",
-      click: () => {
-        eventConfigDialog.value?.openDialog();
-      }
-    },
-    {
-      title: t("TXT_CODE_4f34fc28"),
-      icon: AppstoreAddOutlined,
-      category: "基本管理",
-      condition: () => isAdmin.value,
-      click: () => {
-        instanceDetailsDialog.value?.openDialog();
-      }
-    },
-    {
-      title: t("TXT_CODE_4f34fc28"), // 注意：與上一個重名，建議後續用不同 key
-      icon: AppstoreAddOutlined,
-      category: "基本管理",
-      condition: () =>
-        !isAdmin.value &&
-        instanceInfo.value?.config.processType === "docker" &&
-        state.settings.allowChangeCmd,
-      click: () => {
-        instanceFundamentalDetailDialog.value?.openDialog();
-      }
-    },
-    // ---------- 終端與連線 ----------
-    {
-      title: t("TXT_CODE_40241d8e"),
-      icon: UsergroupDeleteOutlined,
-      category: "終端與連線",
-      click: () => {
-        mcSettingsDialog.value?.openDialog();
-      },
-      condition: () => isAdmin.value && (instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false)
-    },
-    {
-      title: t("TXT_CODE_656a85d8"),
-      icon: BuildOutlined,
-      category: "終端與連線",
-      click: () => {
-        rconSettingsDialog.value?.openDialog();
-      },
-      condition: () =>
-        instanceInfo.value?.config.type.includes(TYPE_STEAM_SERVER_UNIVERSAL) ?? false
-    },
-    {
-      title: t("TXT_CODE_d23631cb"),
-      icon: CodeOutlined,
-      category: "終端與連線",
-      click: () => {
-        terminalConfigDialog.value?.openDialog();
-      }
-    },
-    // ---------- Minecraft 功能 ----------
-    {
-      title: t("快捷指令"),
-      icon: ControlOutlined,
-      category: "Minecraft 功能",
-      click: async () => {
-        if (!terminalHook.isConnect.value) {
-          try {
-            await terminalHook.execute({
-              instanceId: instanceId!,
-              daemonId: daemonId!
-            });
-          } catch (err) {
-            console.error("OftenCommand Connection Failed:", err);
-            return;
-          }
-        }
-        oftencommandDialog.value?.openDialog();
-      },
-      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
-    },
-    {
-      title: t("玩家管理"),
-      icon: UsergroupDeleteOutlined,
-      category: "Minecraft 功能",
-      click: async () => {
-        if (!terminalHook.isConnect.value) {
-          try {
-            await terminalHook.execute({
-              instanceId: instanceId!,
-              daemonId: daemonId!
-            });
-          } catch (err) {
-            console.error("PlayerManager Connection Failed:", err);
-            return;
-          }
-        }
-        playermanagementDialog.value?.openDialog();
-      },
-      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
-    },
-    {
-      title: t("切換 Java"),
-      icon: CoffeeOutlined,
-      category: "Minecraft 功能",
-      click: () => {
-        javaDialog.value?.openDialog();
-      },
-      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
-    },
-    {
-      title: t("Modpack 自動化安裝"),
-      icon: CloudDownloadOutlined,
-      category: "Minecraft 功能",
-      click: () => {
-        cfInstallDialog.value?.openDialog();
-      },
-      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
-    },
-    {
-      title: t("ModLoader 自動化安裝"),
-      icon: CloudDownloadOutlined,
-      category: "Minecraft 功能",
-      click: () => {
-        modloaderinstallDialog.value?.openDialog();
-      },
-      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
-    },
-    {
-      title: t("存檔替換 / 匯入"),
-      icon: SaveOutlined,
-      category: "Minecraft 功能",
-      click: () => {
-        worldchangeDialog.value?.openDialog();
-      },
-      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
-    },
-    {
-      title: t("自定義域名"),
-      icon: GlobalOutlined,
-      category: "Minecraft 功能",
-      click: () => {
-        srvDialog.value?.openDialog();
-      },
-      condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
-    },
-    // ---------- 備份與分析 ----------
-    {
-      title: t("備份管理"),
-      icon: HistoryOutlined,
-      category: "備份與分析",
-      click: () => {
-        backupDialog.value?.openDialog();
-      },
-      condition: () => state.settings.canFileManager || isAdmin.value
-    },
-    {
-      title: t("統計圖表"),
-      icon: HistoryOutlined,
-      category: "備份與分析",
-      click: () => {
-        chartDialog.value?.openDialog();
-      },
-      condition: () => state.settings.canFileManager || isAdmin.value
-    }
-  ]);
-});
 
-// 按照分類分組，保持分類順序
-const groupedBtns = computed(() => {
-  const groups: Record<string, typeof btns.value> = {};
-  btns.value.forEach((btn) => {
-    const cat = btn.category || "其他";
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(btn);
-  });
-  // 依照 categoryOrder 排序，未定義的分類放在最後
-  const sorted: Record<string, typeof btns.value> = {};
-  categoryOrder.forEach((cat) => {
-    if (groups[cat]) sorted[cat] = groups[cat];
-  });
-  // 加入未在 categoryOrder 中的分類
-  Object.keys(groups).forEach((cat) => {
-    if (!sorted[cat]) sorted[cat] = groups[cat];
-  });
-  return sorted;
+  const groups = [
+    {
+      groupName: t("基礎管理"),
+      items: arrayFilter([
+        {
+          title: t("TXT_CODE_d07742fe"), // 配置文件
+          icon: ControlOutlined,
+          condition: () => !isGlobalTerminal.value && !!serverConfigFiles.value && serverConfigFiles.value?.length > 0,
+          click: (): void => {
+            toPage({
+              path: "/instances/terminal/serverConfig",
+              query: { type: instanceInfo.value?.config.type }
+            });
+          }
+        },
+        {
+          title: t("TXT_CODE_ae533703"), // 檔案管理
+          icon: FolderOpenOutlined,
+          click: () => { toPage({ path: "/instances/terminal/files" }); },
+          condition: () => state.settings.canFileManager || isAdmin.value
+        },
+        {
+          title: t("備份管理"),
+          icon: HistoryOutlined,
+          click: () => { backupDialog.value?.openDialog(); },
+          condition: () => state.settings.canFileManager || isAdmin.value
+        },
+        {
+          title: t("統計圖表"),
+          icon: BarChartOutlined, // 優化為圖表專用圖標
+          click: () => { chartDialog.value?.openDialog(); },
+          condition: () => state.settings.canFileManager || isAdmin.value
+        }
+      ])
+    },
+    {
+      groupName: t("Minecraft 專區"),
+      items: arrayFilter([
+        {
+          title: t("玩家管理"),
+          icon: UsergroupDeleteOutlined,
+          click: async () => {
+            if (!terminalHook.isConnect.value) {
+              try {
+                await terminalHook.execute({ instanceId: instanceId!, daemonId: daemonId! });
+              } catch (err) {
+                console.error("PlayerManager Connection Failed:", err);
+                return;
+              }
+            }
+            playermanagementDialog.value?.openDialog();
+          },
+          condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+        },
+        {
+          title: t("快捷指令"),
+          icon: ThunderboltOutlined, // 採用原註解建議的閃電圖標
+          click: async () => {
+            if (!terminalHook.isConnect.value) {
+              try {
+                await terminalHook.execute({ instanceId: instanceId!, daemonId: daemonId! });
+              } catch (err) {
+                console.error("OftenCommand Connection Failed:", err);
+                return;
+              }
+            }
+            oftencommandDialog.value?.openDialog();
+          },
+          condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+        },
+        {
+          title: t("TXT_CODE_40241d8e"), // Minecraft 設定 (Ping/MOTD等)
+          icon: ControlOutlined,
+          click: () => { mcSettingsDialog.value?.openDialog(); },
+          condition: () => isAdmin.value && (instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false)
+        },
+        {
+          title: t("切換 Java"),
+          icon: CoffeeOutlined,
+          click: () => { javaDialog.value?.openDialog(); },
+          condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+        },
+        {
+          title: t("Modpack 自動化安裝"),
+          icon: CloudDownloadOutlined,
+          click: () => { cfInstallDialog.value?.openDialog(); },
+          condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+        },
+        {
+          title: t("ModLoader 自動化安裝"),
+          icon: CloudDownloadOutlined,
+          click: () => { modloaderinstallDialog.value?.openDialog(); },
+          condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+        },
+        {
+          title: t("存檔替換 / 匯入"),
+          icon: SaveOutlined,
+          click: () => { worldchangeDialog.value?.openDialog(); },
+          condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+        },
+        {
+          title: t("自定義域名"),
+          icon: GlobalOutlined,
+          click: () => { srvDialog.value?.openDialog(); },
+          condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+        }
+      ])
+    },
+    {
+      groupName: t("進階與高級設定"),
+      items: arrayFilter([
+        {
+          title: t("TXT_CODE_656a85d8"), // Steam Rcon 設定
+          icon: BuildOutlined,
+          click: () => { rconSettingsDialog.value?.openDialog(); },
+          condition: () => instanceInfo.value?.config.type.includes(TYPE_STEAM_SERVER_UNIVERSAL) ?? false
+        },
+        {
+          title: t("TXT_CODE_d23631cb"), // 終端機設定
+          icon: CodeOutlined,
+          click: () => { terminalConfigDialog.value?.openDialog(); }
+        },
+        {
+          title: t("TXT_CODE_b7d026f8"), // 排程任務
+          icon: FieldTimeOutlined,
+          condition: () => !isGlobalTerminal.value,
+          click: () => {
+            toPage({
+              path: "/instances/schedule",
+              query: { instanceId, daemonId }
+            });
+          }
+        },
+        {
+          title: t("TXT_CODE_d341127b"), // 事件配置
+          icon: DashboardOutlined,
+          click: () => { eventConfigDialog.value?.openDialog(); }
+        },
+        {
+          title: t("TXT_CODE_4f34fc28"), // 實例詳細設定 (管理員)
+          icon: AppstoreAddOutlined,
+          condition: () => isAdmin.value,
+          click: () => { instanceDetailsDialog.value?.openDialog(); }
+        },
+        {
+          title: t("TXT_CODE_4f34fc28"), // 實例基礎設定 (Docker普通用戶)
+          icon: AppstoreAddOutlined,
+          condition: () => !isAdmin.value && instanceInfo.value?.config.processType === "docker" && state.settings.allowChangeCmd,
+          click: () => { instanceFundamentalDetailDialog.value?.openDialog(); }
+        }
+      ])
+    }
+  ];
+
+  // 過濾掉內部沒有任何可用按鈕的分組
+  return groups.filter(g => g.items.length > 0);
 });
 
 watch(instanceInfo, (cfg, oldCfg) => {
@@ -349,184 +276,81 @@ watch(instanceInfo, (cfg, oldCfg) => {
   <CardPanel class="containerWrapper" style="height: 100%">
     <template #title>{{ card.title }}</template>
     <template #body>
-      <div class="function-categories">
-        <div
-          class="category-group"
-          v-for="(items, category) in groupedBtns"
-          :key="category"
-        >
-          <div class="category-label">{{ category }}</div>
-          <div class="category-items">
-            <InnerCard
-              v-for="item in items"
-              :key="item.title"
-              :style="{ height: LayoutCardHeight.MINI }"
-              :icon="item.icon"
-              @click="item.click"
-            >
-              <template #title>{{ item.title }}</template>
-              <template #body>
-                <a href="javascript:void(0);">
-                  <span>
-                    {{ t("TXT_CODE_6c5985ca") }}
-                    <ArrowRightOutlined style="font-size: 12px" />
-                  </span>
-                </a>
-              </template>
-            </InnerCard>
-          </div>
+      <div class="scroll-container">
+        <div v-for="group in categorizedBtns" :key="group.groupName" class="category-group">
+          <div class="category-title">{{ group.groupName }}</div>
+          
+          <ResponsiveLayoutGroup class="function-btns-container" :items="group.items">
+            <template #default="{ item }">
+              <InnerCard
+                :style="{ height: LayoutCardHeight.MINI }"
+                :icon="item.icon"
+                @click="item.click"
+              >
+                <template #title>
+                  {{ item.title }}
+                </template>
+                <template #body>
+                  <a href="javascript:void(0);">
+                    <span>
+                      {{ t("TXT_CODE_6c5985ca") }}
+                      <ArrowRightOutlined style="font-size: 12px" />
+                    </span>
+                  </a>
+                </template>
+              </InnerCard>
+            </template>
+          </ResponsiveLayoutGroup>
         </div>
       </div>
     </template>
   </CardPanel>
 
-  <!-- 所有對話框保持不變 -->
-  <TermConfig
-    ref="terminalConfigDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
-  />
-  <EventConfig
-    ref="eventConfigDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
-  />
-  <PingConfig
-    ref="pingConfigDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
-  />
-  <InstanceDetail
-    ref="instanceDetailsDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
-  />
-  <InstanceFundamentalDetail
-    ref="instanceFundamentalDetailDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
-  />
-  <RconSettings
-    ref="rconSettingsDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
-  />
-  <McPingSettings
-    ref="mcSettingsDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
-  />
-  <backup
-    ref="backupDialog"
-    :instance-id="instanceId ?? ''"
-    :daemon-id="daemonId ?? ''"
-    @save="refreshInstanceInfo"
-  />
-  <java
-    ref="javaDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    @update="refreshInstanceInfo"
-  />
-  <srv
-    ref="srvDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId ?? ''"
-    :daemon-id="daemonId ?? ''"
-    @update="refreshInstanceInfo"
-  />
-  <playermanagement
-    ref="playermanagementDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    :use-terminal-hook="terminalHook"
-    @update="refreshInstanceInfo"
-  />
-  <oftencommand
-    ref="oftencommandDialog"
-    :instance-info="instanceInfo"
-    :instance-id="instanceId"
-    :daemon-id="daemonId"
-    :use-terminal-hook="terminalHook"
-    @update="refreshInstanceInfo"
-  />
-  <worldchange
-    ref="worldchangeDialog"
-    :instance-id="instanceId ?? ''"
-    :daemon-id="daemonId ?? ''"
-    @save="refreshInstanceInfo"
-  />
-  <CurseForgeInstall
-    ref="cfInstallDialog"
-    :instance-id="instanceId ?? ''"
-    :daemon-id="daemonId ?? ''"
-    :instance-info="instanceInfo"
-  />
-  <modloaderinstall
-    ref="modloaderinstallDialog"
-    :instance-id="instanceId ?? ''"
-    :daemon-id="daemonId ?? ''"
-    :instance-info="instanceInfo"
-  />
-  <chart
-    ref="chartDialog"
-    :instance-id="instanceId ?? ''"
-    :daemon-id="daemonId ?? ''"
-    :instance-info="instanceInfo"
-  />
+  <TermConfig ref="terminalConfigDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" @update="refreshInstanceInfo" />
+  <EventConfig ref="eventConfigDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" @update="refreshInstanceInfo" />
+  <PingConfig ref="pingConfigDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" @update="refreshInstanceInfo" />
+  <InstanceDetail ref="instanceDetailsDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" @update="refreshInstanceInfo" />
+  <InstanceFundamentalDetail ref="instanceFundamentalDetailDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" @update="refreshInstanceInfo" />
+  <RconSettings ref="rconSettingsDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" @update="refreshInstanceInfo" />
+  <McPingSettings ref="mcSettingsDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" @update="refreshInstanceInfo" />
+  <backup ref="backupDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" @save="refreshInstanceInfo" />
+  <java ref="javaDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" @update="refreshInstanceInfo" />
+  <srv ref="srvDialog" :instance-info="instanceInfo" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" @update="refreshInstanceInfo" />
+  <playermanagement ref="playermanagementDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" :use-terminal-hook="terminalHook" @update="refreshInstanceInfo" />
+  <oftencommand ref="oftencommandDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" :use-terminal-hook="terminalHook" @update="refreshInstanceInfo" />
+  <worldchange ref="worldchangeDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" @save="refreshInstanceInfo" />
+  <CurseForgeInstall ref="cfInstallDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
+  <modloaderinstall ref="modloaderinstallDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
+  <chart ref="chartDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
 </template>
 
 <style lang="scss" scoped>
-.function-categories {
+.scroll-container {
   height: 100%;
   overflow-y: auto;
-  padding: 8px 0;
+  padding-right: 4px;
 }
 
 .category-group {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 
-  .category-label {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.5);
-    padding: 0 8px 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .category-items {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 0 8px;
+  &:last-child {
+    margin-bottom: 0;
   }
 }
 
-/* 覆蓋原本絕對定位，改用 flex 排版 */
-.containerWrapper {
-  :deep(.ant-card-body) {
-    padding-top: 8px;
-    position: relative;
-  }
+.category-title {
+  font-size: 13px;
+  // 使用 Ant Design 原生變數，自動適應 MCSManager 的深淺色主題
+  color: var(--color-text-secondary, rgba(0, 0, 0, 0.45));
+  margin-bottom: 10px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 .function-btns-container {
-  position: static; /* 取消原本的絕對定位 */
+  // 移除原本的 position: absolute 防止多個分組重疊
+  position: relative;
+  width: 100%;
 }
 </style>
