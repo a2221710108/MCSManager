@@ -49,6 +49,7 @@ import oftencommand from "./dialogs/oftencommand.vue";
 import worldchange from "./dialogs/worldchange.vue";
 import CurseForgeInstall from "./dialogs/CurseForgeInstall.vue";
 import modloaderinstall from "./dialogs/modloaderinstall.vue";
+import chart from "./dialogs/chart.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -66,6 +67,7 @@ const worldchangeDialog = ref<InstanceType<typeof worldchange>>();
 // 在其他 Dialog ref 附近加入
 const cfInstallDialog = ref<InstanceType<typeof CurseForgeInstall>>();
 const modloaderinstallDialog = ref<InstanceType<typeof modloaderinstall>>();
+const chartDialog = ref<InstanceType<typeof chart>>();
 
 const terminalHook = useTerminal();
   
@@ -175,6 +177,15 @@ const btns = computed(() => {
       icon: HistoryOutlined,
       click: () => {
         backupDialog.value?.openDialog();
+      },
+      // 權限控制：通常管理員或有文件管理權限的人可以看到
+      condition: () => state.settings.canFileManager || isAdmin.value
+    },
+    {
+      title: t("統計圖表"), // 或者使用對應的 i18n key
+      icon: HistoryOutlined,
+      click: () => {
+        chartDialog.value?.openDialog();
       },
       // 權限控制：通常管理員或有文件管理權限的人可以看到
       condition: () => state.settings.canFileManager || isAdmin.value
@@ -457,6 +468,13 @@ watch(instanceInfo, (cfg, oldCfg) => {
 
   <modloaderinstall
   ref="modloaderinstallDialog"
+  :instance-id="instanceId ?? ''"
+  :daemon-id="daemonId ?? ''"
+  :instance-info="instanceInfo" 
+/>
+
+  <chart
+  ref="chartDialog"
   :instance-id="instanceId ?? ''"
   :daemon-id="daemonId ?? ''"
   :instance-info="instanceInfo" 
