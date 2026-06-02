@@ -132,16 +132,15 @@ const calculateStats = (arr: number[], type: "float" | "int" | "net" = "float") 
 
 // 異步獲取 LazyCloud 後端數據
 const loadChartData = async () => {
-  // ==================== 偵錯階段：永遠固定一個實例 ID ====================
-  const debugInstanceId = "09d3e8a93640468daa974a67bb1d04fc"; 
-  // ====================================================================
-
+  // 正式環境：嚴格讀取 MCSManager 控制界面傳入的實例 ID
+  if (!props.instanceId) return;
+  
   isLoadingData.value = true;
   const until = Math.floor(Date.now() / 1000);
   const since = until - selectedRange.value;
 
   try {
-    const res = await fetch(`${BACKEND_API}?instance_id=${debugInstanceId}&since=${since}&until=${until}&limit=1000`);
+    const res = await fetch(`${BACKEND_API}?instance_id=${props.instanceId}&since=${since}&until=${until}&limit=1000`);
     if (!res.ok) throw new Error("無法取得監控數據");
     const data = await res.json();
 
@@ -488,7 +487,7 @@ defineExpose({ openDialog });
   height: 230px;
 }
 
-/* --- 新增：底部最大/平均/最小數據面版樣式 --- */
+/* --- 底部最大/平均/最小數據面版樣式 --- */
 .chart-stats-panel {
   display: flex;
   justify-content: space-around;
