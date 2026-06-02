@@ -11,18 +11,7 @@ const props = defineProps<{
   instanceId?: string;
   daemonId?: string;
 }>();
-// ==================== 偵錯階段：強制固定實例 ID ====================
-const props = defineProps<{
-  instanceInfo?: InstanceDetail;
-  instanceId?: string;
-  daemonId?: string;
-}>();
 
-// ==================== 偵錯階段：強制固定實例 ID ====================
-// 直接用一個變數覆蓋 props.instanceId，讓它在接下來的 loadChartData 中永遠固定
-const targetInstanceId = "09d3e8a93640468daa974a67bb1d04fc"; 
-// ================================================================
-  
 const open = ref(false);
 const isLoadingData = ref(false);
 const playerNames = ref<string[]>([]);
@@ -81,14 +70,18 @@ const getBaseLineOption = (title: string, yMax?: number): any => {
 
 // 異步獲取 LazyCloud 後端數據
 const loadChartData = async () => {
-  if (!props.instanceId) return;
-  isLoadingData.value = true;
+  // ==================== 偵錯階段：永遠固定一個實例 ID ====================
+  // 請在這裡填入你用來測試的真實實例 UUID
+  const debugInstanceId = "09d3e8a93640468daa974a67bb1d04fc"; 
+  // ====================================================================
 
+  isLoadingData.value = true;
   const until = Math.floor(Date.now() / 1000);
   const since = until - 24 * 60 * 60; // 24小時
 
   try {
-    const res = await fetch(`${BACKEND_API}?instance_id=${props.instanceId}&since=${since}&until=${until}&limit=500`);
+    // 這裡直接帶入固定的 debugInstanceId
+    const res = await fetch(`${BACKEND_API}?instance_id=${debugInstanceId}&since=${since}&until=${until}&limit=500`);
     if (!res.ok) throw new Error("無法取得監控數據");
     const data = await res.json();
 
