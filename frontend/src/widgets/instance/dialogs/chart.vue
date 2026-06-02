@@ -4,7 +4,7 @@ import { reportErrorMsg } from "@/tools/validator";
 import type { InstanceDetail } from "@/types";
 import { LineChartOutlined, TeamOutlined } from "@ant-design/icons-vue";
 import { ref, watch, nextTick } from "vue";
-import { graphic, init, type ECharts } from "echarts"; // 直接引入 MCSM 內置的 echarts
+import { graphic, init, type ECharts } from "echarts";
 
 const props = defineProps<{
   instanceInfo?: InstanceDetail;
@@ -25,7 +25,7 @@ let playersChartInstance: ECharts | undefined;
 const BACKEND_API = "https://chart.lazycloud.one/api/stats";
 
 // --- 提取 MCSM 原生的漸層色與基礎配置 ---
-const getBaseLineOption = (title: string, yMax?: number) => {
+const getBaseLineOption = (title: string, yMax?: number): any => {
   const isDarkMode = document.documentElement.className.includes("dark");
   const textColor = isDarkMode ? "rgba(255, 255, 255, 0.65)" : "rgba(0, 0, 0, 0.65)";
   const lineColor = isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.05)";
@@ -42,7 +42,8 @@ const getBaseLineOption = (title: string, yMax?: number) => {
       type: "category",
       boundaryGap: false,
       axisLabel: { color: textColor },
-      axisLine: { lineStyle: { color: lineColor } }
+      axisLine: { lineStyle: { color: lineColor } },
+      data: [] as any[]
     },
     yAxis: {
       type: "value",
@@ -59,7 +60,9 @@ const getBaseLineOption = (title: string, yMax?: number) => {
         smooth: true,
         symbol: "none",
         lineStyle: { color: "rgba(67, 145, 250, 0.9)", width: 1.5 },
-        areaStyle: { color: colorGradient }
+        areaStyle: { color: colorGradient },
+        data: [] as any[],
+        step: undefined as string | undefined
       }
     ]
   };
@@ -118,7 +121,7 @@ const initECharts = (time: string[], cpu: any[], ram: any[], rx: any[], tx: any[
   if (cpuDom) {
     cpuChartInstance = init(cpuDom);
     const opt = getBaseLineOption(t("CPU 使用率 (%)"), 100);
-    opt.xAxis.data = time as any;
+    opt.xAxis.data = time;
     opt.series[0].data = cpu;
     cpuChartInstance.setOption(opt);
   }
@@ -128,9 +131,8 @@ const initECharts = (time: string[], cpu: any[], ram: any[], rx: any[], tx: any[
   if (ramDom) {
     ramChartInstance = init(ramDom);
     const opt = getBaseLineOption(t("已用記憶體 (MB)"));
-    opt.xAxis.data = time as any;
+    opt.xAxis.data = time;
     opt.series[0].data = ram;
-    // 使用紫色系微調（呼應前面的RAM設計，也可以保留官方純藍）
     opt.series[0].color = "rgb(155, 89, 182)";
     ramChartInstance.setOption(opt);
   }
@@ -140,12 +142,11 @@ const initECharts = (time: string[], cpu: any[], ram: any[], rx: any[], tx: any[
   if (netDom) {
     netChartInstance = init(netDom);
     const opt = getBaseLineOption(t("網絡流量 (MB)"));
-    opt.xAxis.data = time as any;
-    // 改造為雙線
+    opt.xAxis.data = time;
     opt.series = [
       { name: "RX (接收)", type: "line", smooth: true, symbol: "none", data: rx, color: "#2ecc71" },
       { name: "TX (發送)", type: "line", smooth: true, symbol: "none", data: tx, color: "#e74c3c" }
-    ] as any;
+    ];
     netChartInstance.setOption(opt);
   }
 
@@ -154,9 +155,9 @@ const initECharts = (time: string[], cpu: any[], ram: any[], rx: any[], tx: any[
   if (playersDom) {
     playersChartInstance = init(playersDom);
     const opt = getBaseLineOption(t("在線人數"));
-    opt.xAxis.data = time as any;
+    opt.xAxis.data = time;
     opt.series[0].data = players;
-    opt.series[0].step = "end"; // 設定為階梯線
+    opt.series[0].step = "end";
     opt.series[0].color = "rgb(241, 196, 15)";
     playersChartInstance.setOption(opt);
   }
@@ -291,10 +292,10 @@ defineExpose({ openDialog });
   opacity: 0.85;
 }
 
-/* --- ECharts 容器基礎尺寸（核心） --- */
+/* --- ECharts 容器基礎尺寸 --- */
 .echarts-dom {
   width: 100%;
-  height: 250px; /* 給予精準高度，ECharts 就會把畫布塞滿這裡 */
+  height: 250px;
 }
 
 @media (max-width: 768px) {
