@@ -351,7 +351,7 @@ defineExpose({ openDialog });
     <div class="monitor-wrapper">
       <div class="range-selector-bar">
         <span class="bar-title">
-          <clock-circle-outlined /> {{ t("動態時間範圍") }}：
+          <clock-circle-outlined /> {{ t("時間範圍") }}：
         </span>
         <a-radio-group v-model:value="selectedRange" button-style="solid" size="small">
           <a-radio-button 
@@ -410,7 +410,7 @@ defineExpose({ openDialog });
           </div>
 
           <div class="chart-card">
-            <div class="chart-title"><line-chart-outlined /> {{ t("歷史在線人數與名單") }}</div>
+            <div class="chart-title"><line-chart-outlined /> {{ t("Minecraft 在線人數與名單") }}</div>
             <div id="mcsmPlayersChart" class="echarts-dom"></div>
             <div class="chart-stats-panel">
               <div class="stat-item"><span class="stat-lbl">{{ t("最大") }}</span><span class="stat-val">{{ stats.players.max }} 人</span></div>
