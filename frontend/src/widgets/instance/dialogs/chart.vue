@@ -11,7 +11,18 @@ const props = defineProps<{
   instanceId?: string;
   daemonId?: string;
 }>();
+// ==================== 偵錯階段：強制固定實例 ID ====================
+const props = defineProps<{
+  instanceInfo?: InstanceDetail;
+  instanceId?: string;
+  daemonId?: string;
+}>();
 
+// ==================== 偵錯階段：強制固定實例 ID ====================
+// 直接用一個變數覆蓋 props.instanceId，讓它在接下來的 loadChartData 中永遠固定
+const targetInstanceId = "09d3e8a93640468daa974a67bb1d04fc"; 
+// ================================================================
+  
 const open = ref(false);
 const isLoadingData = ref(false);
 const playerNames = ref<string[]>([]);
