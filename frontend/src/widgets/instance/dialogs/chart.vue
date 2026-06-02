@@ -2,7 +2,7 @@
 import { t } from "@/lang/i18n";
 import { reportErrorMsg } from "@/tools/validator";
 import type { InstanceDetail } from "@/types";
-import { LineChartOutlined, ClockCircleOutlined } from "@ant-design/icons-vue";
+import { LineChartOutlined, ClockCircleOutlined, InfoCircleOutlined } from "@ant-design/icons-vue";
 import { ref, watch, nextTick } from "vue";
 import { graphic, init, type ECharts } from "echarts";
 
@@ -33,6 +33,15 @@ const selectedRange = ref(24 * 60 * 60);
 // 儲存原始數據，以便在 Tooltip 中映射玩家名稱
 let globalMetricsData: any[] = [];
 
+// 定義響應式變數來儲存計算後的統計值
+const stats = ref({
+  cpu: { max: "0.0", avg: "0.0", min: "0.0" },
+  ram: { max: "0", avg: "0", min: "0" },
+  netRx: { max: "0.00", avg: "0.00", min: "0.00" },
+  netTx: { max: "0.00", avg: "0.00", min: "0.00" },
+  players: { max: 0, avg: 0, min: 0 }
+});
+
 // 儲存 ECharts 實例
 let cpuChartInstance: ECharts | undefined;
 let ramChartInstance: ECharts | undefined;
@@ -43,9 +52,7 @@ const BACKEND_API = "https://chart.lazycloud.one/api/stats";
 
 // --- 動態獲取當前最新的主題顏色 ---
 const getThemeColors = () => {
-  // 實時檢測 html 或 body 上是否有 dark 類別
   const isDark = document.documentElement.className.includes("dark") || document.body.className.includes("dark");
-  
   return {
     textColor: isDark ? "rgba(255, 255, 255, 0.65)" : "rgba(0, 0, 0, 0.65)",
     lineColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)",
@@ -82,21 +89,51 @@ const getBaseLineOption = (title: string, config: { yMax?: any; showLegend?: boo
       type: "value",
       min: 0,
       max: config.yMax,
-      minInterval: config.isIntegerOnly ? 1 : undefined, // 強制最少間隔為 1，防止人數出現小數點
+      minInterval: config.isIntegerOnly ? 1 : undefined,
       splitLine: { lineStyle: { color: theme.lineColor } },
       axisLabel: { 
         color: theme.textColor,
-        formatter: config.isIntegerOnly ? (val: number) => Math.floor(val).toString() : undefined // 強制鋸掉人數小數
+        formatter: config.isIntegerOnly ? (val: number) => Math.floor(val).toString() : undefined
       }
     },
     series: [] as any[]
   };
 };
 
+// --- 輔助函式：計算統計值 ---
+const calculateStats = (arr: number[], type: "float" | "int" | "net" = "float") => {
+  if (!arr || arr.length === 0) return { max: "0", avg: "0", min: "0" };
+  
+  const numericArr = arr.map(v => Number(v) || 0);
+  const max = Math.max(...numericArr);
+  const min = Math.min(...numericArr);
+  const sum = numericArr.reduce((a, b) => a + b, 0);
+  const avg = sum / numericArr.length;
+
+  if (type === "int") {
+    return {
+      max: Math.floor(max).toString(),
+      avg: Math.round(avg).toString(),
+      min: Math.floor(min).toString()
+    };
+  } else if (type === "net") {
+    return {
+      max: max.toFixed(2),
+      avg: avg.toFixed(2),
+      min: min.toFixed(2)
+    };
+  }
+  return {
+    max: max.toFixed(1),
+    avg: avg.toFixed(1),
+    min: min.toFixed(1)
+  };
+};
+
 // 異步獲取 LazyCloud 後端數據
 const loadChartData = async () => {
   // ==================== 偵錯階段：永遠固定一個實例 ID ====================
-  const debugInstanceId = "你的固定實例UUID放這裡"; 
+  const debugInstanceId = "09d3e8a93640468daa974a67bb1d04fc"; 
   // ====================================================================
 
   isLoadingData.value = true;
@@ -114,10 +151,9 @@ const loadChartData = async () => {
       return;
     }
 
-    // 快取原始數據提供給 Tooltip 查詢使用
     globalMetricsData = data;
 
-    // 格式化 X 軸時間。若時間範圍大於 24 小時則顯示日期，否則僅顯示時分。
+    // 格式化 X 軸時間
     const useDateFormat = selectedRange.value > 24 * 60 * 60;
     const timestamps = data.map((d: any) => {
       const date = new Date(d.timestamp * 1000);
@@ -132,13 +168,28 @@ const loadChartData = async () => {
     const cpuData = data.map((d: any) => d.cpu_percent);
     const ramUsedData = data.map((d: any) => d.ram_used_mb);
     const ramTotalData = data.map((d: any) => d.ram_total_mb);
-    const rxData = data.map((d: any) => (d.network_rx_bytes / 1024 / 1024).toFixed(2));
-    const txData = data.map((d: any) => (d.network_tx_bytes / 1024 / 1024).toFixed(2));
+    const rxData = data.map((d: any) => (d.network_rx_bytes / 1024 / 1024));
+    const txData = data.map((d: any) => (d.network_tx_bytes / 1024 / 1024));
     const playerCountData = data.map((d: any) => d.player_count);
+
+    // 計算當前範圍內的 最大 / 平均 / 最小 統計值
+    stats.value.cpu = calculateStats(cpuData, "float");
+    stats.value.ram = calculateStats(ramUsedData, "int");
+    stats.value.netRx = calculateStats(rxData, "net");
+    stats.value.netTx = calculateStats(txData, "net");
+    stats.value.players = calculateStats(playerCountData, "int") as any;
 
     // 渲染 ECharts
     await nextTick();
-    initECharts(timestamps, cpuData, ramUsedData, ramTotalData, rxData, txData, playerCountData);
+    initECharts(
+      timestamps, 
+      cpuData, 
+      ramUsedData, 
+      ramTotalData, 
+      rxData.map((v: number) => v.toFixed(2)), 
+      txData.map((v: number) => v.toFixed(2)), 
+      playerCountData
+    );
   } catch (error: any) {
     reportErrorMsg(error.message || t("圖表數據加載失敗"));
   } finally {
@@ -179,7 +230,7 @@ const initECharts = (time: string[], cpu: any[], ramUsed: any[], ramTotal: any[]
     cpuChartInstance.setOption(opt);
   }
 
-  // 2. 記憶體 (RAM) 使用與最大上限雙線圖
+  // 2. 記憶體 (RAM)
   const ramDom = document.getElementById("mcsmRamChart");
   if (ramDom) {
     ramChartInstance = init(ramDom);
@@ -209,7 +260,7 @@ const initECharts = (time: string[], cpu: any[], ramUsed: any[], ramTotal: any[]
     ramChartInstance.setOption(opt);
   }
 
-  // 3. 網絡流量 (RX 與 TX 雙線圖)
+  // 3. 網絡流量
   const netDom = document.getElementById("mcsmNetChart");
   if (netDom) {
     netChartInstance = init(netDom);
@@ -222,15 +273,13 @@ const initECharts = (time: string[], cpu: any[], ramUsed: any[], ramTotal: any[]
     netChartInstance.setOption(opt);
   }
 
-  // 4. 在線人數 (整合整數限制與 Tooltip 玩家清單)
+  // 4. 在線人數
   const playersDom = document.getElementById("mcsmPlayersChart");
   if (playersDom) {
     playersChartInstance = init(playersDom);
-    // 傳入 isIntegerOnly: true，確保刻度不出現小數點
     const opt = getBaseLineOption(t("在線人數"), { isIntegerOnly: true });
     opt.xAxis.data = time;
     
-    // 客製化玩家人數的 Tooltip 顯示資訊
     opt.tooltip.formatter = (params: any[]) => {
       const p = params[0];
       const dataIndex = p.dataIndex;
@@ -284,7 +333,6 @@ const openDialog = () => {
   loadChartData();
 };
 
-// 監聽彈窗關閉
 watch(open, (val) => {
   if (!val) disposeCharts();
 });
@@ -319,25 +367,59 @@ defineExpose({ openDialog });
 
       <a-spin :spinning="isLoadingData">
         <div class="charts-grid">
+          
           <div class="chart-card">
             <div class="chart-title"><line-chart-outlined /> {{ t("CPU 使用率") }}</div>
             <div id="mcsmCpuChart" class="echarts-dom"></div>
+            <div class="chart-stats-panel">
+              <div class="stat-item"><span class="stat-lbl">{{ t("最大") }}</span><span class="stat-val">{{ stats.cpu.max }}%</span></div>
+              <div class="stat-item"><span class="stat-lbl">{{ t("平均") }}</span><span class="stat-val">{{ stats.cpu.avg }}%</span></div>
+              <div class="stat-item"><span class="stat-lbl">{{ t("最小") }}</span><span class="stat-val">{{ stats.cpu.min }}%</span></div>
+            </div>
           </div>
           
           <div class="chart-card">
             <div class="chart-title"><line-chart-outlined /> {{ t("記憶體使用 (RAM)") }}</div>
             <div id="mcsmRamChart" class="echarts-dom"></div>
+            <div class="chart-stats-panel">
+              <div class="stat-item"><span class="stat-lbl">{{ t("最大") }}</span><span class="stat-val">{{ stats.ram.max }} MB</span></div>
+              <div class="stat-item"><span class="stat-lbl">{{ t("平均") }}</span><span class="stat-val">{{ stats.ram.avg }} MB</span></div>
+              <div class="stat-item"><span class="stat-lbl">{{ t("最小") }}</span><span class="stat-val">{{ stats.ram.min }} MB</span></div>
+            </div>
           </div>
 
           <div class="chart-card">
             <div class="chart-title"><line-chart-outlined /> {{ t("網路流量 (MB)") }}</div>
             <div id="mcsmNetChart" class="echarts-dom"></div>
+            <div class="chart-stats-panel net-stats-panel">
+              <div class="stat-group">
+                <span class="group-tag rx-tag">RX</span>
+                <div class="stat-item"><span class="stat-val">{{ stats.netRx.max }}</span></div>
+                <div class="stat-item"><span class="stat-val">{{ stats.netRx.avg }}</span></div>
+                <div class="stat-item"><span class="stat-val">{{ stats.netRx.min }}</span></div>
+              </div>
+              <div class="stat-group">
+                <span class="group-tag tx-tag">TX</span>
+                <div class="stat-item"><span class="stat-val" title="Max">{{ stats.netTx.max }}</span></div>
+                <div class="stat-item"><span class="stat-val" title="Avg">{{ stats.netTx.avg }}</span></div>
+                <div class="stat-item"><span class="stat-val" title="Min">{{ stats.netTx.min }}</span></div>
+              </div>
+              <div class="net-info-tip">
+                <info-circle-outlined /> {{ t("欄位順序：最大 / 平均 / 最小") }}
+              </div>
+            </div>
           </div>
 
           <div class="chart-card">
             <div class="chart-title"><line-chart-outlined /> {{ t("歷史在線人數與名單") }}</div>
             <div id="mcsmPlayersChart" class="echarts-dom"></div>
+            <div class="chart-stats-panel">
+              <div class="stat-item"><span class="stat-lbl">{{ t("最大") }}</span><span class="stat-val">{{ stats.players.max }} 人</span></div>
+              <div class="stat-item"><span class="stat-lbl">{{ t("平均") }}</span><span class="stat-val">{{ stats.players.avg }} 人</span></div>
+              <div class="stat-item"><span class="stat-lbl">{{ t("最小") }}</span><span class="stat-val">{{ stats.players.min }} 人</span></div>
+            </div>
           </div>
+
         </div>
       </a-spin>
     </div>
@@ -385,6 +467,8 @@ defineExpose({ openDialog });
   padding: 16px;
   border: 1px solid rgba(140, 140, 140, 0.15);
   color: inherit;
+  display: flex;
+  flex-direction: column;
 }
 
 .chart-title {
@@ -401,7 +485,74 @@ defineExpose({ openDialog });
 /* --- ECharts 畫布規格 --- */
 .echarts-dom {
   width: 100%;
-  height: 250px;
+  height: 230px;
+}
+
+/* --- 新增：底部最大/平均/最小數據面版樣式 --- */
+.chart-stats-panel {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(140, 140, 140, 0.15);
+  background: rgba(140, 140, 140, 0.02);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-lbl {
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+.stat-val {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+/* 網路流量多組數據客製化排版 */
+.net-stats-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.stat-group {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  width: 100%;
+  position: relative;
+}
+.group-tag {
+  position: absolute;
+  left: 6px;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.rx-tag {
+  background: rgba(46, 204, 113, 0.15);
+  color: #2ecc71;
+}
+.tx-tag {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+}
+.net-info-tip {
+  font-size: 10px;
+  opacity: 0.4;
+  text-align: center;
+  margin-top: 2px;
 }
 
 @media (max-width: 768px) {
