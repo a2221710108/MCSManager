@@ -1,7 +1,7 @@
 import { $t } from "../../../i18n";
 import Instance from "../../instance/instance";
 import InstanceCommand from "../base/command";
-import GeneralKillCommand from "./GeneralKillCommand";
+import GeneralKillCommand from "./general_kill"; // 修改导入路径，去掉大写，匹配实际文件名
 
 export default class GeneralStopCommand extends InstanceCommand {
   constructor() {
@@ -34,7 +34,7 @@ export default class GeneralStopCommand extends InstanceCommand {
       ) {
         instance.println("WARN", $t("TXT_CODE_general_stop.stopTimeout"));
         const killCmd = new GeneralKillCommand();
-        killCmd.exec(instance).catch((err) => {
+        killCmd.exec(instance).catch((err: any) => {  // 给 err 添加类型
           instance.println("ERROR", `强制关闭实例失败: ${err}`);
         });
       }
