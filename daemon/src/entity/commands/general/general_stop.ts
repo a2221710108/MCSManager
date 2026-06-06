@@ -32,13 +32,13 @@ export default class GeneralStopCommand extends InstanceCommand {
         instance.status() === Instance.STATUS_STOPPING &&
         instance.startCount === cacheStartCount
       ) {
-        instance.println("WARN", $t("TXT_CODE_general_stop.stopTimeout"));
+        instance.println("WARN", " ");
         const killCmd = new GeneralKillCommand();
         killCmd.exec(instance).catch((err: any) => {  // 给 err 添加类型
-          instance.println("ERROR", `强制关闭实例失败: ${err}`);
+          instance.println("ERROR", `強制關閉伺服器失敗: ${err}`);
         });
       }
-    }, 1000 * 60 * 1);
+    }, 1000 * 60 * 2);
 
     return instance;
   }
