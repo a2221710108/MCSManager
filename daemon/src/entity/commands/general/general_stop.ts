@@ -32,7 +32,6 @@ export default class GeneralStopCommand extends InstanceCommand {
         instance.status() === Instance.STATUS_STOPPING &&
         instance.startCount === cacheStartCount
       ) {
-        instance.println("WARN", " ");
         const killCmd = new GeneralKillCommand();
         killCmd.exec(instance).catch((err: any) => {  // 给 err 添加类型
           instance.println("ERROR", `強制關閉伺服器失敗: ${err}`);
