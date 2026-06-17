@@ -3,44 +3,45 @@ import { InstanceUpdateAction } from "../../../service/instance_update_action";
 import logger from "../../../service/log";
 import Instance from "../../instance/instance";
 import InstanceCommand from "../base/command";
+import GeneralStartCommand from "../../start/general_start";
 
 export default class GeneralUpdateCommand extends InstanceCommand {
   private updateTask?: InstanceUpdateAction;
-
   constructor() {
     super("GeneralUpdateCommand");
   }
-
   private stopped(instance: Instance) {
     instance.asynchronousTask = undefined;
     instance.setLock(false);
     instance.status(Instance.STATUS_STOP);
   }
-
   async exec(instance: Instance) {
     if (instance.status() !== Instance.STATUS_STOP && instance.status() !== Instance.STATUS_BUSY)
       return instance.failure(new Error($t("TXT_CODE_general_update.statusErr_notStop")));
     if (instance.asynchronousTask)
       return instance.failure(new Error($t("TXT_CODE_general_update.statusErr_otherProgress")));
-
+    let shouldAutoStart = true;
     try {
       instance.setLock(true);
       instance.asynchronousTask = this;
       instance.status(Instance.STATUS_BUSY);
-
       this.updateTask = new InstanceUpdateAction(instance);
       await this.updateTask?.start();
       await this.updateTask?.wait();
     } catch (err: any) {
+      shouldAutoStart = false;
       instance.println(
         $t("TXT_CODE_general_update.update"),
         $t("TXT_CODE_general_update.error", { err: err })
       );
     } finally {
       this.stopped(instance);
+      if (shouldAutoStart) {
+        const startCommand = new GeneralStartCommand();
+        await startCommand.exec(instance);
+      }
     }
   }
-
   async stop(instance: Instance): Promise<void> {
     instance.asynchronousTask = undefined;
     logger.info(
