@@ -781,7 +781,7 @@
   "TXT_CODE_56c42793": "玩家在 AFK 狀態時在玩家列表姓名前顯示的前綴。",
   "TXT_CODE_56c686f8": "失敗",
   "TXT_CODE_56ff18c1": "伺服器資訊展示 若使用 ColorMotd 等外掛程式可留空該選項",
-  "TXT_CODE_57245e94": "開啟",
+  "TXT_CODE_57245e94": "啟動",
   "TXT_CODE_57358a8b": "設定為 true 讓船在陸地上彈出玩家",
   "TXT_CODE_57417f60": "玩家超過 MaxDamage 閾值時是否踢出",
   "TXT_CODE_574ed474": "在線功能",
