@@ -66,7 +66,10 @@ const formData = reactive<NewInstanceForm>({
     maxSpace: undefined,
     io: undefined,
     network: undefined,
-    env: []
+    env: [
+      "LANG=en_US.UTF-8",
+      "LC_ALL=en_US.UTF-8"
+    ]
   }
 });
 
