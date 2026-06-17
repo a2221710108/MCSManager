@@ -3,7 +3,7 @@ import { InstanceUpdateAction } from "../../../service/instance_update_action";
 import logger from "../../../service/log";
 import Instance from "../../instance/instance";
 import InstanceCommand from "../base/command";
-import GeneralStartCommand from "../../start/general_start";
+import GeneralStartCommand from "./general_start";
 
 export default class GeneralUpdateCommand extends InstanceCommand {
   private updateTask?: InstanceUpdateAction;
