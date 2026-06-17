@@ -243,7 +243,7 @@ defineExpose({ openDialog });
         <div class="mb-4 p-3 bg-orange-50 rounded border border-orange-100">
           <div class="flex flex-col gap-2">
             <a-checkbox v-model:checked="agreeTest">
-              <span class="text-xs text-orange-700">{{ t('我已知曉使用該功能將刪除現有的存檔') }}</span>
+              <span class="text-xs text-orange-700">{{ t('我已知曉使用該功能將刪除現有的存檔(該功能可能在26.1及以上版本不相容)') }}</span>
             </a-checkbox>
             <a-checkbox v-model:checked="agreeBackup">
               <span class="text-xs text-orange-700">{{ t('我已備份現有存檔，或我確認無需備份現有存檔') }}</span>
