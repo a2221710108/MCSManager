@@ -3,7 +3,6 @@ import { InstanceUpdateAction } from "../../../service/instance_update_action";
 import logger from "../../../service/log";
 import Instance from "../../instance/instance";
 import InstanceCommand from "../base/command";
-import GeneralStartCommand from "../start/general_start";  // 注意路徑，根據你的目錄結構可能是 "../start/general_start"
 
 export default class GeneralUpdateCommand extends InstanceCommand {
   private updateTask?: InstanceUpdateAction;
@@ -44,10 +43,9 @@ export default class GeneralUpdateCommand extends InstanceCommand {
       this.stopped(instance);
 
       if (shouldAutoStart) {
-        // 延遲執行，確保更新後的實例狀態完全釋放
+        // 延遲一小段時間確保資源完全釋放
         setTimeout(() => {
-          const startCmd = new GeneralStartCommand();
-          startCmd.exec(instance).catch((startErr: any) => {
+          instance.start().catch((startErr: any) => {
             logger.error("Auto-start after update failed:", startErr);
             instance.println("ERROR", $t("TXT_CODE_general_update.autoStartFailed", { err: startErr?.message || startErr }));
           });
