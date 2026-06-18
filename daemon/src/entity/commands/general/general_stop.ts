@@ -37,7 +37,7 @@ export default class GeneralStopCommand extends InstanceCommand {
           instance.println("ERROR", `強制關閉伺服器失敗: ${err}`);
         });
       }
-    }, 1000 * 60 * 2);
+    }, 1000 * 90 * 1);
 
     return instance;
   }
