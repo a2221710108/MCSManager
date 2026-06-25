@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, reactive, watch } from "vue";
+import { ref, reactive, watch, computed } from "vue";
 import { message, Modal } from "ant-design-vue";
-import { 
-  CloudDownloadOutlined, 
-  CheckCircleOutlined
+import {
+  CloudDownloadOutlined,
+  CheckCircleOutlined,
+  DeleteOutlined,
+  SettingOutlined
 } from "@ant-design/icons-vue";
 import axios from "axios";
 import { fileList, deleteFile } from "@/services/apis/fileManager";
@@ -11,13 +13,11 @@ import { installModLoader } from "@/services/apis/instance";
 
 // --- 配置區 ---
 const PROXY = "https://get-modloader-version.lazycloud.one/?url=";
-
 const props = defineProps<{
   daemonId: string;
   instanceId: string;
-  instanceInfo: any; 
+  instanceInfo: any;
 }>();
-
 const isVisible = ref(false);
 const confirmLoading = ref(false);
 const isCleaning = ref(false);
@@ -28,11 +28,15 @@ const hasCleaned = ref(false);
 const mcVersions = ref<string[]>([]);
 const loaderVersions = ref<{version: string, tag?: string}[]>([]);
 const loadingLoaders = ref(false);
-
 const form = reactive({
   mcVersion: "",
   loaderType: "forge",
   loaderVersion: ""
+});
+
+// 判斷是否為無需 Loader 版本的類型 (Paper, Folia, Vanilla)
+const isSimpleServer = computed(() => {
+  return ["paper", "folia", "vanilla"].includes(form.loaderType);
 });
 
 // MCSManager 內建 API 執行器
@@ -55,7 +59,7 @@ const openDialog = async () => {
     return message.error("請先關閉伺服器再進行安裝");
   }
   isVisible.value = true;
-  
+
   try {
     const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
     mcVersions.value = data.versions
@@ -75,27 +79,30 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
     form.loaderVersion = "";
     return;
   }
-  
+
+  // 如果選擇的是 Paper / Folia / Vanilla，則不請求版本，直接清空並返回
+  if (isSimpleServer.value) {
+    loaderVersions.value = [];
+    form.loaderVersion = "";
+    loadingLoaders.value = false;
+    return;
+  }
+
   loadingLoaders.value = true;
   const tempVersions: {version: string, tag?: string}[] = [];
-
   try {
     let target = "";
     if (newType === "forge") {
       target = `https://bmclapi2.bangbang93.com/forge/minecraft/${newMc}`;
       const data = await proxyGet(target);
       if (Array.isArray(data)) {
-        // 1. 先進行自定義排序：將版本號從大到小排列
         const sortedData = data.sort((a: any, b: any) => {
-          // 使用 localeCompare 並開啟 numeric 模式，這樣 "47.2.20" 就會大於 "47.2.2"
           return b.version.localeCompare(a.version, undefined, { numeric: true, sensitivity: 'base' });
         });
-
-        // 2. 取前 100 筆數據（此時已經是最新在前）
         sortedData.slice(0, 30).forEach((v: any) => {
-          tempVersions.push({ 
-            version: v.version, 
-            tag: v.category === "recommended" ? "⭐" : "" 
+          tempVersions.push({
+            version: v.version,
+            tag: v.category === "recommended" ? "⭐" : ""
           });
         });
       }
@@ -109,21 +116,20 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
           tempVersions.push({ version: vStr, tag: "" });
         });
       }
-    } 
+    }
     else if (newType === "fabric") {
       target = `https://meta.fabricmc.net/v2/versions/loader/${newMc}`;
       const data = await proxyGet(target);
       if (Array.isArray(data)) {
         data.slice(0, 30).forEach((v: any) => {
-          tempVersions.push({ 
-            version: v.loader.version, 
-            tag: v.loader.stable ? "" : "[舊版]" 
+          tempVersions.push({
+            version: v.loader.version,
+            tag: v.loader.stable ? "" : "[舊版]"
           });
         });
       }
     }
-
-    form.loaderVersion = ""; 
+    form.loaderVersion = "";
     loaderVersions.value = tempVersions;
   } catch (err) {
     console.error("Loader Fetch Error:", err);
@@ -146,28 +152,27 @@ const handleCleanServer = async () => {
       try {
         isCleaning.value = true;
         const res = await fetchFileList({
-          params: { 
-            daemonId: props.daemonId, 
-            uuid: props.instanceId, 
+          params: {
+            daemonId: props.daemonId,
+            uuid: props.instanceId,
             target: "/",
-            page: 0, 
+            page: 0,
             page_size: 100,
-            file_name: "" 
+            file_name: ""
           }
         });
-        
+
         const items = res.value?.items || [];
         const targets = items
           .filter((i: any) => i.name !== "LazyCloud_backup")
           .map((i: any) => "/" + i.name);
-
         if (targets.length > 0) {
           await executeDelete({
             params: { daemonId: props.daemonId, uuid: props.instanceId },
             data: { targets }
           });
         }
-        
+
         message.success("已清空伺服器檔案");
         hasCleaned.value = true;
       } catch (err) {
@@ -180,14 +185,12 @@ const handleCleanServer = async () => {
 };
 
 /**
- * 提交安裝任務（強化數據傳遞版）
+ * 提交安裝任務
  */
-
-  const handleInstall = async () => {
+const handleInstall = async () => {
   const mcV = String(form.mcVersion).trim();
   const lT = String(form.loaderType).trim();
   const lV = String(form.loaderVersion).trim();
-
   confirmLoading.value = true;
   try {
     await installModLoader().execute({
@@ -199,13 +202,11 @@ const handleCleanServer = async () => {
       data: {
         instanceUuid: props.instanceId,
         taskName: "modloader_install",
-        // 直接寫在這裡，不包 parameter
         mcVersion: mcV,
         loaderType: lT,
-        loaderVersion: lV
+        loaderVersion: lV  // 對於 paper/folia/vanilla 會是空字串
       }
     });
-
     message.success("安裝任務已啟動");
     isVisible.value = false;
   } catch (err: any) {
@@ -252,13 +253,12 @@ defineExpose({ openDialog });
             </a-tag>
           </transition>
         </div>
-
         <div class="card-action">
           <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned" class="custom-checkbox">
             <span class="checkbox-text">我同意清空伺服器檔案</span>
           </a-checkbox>
-          <a-button 
-            danger 
+          <a-button
+            danger
             block
             :loading="isCleaning"
             :disabled="!agreeClean || hasCleaned"
@@ -275,11 +275,10 @@ defineExpose({ openDialog });
           <setting-outlined /> 第二步：選擇 ModLoader
         </h4>
         <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與 ModLoader</p>
-        
+
         <a-form layout="vertical" class="mt-4">
           <a-form-item label="Minecraft 版本">
             <a-select v-model:value="form.mcVersion" show-search placeholder="請選擇版本">
-              
               <a-select-option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</a-select-option>
             </a-select>
           </a-form-item>
@@ -291,12 +290,21 @@ defineExpose({ openDialog });
                   <a-select-option value="forge">Forge</a-select-option>
                   <a-select-option value="neoforge">NeoForge</a-select-option>
                   <a-select-option value="fabric">Fabric</a-select-option>
+                  <!-- 新增 Paper、Folia、Vanilla -->
+                  <a-select-option value="paper">Paper</a-select-option>
+                  <a-select-option value="folia">Folia</a-select-option>
+                  <a-select-option value="vanilla">Vanilla</a-select-option>
                 </a-select>
               </a-form-item>
             </a-col>
             <a-col :span="14">
               <a-form-item label="ModLoader 版本">
-                <a-select v-model:value="form.loaderVersion" :loading="loadingLoaders" placeholder="請先選擇遊戲版本">
+                <a-select
+                  v-model:value="form.loaderVersion"
+                  :loading="loadingLoaders"
+                  :disabled="isSimpleServer"
+                  :placeholder="isSimpleServer ? '此類型無需選擇版本' : '請先選擇遊戲版本'"
+                >
                   <a-select-option v-for="l in loaderVersions" :key="l.version" :value="l.version">
                     {{ l.version }} <small style="color: #888">{{ l.tag }}</small>
                   </a-select-option>
@@ -307,10 +315,10 @@ defineExpose({ openDialog });
 
           <div class="footer-actions">
             <a-button @click="isVisible = false">取消</a-button>
-            <a-button 
-              type="primary" 
-              :loading="confirmLoading" 
-              :disabled="!hasCleaned || !form.loaderVersion"
+            <a-button
+              type="primary"
+              :loading="confirmLoading"
+              :disabled="!hasCleaned || (!isSimpleServer && !form.loaderVersion)"
               class="submit-btn"
               @click="handleInstall"
             >
@@ -326,8 +334,6 @@ defineExpose({ openDialog });
 
 <style scoped>
 .install-container { padding: 4px 0; display: flex; flex-direction: column; gap: 16px; }
-
-/* 頂部橫幅 */
 .header-banner {
   display: flex;
   align-items: center;
@@ -337,17 +343,13 @@ defineExpose({ openDialog });
 .banner-icon { font-size: 32px; color: #1677ff; }
 .banner-text h3 { margin: 0; font-weight: 600; font-size: 18px; }
 .banner-text p { margin: 0; font-size: 12px; color: #8c8c8c; }
-
-/* 通用卡片 */
 .step-card {
   border-radius: 12px;
   padding: 16px;
   border: 1px solid rgba(140, 140, 140, 0.15);
   transition: all 0.3s ease;
 }
-
 .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-
 .step-title {
   font-weight: 600;
   font-size: 15px;
@@ -356,28 +358,18 @@ defineExpose({ openDialog });
   align-items: center;
   gap: 8px;
 }
-
 .step-desc { font-size: 12px; opacity: 0.6; margin: 0; line-height: 1.5; }
-
-/* 危險區域樣式 */
 .danger-zone { background: rgba(255, 77, 79, 0.04); border-color: rgba(255, 77, 79, 0.15); }
 .danger-zone .danger { color: #ff4d4f; }
-
 .card-action { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .checkbox-text { font-size: 12px; }
-
-/* 配置區域樣式 */
 .config-zone { background: rgba(22, 119, 255, 0.04); border-color: rgba(22, 119, 255, 0.15); }
 .config-zone.is-locked { opacity: 0.4; filter: grayscale(0.5); pointer-events: none; }
-
 .footer-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .submit-btn { min-width: 140px; font-weight: 500; border-radius: 6px; }
-
 .status-tag { border-radius: 6px; }
-
 .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
-
 :deep(.ant-form-item) { margin-bottom: 12px; }
 :deep(.ant-select-selector), :deep(.ant-input) { border-radius: 6px !important; }
 </style>
