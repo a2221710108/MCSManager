@@ -196,7 +196,7 @@ const categorizedBtns = computed(() => {
           condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
         },
         {
-          title: t("ModLoader 自動化安裝"),
+          title: t("Server Core 自動化安裝"),
           icon: CloudDownloadOutlined,
           click: () => { modloaderinstallDialog.value?.openDialog(); },
           condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
