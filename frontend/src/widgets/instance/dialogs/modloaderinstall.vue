@@ -304,13 +304,13 @@ defineExpose({ openDialog });
         <!-- 第二步標題與最右邊的勾選框 -->
         <div class="step-header-row">
           <h4 class="step-title">
-            <setting-outlined /> 第二步：選擇 ModLoader
+            <setting-outlined /> 第二步：選擇 Server Core
           </h4>
           <a-checkbox v-model:checked="showSnapshots" class="snapshot-checkbox">
-            顯示快照版本
+            顯示最近的快照版本
           </a-checkbox>
         </div>
-        <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與 ModLoader</p>
+        <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與 Server Core</p>
 
         <a-form layout="vertical" class="mt-4">
           <a-form-item label="Minecraft 版本">
@@ -321,7 +321,7 @@ defineExpose({ openDialog });
 
           <a-row :gutter="12">
             <a-col :span="10">
-              <a-form-item label="ModLoader 類型">
+              <a-form-item label="Server Core 類型">
                 <a-select v-model:value="form.loaderType">
                   <!-- 圖標為外部圖片 URL，請自行填入對應圖片鏈接 -->
                   <a-select-option value="forge">
@@ -351,7 +351,7 @@ defineExpose({ openDialog });
                   v-model:value="form.loaderVersion"
                   :loading="loadingLoaders"
                   :disabled="isSimpleServer"
-                  :placeholder="isSimpleServer ? '此類型無需選擇版本' : '請先選擇遊戲版本'"
+                  :placeholder="isSimpleServer ? '此 Server Core 無需選擇此項' : '請先選擇遊戲版本'"
                 >
                   <a-select-option v-for="l in loaderVersions" :key="l.version" :value="l.version">
                     {{ l.version }} <small style="color: #888">{{ l.tag }}</small>
