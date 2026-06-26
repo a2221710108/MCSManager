@@ -264,7 +264,7 @@ defineExpose({ openDialog });
       <div class="header-banner">
         <cloud-download-outlined class="banner-icon" />
         <div class="banner-text">
-          <h3>ModLoader 自動安裝</h3>
+          <h3>Server Core 自動化安裝</h3>
           <p>如安裝過舊的 Minecraft 版本可能安裝失敗；如 安裝失敗 或 獲取版本 失敗請稍後重試</p>
         </div>
       </div>
