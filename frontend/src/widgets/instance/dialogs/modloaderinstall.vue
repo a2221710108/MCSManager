@@ -23,6 +23,7 @@ const confirmLoading = ref(false);
 const isCleaning = ref(false);
 const agreeClean = ref(false);
 const hasCleaned = ref(false);
+const showSnapshots = ref(false); // 顯示快照版本
 
 // 數據存儲
 const mcVersions = ref<string[]>([]);
@@ -52,6 +53,26 @@ const proxyGet = async (targetUrl: string) => {
 };
 
 /**
+ * 獲取 Minecraft 版本清單（可根據 showSnapshots 決定是否過濾）
+ */
+const fetchMcVersions = async () => {
+  try {
+    const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
+    if (showSnapshots.value) {
+      // 顯示所有版本（包含快照）
+      mcVersions.value = data.versions.map((v: any) => v.id);
+    } else {
+      // 只顯示正式版
+      mcVersions.value = data.versions
+        .filter((v: any) => v.type === "release")
+        .map((v: any) => v.id);
+    }
+  } catch (err) {
+    message.error("獲取 Minecraft 版本清單失敗");
+  }
+};
+
+/**
  * 打開彈窗並初始化 Minecraft 版本列表
  */
 const openDialog = async () => {
@@ -59,16 +80,15 @@ const openDialog = async () => {
     return message.error("請先關閉伺服器再進行安裝");
   }
   isVisible.value = true;
-
-  try {
-    const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
-    mcVersions.value = data.versions
-      .filter((v: any) => v.type === "release")
-      .map((v: any) => v.id);
-  } catch (err) {
-    message.error("獲取 Minecraft 版本清單失敗");
-  }
+  await fetchMcVersions();
 };
+
+/**
+ * 監聽 showSnapshots 變化，重新取得版本列表
+ */
+watch(showSnapshots, () => {
+  fetchMcVersions();
+});
 
 /**
  * 監聽選擇變化，自動獲取對應的 Loader 版本
@@ -190,7 +210,9 @@ const handleCleanServer = async () => {
 const handleInstall = async () => {
   const mcV = String(form.mcVersion).trim();
   const lT = String(form.loaderType).trim();
-  const lV = String(form.loaderVersion).trim();
+  // 若為 Paper / Folia / Vanilla，則傳送 "NA"，否則取表單值
+  const lV = isSimpleServer.value ? "NA" : String(form.loaderVersion).trim();
+
   confirmLoading.value = true;
   try {
     await installModLoader().execute({
@@ -204,7 +226,7 @@ const handleInstall = async () => {
         taskName: "modloader_install",
         mcVersion: mcV,
         loaderType: lT,
-        loaderVersion: lV  // 對於 paper/folia/vanilla 會是空字串
+        loaderVersion: lV
       }
     });
     message.success("安裝任務已啟動");
@@ -271,9 +293,15 @@ defineExpose({ openDialog });
       </div>
 
       <div class="step-card config-zone" :class="{ 'is-locked': !hasCleaned }">
-        <h4 class="step-title">
-          <setting-outlined /> 第二步：選擇 ModLoader
-        </h4>
+        <!-- 第二步標題與最右邊的勾選框 -->
+        <div class="step-header-row">
+          <h4 class="step-title">
+            <setting-outlined /> 第二步：選擇 ModLoader
+          </h4>
+          <a-checkbox v-model:checked="showSnapshots" class="snapshot-checkbox">
+            顯示快照版本
+          </a-checkbox>
+        </div>
         <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與 ModLoader</p>
 
         <a-form layout="vertical" class="mt-4">
@@ -287,13 +315,25 @@ defineExpose({ openDialog });
             <a-col :span="10">
               <a-form-item label="ModLoader 類型">
                 <a-select v-model:value="form.loaderType">
-                  <a-select-option value="forge">Forge</a-select-option>
-                  <a-select-option value="neoforge">NeoForge</a-select-option>
-                  <a-select-option value="fabric">Fabric</a-select-option>
-                  <!-- 新增 Paper、Folia、Vanilla -->
-                  <a-select-option value="paper">Paper</a-select-option>
-                  <a-select-option value="folia">Folia</a-select-option>
-                  <a-select-option value="vanilla">Vanilla</a-select-option>
+                  <!-- 圖標為外部圖片 URL，請自行填入對應圖片鏈接 -->
+                  <a-select-option value="forge">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/forge.png" alt="forge" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Forge
+                  </a-select-option>
+                  <a-select-option value="neoforge">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/neoforge.png" alt="neoforge" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> NeoForge
+                  </a-select-option>
+                  <a-select-option value="fabric">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/fabric.png" alt="fabric" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Fabric
+                  </a-select-option>
+                  <a-select-option value="paper">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/paper.png" alt="paper" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Paper
+                  </a-select-option>
+                  <a-select-option value="folia">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/folia.png" alt="folia" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Folia
+                  </a-select-option>
+                  <a-select-option value="vanilla">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/minecraft.png" alt="vanilla" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Vanilla
+                  </a-select-option>
                 </a-select>
               </a-form-item>
             </a-col>
@@ -318,7 +358,7 @@ defineExpose({ openDialog });
             <a-button
               type="primary"
               :loading="confirmLoading"
-              :disabled="!hasCleaned || (!isSimpleServer && !form.loaderVersion)"
+              :disabled="!hasCleaned || !form.mcVersion || (!isSimpleServer && !form.loaderVersion)"
               class="submit-btn"
               @click="handleInstall"
             >
@@ -359,6 +399,17 @@ defineExpose({ openDialog });
   gap: 8px;
 }
 .step-desc { font-size: 12px; opacity: 0.6; margin: 0; line-height: 1.5; }
+.step-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.step-header-row .step-title {
+  margin-bottom: 0;
+}
+.snapshot-checkbox {
+  font-size: 12px;
+}
 .danger-zone { background: rgba(255, 77, 79, 0.04); border-color: rgba(255, 77, 79, 0.15); }
 .danger-zone .danger { color: #ff4d4f; }
 .card-action { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
