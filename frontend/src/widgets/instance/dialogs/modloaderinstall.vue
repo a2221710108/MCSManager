@@ -59,10 +59,18 @@ const fetchMcVersions = async () => {
   try {
     const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
     if (showSnapshots.value) {
-      // 顯示所有版本（包含快照）
-      mcVersions.value = data.versions.map((v: any) => v.id);
+      let snapshotCount = 0;
+      const list: string[] = [];
+      for (const v of data.versions) {
+        if (v.type === 'release') {
+          list.push(v.id);
+        } else if (v.type === 'snapshot' && snapshotCount < 30) {
+          list.push(v.id);
+          snapshotCount++;
+        }
+      }
+      mcVersions.value = list;
     } else {
-      // 只顯示正式版
       mcVersions.value = data.versions
         .filter((v: any) => v.type === "release")
         .map((v: any) => v.id);
