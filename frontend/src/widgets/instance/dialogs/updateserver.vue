@@ -147,7 +147,7 @@ const openDialog = async () => {
           params: {
             daemonId: props.daemonId,
             uuid: props.instanceId,
-            target: "/Version",
+            target: "/versions",
             page: 0,
             page_size: 100,
             file_name: ""
@@ -208,7 +208,7 @@ const handleCleanServer = async () => {
     onOk: async () => {
       try {
         isCleaning.value = true;
-        const targets = ["/startmc.jar", "/libraries"];
+        const targets = ["/startmc.jar", "/libraries", "/versions"];
         await executeDelete({
           params: { daemonId: props.daemonId, uuid: props.instanceId },
           data: { targets }
