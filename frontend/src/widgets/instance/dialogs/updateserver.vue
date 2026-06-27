@@ -23,8 +23,9 @@ const isCleaning = ref(false);
 const agreeClean = ref(false);
 const hasCleaned = ref(false);
 const showSnapshots = ref(false);
-const isModServer = ref(false);       // 是否為模組伺服器（不可升級）
-const checkingModServer = ref(false); // 正在檢查環境
+const isModServer = ref(false);
+const checkingModServer = ref(false);
+const baseVersion = ref<string | null>(null);
 
 const mcVersions = ref<string[]>([]);
 const loaderVersions = ref<{ version: string; tag?: string }[]>([]);
@@ -32,11 +33,10 @@ const loadingLoaders = ref(false);
 
 const form = reactive({
   mcVersion: "",
-  loaderType: "paper",   // 預設改為 Paper，亦可為 folia / vanilla
-  loaderVersion: ""      // 將始終為空，因為僅剩 simple server 類型
+  loaderType: "paper",
+  loaderVersion: ""
 });
 
-// 僅保留無需 Loader 的類型
 const isSimpleServer = computed(() => {
   return ["paper", "folia", "vanilla"].includes(form.loaderType);
 });
@@ -49,32 +49,42 @@ const proxyGet = async (targetUrl: string) => {
   return res.data;
 };
 
+// 獲取 Minecraft 版本清單並根據基底版本過濾
 const fetchMcVersions = async () => {
   try {
     const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
+    let versions: string[] = [];
+
     if (showSnapshots.value) {
       let snapshotCount = 0;
-      const list: string[] = [];
       for (const v of data.versions) {
         if (v.type === "release") {
-          list.push(v.id);
+          versions.push(v.id);
         } else if (v.type === "snapshot" && snapshotCount < 30) {
-          list.push(v.id);
+          versions.push(v.id);
           snapshotCount++;
         }
       }
-      mcVersions.value = list;
     } else {
-      mcVersions.value = data.versions
+      versions = data.versions
         .filter((v: any) => v.type === "release")
         .map((v: any) => v.id);
     }
+
+    // 如果有基底版本，過濾僅保留 >= baseVersion 的版本
+    if (baseVersion.value) {
+      versions = versions.filter(v => {
+        return v.localeCompare(baseVersion.value!, undefined, { numeric: true, sensitivity: 'base' }) >= 0;
+      });
+    }
+
+    mcVersions.value = versions;
   } catch (err) {
     message.error("獲取 Minecraft 版本清單失敗");
   }
 };
 
-// 打開視窗時先檢查是否為模組伺服器
+// 打開視窗時的全盤檢查
 const openDialog = async () => {
   if (props.instanceInfo.status !== 0) {
     return message.error("請先關閉伺服器再進行升級");
@@ -82,10 +92,12 @@ const openDialog = async () => {
   isVisible.value = true;
   hasCleaned.value = false;
   isModServer.value = false;
+  baseVersion.value = null;
   checkingModServer.value = true;
 
   try {
-    const res = await fetchFileList({
+    // 1. 檢查 libraries/net 下的模組目錄
+    const libRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
         uuid: props.instanceId,
@@ -95,11 +107,65 @@ const openDialog = async () => {
         file_name: ""
       }
     });
-    const items = res.value?.items || [];
-    const modFolders = ["minecraftforge", "neoforge", "neoforged", "fabricmc", "forge"];
-    isModServer.value = items.some((item: any) => modFolders.includes(item.name));
+    const libItems = libRes.value?.items || [];
+    const modFolders = ["minecraftforge", "neoforged", "fabricmc", "forge"];
+    const hasModFolder = libItems.some((item: any) => modFolders.includes(item.name));
+
+    if (hasModFolder) {
+      isModServer.value = true;
+    }
+
+    // 2. 檢查根目錄特殊檔案與 Version 目錄
+    const rootRes = await fetchFileList({
+      params: {
+        daemonId: props.daemonId,
+        uuid: props.instanceId,
+        target: "/",
+        page: 0,
+        page_size: 200,
+        file_name: ""
+      }
+    });
+    const rootItems = rootRes.value?.items || [];
+
+    // 檢查 run.sh 或 user_jvm_args.txt 是否存在（需為檔案）
+    const hasRunOrJvm = rootItems.some(
+      (item: any) =>
+        (item.name === "run.sh" || item.name === "user_jvm_args.txt") && item.type === "file"
+    );
+    if (hasRunOrJvm) {
+      isModServer.value = true;
+    }
+
+    // 檢查是否有 Version 目錄，並讀取其內部版本號
+    const versionDir = rootItems.find(
+      (item: any) => item.name === "Version" && item.type === "dir"
+    );
+    if (versionDir) {
+      try {
+        const versionRes = await fetchFileList({
+          params: {
+            daemonId: props.daemonId,
+            uuid: props.instanceId,
+            target: "/Version",
+            page: 0,
+            page_size: 100,
+            file_name: ""
+          }
+        });
+        const versionItems = versionRes.value?.items || [];
+        const versionSubDir = versionItems.find(
+          (item: any) => item.type === "dir"
+        );
+        if (versionSubDir) {
+          baseVersion.value = versionSubDir.name;
+        }
+      } catch (e) {
+        // 忽略讀取錯誤
+      }
+    }
+
   } catch (e) {
-    // 若 /libraries/net 不存在或讀取錯誤，則視為非模組伺服器
     isModServer.value = false;
   } finally {
     checkingModServer.value = false;
@@ -108,7 +174,7 @@ const openDialog = async () => {
   if (!isModServer.value) {
     await fetchMcVersions();
   } else {
-    mcVersions.value = []; // 不載入版本列表
+    mcVersions.value = [];
   }
 };
 
@@ -122,20 +188,17 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
     form.loaderVersion = "";
     return;
   }
-  // 由於只剩 simple server，直接清空並返回
   if (isSimpleServer.value) {
     loaderVersions.value = [];
     form.loaderVersion = "";
     loadingLoaders.value = false;
     return;
   }
-  // 以下分支保留以防未來擴展，但不會再被執行
   loadingLoaders.value = true;
-  // ... 原 forge/neoforge/fabric 邏輯保留但無影響，此處省略 ...
+  // 原 loader 獲取邏輯保留但不會執行，此處省略
   loadingLoaders.value = false;
 });
 
-// 第一步：清理舊核心檔案（僅刪除 startmc.jar 與 libraries）
 const handleCleanServer = async () => {
   Modal.confirm({
     title: "確定要清理舊核心檔案嗎？",
@@ -308,13 +371,12 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 原有樣式完整保留，僅新增 .mod-server-overlay 及 .install-container position */
 .install-container {
   padding: 4px 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  position: relative; /* 讓遮罩層定位 */
+  position: relative;
 }
 .header-banner {
   display: flex;
@@ -375,6 +437,5 @@ defineExpose({ openDialog });
 }
 .mod-server-overlay .ant-alert {
   max-width: 90%;
-  pointer-events: none; /* 僅展示文字，允許點擊穿透到關閉按鈕 */
 }
 </style>
