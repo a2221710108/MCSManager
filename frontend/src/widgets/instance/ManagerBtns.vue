@@ -332,7 +332,7 @@ watch(instanceInfo, (cfg, oldCfg) => {
   <CurseForgeInstall ref="cfInstallDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
   <modloaderinstall ref="modloaderinstallDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
   <chart ref="chartDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
-  <modloaderinstall ref="updateserverDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
+  <updateserver ref="updateserverDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
 </template>
 
 <style lang="scss" scoped>
