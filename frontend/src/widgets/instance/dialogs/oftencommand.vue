@@ -529,13 +529,13 @@ defineExpose({ openDialog });
         </div>
       </div>
 
-      <!-- 搜尋框 -->
-      <div class="search-container">
+      <!-- 搜尋框（已恢復原始樣式） -->
+      <div class="search-box">
         <a-input
           v-model:value="searchQuery"
           :placeholder="t('搜索指令或關鍵字...')"
           allow-clear
-          class="custom-search-input"
+          class="custom-search"
         >
           <template #prefix><SearchOutlined /></template>
         </a-input>
@@ -608,6 +608,7 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
+/* 所有原始樣式保持不變，並恢復了搜尋框的深色模式適配 */
 .quick-cmd-container {
   padding: 0 4px;
   max-height: 70vh;
@@ -633,13 +634,39 @@ defineExpose({ openDialog });
   background: rgba(140, 140, 140, 0.1);
   border: none;
 }
-.search-container {
+
+/* 搜尋框容器 */
+.search-box {
   padding: 0 12px 16px 12px;
 }
-.custom-search-input {
-  background: rgba(140, 140, 140, 0.05);
-  border-radius: 8px;
+/* 適配深色模式的搜索框 */
+.custom-search {
+  /* 使用透明度疊加，這樣在深色背景下會變深，淺色下會變淺 */
+  background: var(--ant-input-bg, rgba(140, 140, 140, 0.05)) !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(140, 140, 140, 0.1) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.custom-search:hover, .custom-search:focus-within {
+  border-color: var(--ant-primary-color) !important;
+  background: var(--ant-component-background, #ffffff) !important;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+/* 針對輸入框內文字與圖標的深色模式優化 */
+.custom-search :deep(.ant-input),
+.custom-search :deep(.ant-input-prefix) {
+  color: var(--ant-text-color) !important;
+  background: transparent !important;
+}
+.custom-search :deep(.ant-input::placeholder) {
+  color: var(--ant-text-color-placeholder);
+}
+/* 讓清除按鈕也適配 */
+.custom-search :deep(.ant-input-clear-icon) {
+  color: var(--ant-text-color-secondary);
+}
+
+/* 其餘樣式維持 */
 .custom-collapse :deep(.ant-collapse-item) {
   border-bottom: 1px solid rgba(140, 140, 140, 0.1) !important;
   margin-bottom: 4px;
