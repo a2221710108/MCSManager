@@ -4,7 +4,6 @@ import { message, Modal } from "ant-design-vue";
 import {
   CloudDownloadOutlined,
   CheckCircleOutlined,
-  DeleteOutlined,
   SettingOutlined
 } from "@ant-design/icons-vue";
 import axios from "axios";
@@ -20,7 +19,7 @@ const props = defineProps<{
 
 const isVisible = ref(false);
 const confirmLoading = ref(false);
-const isDeleting = ref(false);                // 正在執行刪除
+const isDeleting = ref(false);
 const showSnapshots = ref(false);
 const isModServer = ref(false);
 const checkingModServer = ref(false);
@@ -36,16 +35,14 @@ const form = reactive({
   loaderVersion: ""
 });
 
-// 三個必要勾選
-const agreeDelete = ref(false);       // 同意刪除舊 Server Core
-const agreeBackup = ref(false);       // 已備份
-const agreeCompatibility = ref(false); // 清楚相容性風險
+const agreeDelete = ref(false);
+const agreeBackup = ref(false);
+const agreeCompatibility = ref(false);
 
 const isSimpleServer = computed(() => {
   return ["paper", "folia", "vanilla"].includes(form.loaderType);
 });
 
-// 所有勾選都滿足時才解鎖
 const allAgreed = computed(() => {
   return agreeDelete.value && agreeBackup.value && agreeCompatibility.value;
 });
@@ -96,7 +93,6 @@ const openDialog = async () => {
     return message.error("請先關閉伺服器再進行升級");
   }
   isVisible.value = true;
-  // 重置所有狀態
   agreeDelete.value = false;
   agreeBackup.value = false;
   agreeCompatibility.value = false;
@@ -105,7 +101,6 @@ const openDialog = async () => {
   checkingModServer.value = true;
 
   try {
-    // 檢查模組目錄
     const libRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
@@ -123,14 +118,13 @@ const openDialog = async () => {
       isModServer.value = true;
     }
 
-    // 檢查根目錄特殊檔案與 Version 目錄（讀取基底版本）
     const rootRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
         uuid: props.instanceId,
         target: "/",
         page: 0,
-        page_size: 200,
+        page_size: 100,
         file_name: ""
       }
     });
@@ -144,6 +138,7 @@ const openDialog = async () => {
       isModServer.value = true;
     }
 
+    // 尋找 versions 目錄（小寫），讀取內部子目錄作為基底版本
     const versionDir = rootItems.find(
       (item: any) => item.name === "versions" && item.type === "dir"
     );
@@ -153,7 +148,7 @@ const openDialog = async () => {
           params: {
             daemonId: props.daemonId,
             uuid: props.instanceId,
-            target: "/Version",
+            target: "/versions",
             page: 0,
             page_size: 100,
             file_name: ""
@@ -167,7 +162,7 @@ const openDialog = async () => {
           baseVersion.value = versionSubDir.name;
         }
       } catch (e) {
-        // 忽略
+        // 忽略讀取錯誤
       }
     }
   } catch (e) {
@@ -187,7 +182,6 @@ watch(showSnapshots, () => {
   fetchMcVersions();
 });
 
-// 當 mcVersion 或 loaderType 變化時，保持 loaderVersion 為空（因為只有 simple server）
 watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) => {
   if (!newMc || !newType) {
     loaderVersions.value = [];
@@ -200,10 +194,8 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
     loadingLoaders.value = false;
     return;
   }
-  // 不會進入此分支
 });
 
-// 開始升級：先刪除舊檔案，再呼叫 API
 const handleUpgrade = async () => {
   if (!form.mcVersion) {
     message.warning("請選擇 Minecraft 版本");
@@ -218,7 +210,6 @@ const handleUpgrade = async () => {
   isDeleting.value = true;
 
   try {
-    // 1. 刪除 startmc.jar、libraries、versions
     const targets = ["/startmc.jar", "/libraries", "/versions"];
     await executeDelete({
       params: { daemonId: props.daemonId, uuid: props.instanceId },
@@ -227,7 +218,6 @@ const handleUpgrade = async () => {
     message.success("舊核心檔案清理成功");
     isDeleting.value = false;
 
-    // 2. 呼叫後端升級
     const mcV = String(form.mcVersion).trim();
     const lT = String(form.loaderType).trim();
     const lV = isSimpleServer.value ? "NA" : String(form.loaderVersion).trim();
@@ -271,7 +261,6 @@ defineExpose({ openDialog });
     :width="520"
   >
     <div class="install-container">
-      <!-- 模組伺服器遮罩層 -->
       <div v-if="isModServer" class="mod-server-overlay">
         <a-alert
           type="error"
@@ -289,7 +278,6 @@ defineExpose({ openDialog });
         </div>
       </div>
 
-      <!-- 確認勾選區 -->
       <div class="step-card config-zone" :class="{ 'is-locked': isModServer }">
         <div class="card-header">
           <h4 class="step-title">
@@ -309,7 +297,6 @@ defineExpose({ openDialog });
         </div>
       </div>
 
-      <!-- 選擇配置區（僅當全部勾選後才可操作） -->
       <div class="step-card config-zone" :class="{ 'is-locked': !allAgreed || isModServer }">
         <div class="step-header-row">
           <h4 class="step-title">
@@ -413,7 +400,6 @@ defineExpose({ openDialog });
 :deep(.ant-form-item) { margin-bottom: 12px; }
 :deep(.ant-select-selector), :deep(.ant-input) { border-radius: 6px !important; }
 
-/* 模組伺服器遮罩層 */
 .mod-server-overlay {
   position: absolute;
   inset: 0;
