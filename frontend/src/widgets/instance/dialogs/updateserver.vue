@@ -101,6 +101,7 @@ const openDialog = async () => {
   checkingModServer.value = true;
 
   try {
+    // 1. 檢查 libraries/net 下的模組目錄
     const libRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
@@ -112,19 +113,49 @@ const openDialog = async () => {
       }
     });
     const libItems = libRes.value?.items || [];
-    const modFolders = ["minecraftforge", "neoforged", "fabricmc", "forge"];
+    // 移除 neoforged 的直接比對，保留 minecraftforge, fabricmc, forge
+    const modFolders = ["minecraftforge", "fabricmc", "forge"];
     const hasModFolder = libItems.some((item: any) => modFolders.includes(item.name));
     if (hasModFolder) {
       isModServer.value = true;
     }
 
+    // 2. 額外檢查：若存在 neoforged 目錄，再深入檢查其內部是否有 neoforge 目錄
+    const hasNeoforgedDir = libItems.some(
+      (item: any) => item.name === "neoforged" && item.type === "dir"
+    );
+    if (hasNeoforgedDir && !isModServer.value) {
+      try {
+        const neoforgedRes = await fetchFileList({
+          params: {
+            daemonId: props.daemonId,
+            uuid: props.instanceId,
+            target: "/libraries/net/neoforged",
+            page: 0,
+            page_size: 100,
+            file_name: ""
+          }
+        });
+        const neoforgedItems = neoforgedRes.value?.items || [];
+        const hasNeoforge = neoforgedItems.some(
+          (item: any) => item.name === "neoforge" && item.type === "dir"
+        );
+        if (hasNeoforge) {
+          isModServer.value = true;
+        }
+      } catch (e) {
+        // 忽略查詢錯誤
+      }
+    }
+
+    // 3. 檢查根目錄特殊檔案與 versions 目錄
     const rootRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
         uuid: props.instanceId,
         target: "/",
         page: 0,
-        page_size: 100,
+        page_size: 200,
         file_name: ""
       }
     });
@@ -138,7 +169,7 @@ const openDialog = async () => {
       isModServer.value = true;
     }
 
-    // 尋找 versions 目錄（小寫），讀取內部子目錄作為基底版本
+    // 4. 讀取 versions 目錄中的基底版本號
     const versionDir = rootItems.find(
       (item: any) => item.name === "versions" && item.type === "dir"
     );
@@ -162,7 +193,7 @@ const openDialog = async () => {
           baseVersion.value = versionSubDir.name;
         }
       } catch (e) {
-        // 忽略讀取錯誤
+        // 忽略
       }
     }
   } catch (e) {
