@@ -145,7 +145,7 @@ const openDialog = async () => {
     }
 
     const versionDir = rootItems.find(
-      (item: any) => item.name === "Version" && item.type === "dir"
+      (item: any) => item.name === "versions" && item.type === "dir"
     );
     if (versionDir) {
       try {
