@@ -113,7 +113,6 @@ const openDialog = async () => {
       }
     });
     const libItems = libRes.value?.items || [];
-    // 移除 neoforged 的直接比對，保留 minecraftforge, fabricmc, forge
     const modFolders = ["minecraftforge", "fabricmc", "forge"];
     const hasModFolder = libItems.some((item: any) => modFolders.includes(item.name));
     if (hasModFolder) {
@@ -144,7 +143,7 @@ const openDialog = async () => {
           isModServer.value = true;
         }
       } catch (e) {
-        // 忽略查詢錯誤
+        // 忽略
       }
     }
 
@@ -291,16 +290,17 @@ defineExpose({ openDialog });
     destroy-on-close
     :width="520"
   >
-    <div class="install-container">
-      <div v-if="isModServer" class="mod-server-overlay">
-        <a-alert
-          type="error"
-          message="不支持Mod伺服器一鍵升級"
-          show-icon
-          banner
-        />
-      </div>
+    <!-- Mod 伺服器提示，僅顯示錯誤訊息，不顯示其他元件 -->
+    <div v-if="isModServer" class="mod-server-notification">
+      <a-alert
+        type="error"
+        message="不支持Mod伺服器一鍵升級"
+        show-icon
+      />
+    </div>
 
+    <!-- 正常升級介面 -->
+    <div v-else class="install-container">
       <div class="header-banner">
         <cloud-download-outlined class="banner-icon" />
         <div class="banner-text">
@@ -309,26 +309,26 @@ defineExpose({ openDialog });
         </div>
       </div>
 
-      <div class="step-card config-zone" :class="{ 'is-locked': isModServer }">
+      <div class="step-card config-zone">
         <div class="card-header">
           <h4 class="step-title">
             <check-circle-outlined /> 升級前確認事項
           </h4>
         </div>
         <div class="checklist">
-          <a-checkbox v-model:checked="agreeDelete" :disabled="isModServer">
+          <a-checkbox v-model:checked="agreeDelete">
             我同意刪除舊 Server Core 檔案（startmc.jar、libraries、versions）
           </a-checkbox>
-          <a-checkbox v-model:checked="agreeBackup" :disabled="isModServer">
+          <a-checkbox v-model:checked="agreeBackup">
             我已進行備份（強烈建議備份）
           </a-checkbox>
-          <a-checkbox v-model:checked="agreeCompatibility" :disabled="isModServer">
+          <a-checkbox v-model:checked="agreeCompatibility">
             我清楚升級伺服器核心可能導致存檔及插件等出現相容性問題
           </a-checkbox>
         </div>
       </div>
 
-      <div class="step-card config-zone" :class="{ 'is-locked': !allAgreed || isModServer }">
+      <div class="step-card config-zone" :class="{ 'is-locked': !allAgreed }">
         <div class="step-header-row">
           <h4 class="step-title">
             <setting-outlined /> 選擇 Server Core
@@ -364,7 +364,7 @@ defineExpose({ openDialog });
             <a-button
               type="primary"
               :loading="confirmLoading"
-              :disabled="!allAgreed || !form.mcVersion || isModServer || isDeleting"
+              :disabled="!allAgreed || !form.mcVersion || isDeleting"
               class="submit-btn"
               @click="handleUpgrade"
             >
@@ -384,7 +384,11 @@ defineExpose({ openDialog });
   display: flex;
   flex-direction: column;
   gap: 16px;
-  position: relative;
+}
+.mod-server-notification {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
 }
 .header-banner {
   display: flex;
@@ -430,30 +434,4 @@ defineExpose({ openDialog });
 .submit-btn { min-width: 140px; font-weight: 500; border-radius: 6px; }
 :deep(.ant-form-item) { margin-bottom: 12px; }
 :deep(.ant-select-selector), :deep(.ant-input) { border-radius: 6px !important; }
-
-.mod-server-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  /* 磨砂玻璃效果，搭配高透白底，符合 AntD 現代極簡風格 */
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 10;
-  border-radius: 12px;
-  padding: 24px;
-}
-
-.mod-server-overlay .ant-alert {
-  max-width: 90%;
-  box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.08), 0 9px 28px 0 rgba(0, 0, 0, 0.05);
-  border-radius: 8px;
-  padding: 12px 16px;
-}
 </style>
