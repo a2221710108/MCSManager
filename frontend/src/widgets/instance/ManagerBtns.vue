@@ -204,7 +204,7 @@ const categorizedBtns = computed(() => {
           condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
         },
         {
-          title: t("更新 Minecraft 版本"),
+          title: t("升/降級 Minecraft 版本"),
           icon: CloudDownloadOutlined,
           click: () => { updateserverDialog.value?.openDialog(); },
           condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
