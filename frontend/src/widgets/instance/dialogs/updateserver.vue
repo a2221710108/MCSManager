@@ -433,15 +433,27 @@ defineExpose({ openDialog });
 
 .mod-server-overlay {
   position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* 磨砂玻璃效果，搭配高透白底，符合 AntD 現代極簡風格 */
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 10;
   border-radius: 12px;
+  padding: 24px;
 }
+
 .mod-server-overlay .ant-alert {
   max-width: 90%;
+  box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.08), 0 9px 28px 0 rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  padding: 12px 16px;
 }
 </style>
