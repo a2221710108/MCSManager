@@ -147,24 +147,33 @@ const openDialog = async () => {
       }
     }
 
-    // 3. 檢查根目錄特殊檔案與 versions 目錄
+    // 3. 檢查根目錄特殊檔案、mods 資料夾與 versions 目錄
     const rootRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
         uuid: props.instanceId,
         target: "/",
         page: 0,
-        page_size: 100,
+        page_size: 200,
         file_name: ""
       }
     });
     const rootItems = rootRes.value?.items || [];
 
+    // 檢查特殊檔案
     const hasRunOrJvm = rootItems.some(
       (item: any) =>
         (item.name === "run.sh" || item.name === "user_jvm_args.txt") && item.type === "file"
     );
     if (hasRunOrJvm) {
+      isModServer.value = true;
+    }
+
+    // 檢查 mods 目錄
+    const hasModsDir = rootItems.some(
+      (item: any) => item.name === "mods" && item.type === "dir"
+    );
+    if (hasModsDir) {
       isModServer.value = true;
     }
 
@@ -294,7 +303,7 @@ defineExpose({ openDialog });
     <div v-if="isModServer" class="mod-server-notification">
       <a-alert
         type="error"
-        message="不支持Mod伺服器一鍵升級"
+        message="不支持 Mod 伺服器一鍵升級"
         show-icon
       />
     </div>
@@ -304,8 +313,8 @@ defineExpose({ openDialog });
       <div class="header-banner">
         <cloud-download-outlined class="banner-icon" />
         <div class="banner-text">
-          <h3>Server Core 自動化升級</h3>
-          <p>升級 Minecraft 版本與 Server Core，支援 Paper / Folia / Vanilla</p>
+          <h3>升/降級 Minecraft 版本</h3>
+          <p>升級 Minecraft 版本 / 更換 Server Core。支援 Paper / Folia / Vanilla</p>
         </div>
       </div>
 
@@ -323,7 +332,7 @@ defineExpose({ openDialog });
             我已進行備份（強烈建議備份）
           </a-checkbox>
           <a-checkbox v-model:checked="agreeCompatibility">
-            我清楚升級伺服器核心可能導致存檔及插件等出現相容性問題
+            我清楚升級後可能存在存檔及插件等出現相容性問題
           </a-checkbox>
         </div>
       </div>
@@ -337,7 +346,7 @@ defineExpose({ openDialog });
             顯示最近的快照版本
           </a-checkbox>
         </div>
-        <p class="step-desc">請選擇您希望升級的 Minecraft 版本與 Server Core 類型</p>
+        <p class="step-desc">請選擇您希望升/降級的 Minecraft 版本與 Server Core 類型</p>
         <a-form layout="vertical" class="mt-4">
           <a-form-item label="Minecraft 版本">
             <a-select v-model:value="form.mcVersion" show-search placeholder="請選擇版本">
