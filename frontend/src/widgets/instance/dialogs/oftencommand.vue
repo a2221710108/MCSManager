@@ -510,7 +510,6 @@ defineExpose({ openDialog });
     class="quick-cmd-modal"
   >
     <div v-if="currentVersionCommands.length > 0" class="quick-cmd-container">
-      <!-- 工具列 -->
       <div class="header-toolbar">
         <span class="desc-text">{{ t("Minecraft 版本不同可能導致部分指令無法使用；玩家數據可能有 1-5 分鐘延遲，取決於 API 緩存") }}</span>
         <div class="toolbar-right">
@@ -529,7 +528,6 @@ defineExpose({ openDialog });
         </div>
       </div>
 
-      <!-- 搜尋框（已恢復原始樣式） -->
       <div class="search-box">
         <a-input
           v-model:value="searchQuery"
@@ -541,7 +539,6 @@ defineExpose({ openDialog });
         </a-input>
       </div>
 
-      <!-- 指令面板 -->
       <a-collapse v-model:activeKey="activeKeys" ghost expand-icon-position="right" class="custom-collapse">
         <a-collapse-panel v-for="group in filteredGroups" :key="group.group">
           <template #header>
@@ -608,7 +605,6 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
-/* 所有原始樣式保持不變，並恢復了搜尋框的深色模式適配 */
 .quick-cmd-container {
   padding: 0 4px;
   max-height: 70vh;
@@ -635,13 +631,11 @@ defineExpose({ openDialog });
   border: none;
 }
 
-/* 搜尋框容器 */
+/* === 搜尋框容器與高級樣式同步 === */
 .search-box {
   padding: 0 12px 16px 12px;
 }
-/* 適配深色模式的搜索框 */
 .custom-search {
-  /* 使用透明度疊加，這樣在深色背景下會變深，淺色下會變淺 */
   background: var(--ant-input-bg, rgba(140, 140, 140, 0.05)) !important;
   border-radius: 8px !important;
   border: 1px solid rgba(140, 140, 140, 0.1) !important;
@@ -652,7 +646,6 @@ defineExpose({ openDialog });
   background: var(--ant-component-background, #ffffff) !important;
   box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
 }
-/* 針對輸入框內文字與圖標的深色模式優化 */
 .custom-search :deep(.ant-input),
 .custom-search :deep(.ant-input-prefix) {
   color: var(--ant-text-color) !important;
@@ -661,12 +654,11 @@ defineExpose({ openDialog });
 .custom-search :deep(.ant-input::placeholder) {
   color: var(--ant-text-color-placeholder);
 }
-/* 讓清除按鈕也適配 */
 .custom-search :deep(.ant-input-clear-icon) {
   color: var(--ant-text-color-secondary);
 }
 
-/* 其餘樣式維持 */
+/* === 面板與核心樣式 === */
 .custom-collapse :deep(.ant-collapse-item) {
   border-bottom: 1px solid rgba(140, 140, 140, 0.1) !important;
   margin-bottom: 4px;
@@ -759,6 +751,8 @@ defineExpose({ openDialog });
   height: 16px;
   border-radius: 3px;
 }
+
+/* === 響應式佈局 === */
 @media (max-width: 800px) {
   .cmd-list {
     grid-template-columns: 1fr;
