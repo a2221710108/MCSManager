@@ -17,11 +17,10 @@ const props = defineProps<{
   instanceId: string;
   instanceInfo: any;
 }>();
+
 const isVisible = ref(false);
 const confirmLoading = ref(false);
-const isCleaning = ref(false);
-const agreeClean = ref(false);
-const hasCleaned = ref(false);
+const isDeleting = ref(false);                // 正在執行刪除
 const showSnapshots = ref(false);
 const isModServer = ref(false);
 const checkingModServer = ref(false);
@@ -37,8 +36,18 @@ const form = reactive({
   loaderVersion: ""
 });
 
+// 三個必要勾選
+const agreeDelete = ref(false);       // 同意刪除舊 Server Core
+const agreeBackup = ref(false);       // 已備份
+const agreeCompatibility = ref(false); // 清楚相容性風險
+
 const isSimpleServer = computed(() => {
   return ["paper", "folia", "vanilla"].includes(form.loaderType);
+});
+
+// 所有勾選都滿足時才解鎖
+const allAgreed = computed(() => {
+  return agreeDelete.value && agreeBackup.value && agreeCompatibility.value;
 });
 
 const { execute: fetchFileList } = fileList();
@@ -49,7 +58,6 @@ const proxyGet = async (targetUrl: string) => {
   return res.data;
 };
 
-// 獲取 Minecraft 版本清單並根據基底版本過濾
 const fetchMcVersions = async () => {
   try {
     const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
@@ -71,7 +79,6 @@ const fetchMcVersions = async () => {
         .map((v: any) => v.id);
     }
 
-    // 如果有基底版本，過濾僅保留 >= baseVersion 的版本
     if (baseVersion.value) {
       versions = versions.filter(v => {
         return v.localeCompare(baseVersion.value!, undefined, { numeric: true, sensitivity: 'base' }) >= 0;
@@ -84,19 +91,21 @@ const fetchMcVersions = async () => {
   }
 };
 
-// 打開視窗時的全盤檢查
 const openDialog = async () => {
   if (props.instanceInfo.status !== 0) {
     return message.error("請先關閉伺服器再進行升級");
   }
   isVisible.value = true;
-  hasCleaned.value = false;
+  // 重置所有狀態
+  agreeDelete.value = false;
+  agreeBackup.value = false;
+  agreeCompatibility.value = false;
   isModServer.value = false;
   baseVersion.value = null;
   checkingModServer.value = true;
 
   try {
-    // 1. 檢查 libraries/net 下的模組目錄
+    // 檢查模組目錄
     const libRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
@@ -110,12 +119,11 @@ const openDialog = async () => {
     const libItems = libRes.value?.items || [];
     const modFolders = ["minecraftforge", "neoforged", "fabricmc", "forge"];
     const hasModFolder = libItems.some((item: any) => modFolders.includes(item.name));
-
     if (hasModFolder) {
       isModServer.value = true;
     }
 
-    // 2. 檢查根目錄特殊檔案與 Version 目錄
+    // 檢查根目錄特殊檔案與 Version 目錄（讀取基底版本）
     const rootRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
@@ -128,7 +136,6 @@ const openDialog = async () => {
     });
     const rootItems = rootRes.value?.items || [];
 
-    // 檢查 run.sh 或 user_jvm_args.txt 是否存在（需為檔案）
     const hasRunOrJvm = rootItems.some(
       (item: any) =>
         (item.name === "run.sh" || item.name === "user_jvm_args.txt") && item.type === "file"
@@ -137,7 +144,6 @@ const openDialog = async () => {
       isModServer.value = true;
     }
 
-    // 檢查是否有 Version 目錄，並讀取其內部版本號
     const versionDir = rootItems.find(
       (item: any) => item.name === "Version" && item.type === "dir"
     );
@@ -147,7 +153,7 @@ const openDialog = async () => {
           params: {
             daemonId: props.daemonId,
             uuid: props.instanceId,
-            target: "/versions",
+            target: "/Version",
             page: 0,
             page_size: 100,
             file_name: ""
@@ -161,10 +167,9 @@ const openDialog = async () => {
           baseVersion.value = versionSubDir.name;
         }
       } catch (e) {
-        // 忽略讀取錯誤
+        // 忽略
       }
     }
-
   } catch (e) {
     isModServer.value = false;
   } finally {
@@ -182,6 +187,7 @@ watch(showSnapshots, () => {
   fetchMcVersions();
 });
 
+// 當 mcVersion 或 loaderType 變化時，保持 loaderVersion 為空（因為只有 simple server）
 watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) => {
   if (!newMc || !newType) {
     loaderVersions.value = [];
@@ -194,43 +200,38 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
     loadingLoaders.value = false;
     return;
   }
-  loadingLoaders.value = true;
-  // 原 loader 獲取邏輯保留但不會執行，此處省略
-  loadingLoaders.value = false;
+  // 不會進入此分支
 });
 
-const handleCleanServer = async () => {
-  Modal.confirm({
-    title: "確定要清理舊核心檔案嗎？",
-    content: "將刪除 startmc.jar 及 libraries 資料夾，請確認已備份重要檔案！",
-    okText: "確認清理",
-    okType: "danger",
-    onOk: async () => {
-      try {
-        isCleaning.value = true;
-        const targets = ["/startmc.jar", "/libraries", "/versions"];
-        await executeDelete({
-          params: { daemonId: props.daemonId, uuid: props.instanceId },
-          data: { targets }
-        });
-        message.success("已清理舊核心檔案");
-        hasCleaned.value = true;
-      } catch (err) {
-        message.error("清理失敗");
-      } finally {
-        isCleaning.value = false;
-      }
-    }
-  });
-};
-
-const handleInstall = async () => {
-  const mcV = String(form.mcVersion).trim();
-  const lT = String(form.loaderType).trim();
-  const lV = isSimpleServer.value ? "NA" : String(form.loaderVersion).trim();
+// 開始升級：先刪除舊檔案，再呼叫 API
+const handleUpgrade = async () => {
+  if (!form.mcVersion) {
+    message.warning("請選擇 Minecraft 版本");
+    return;
+  }
+  if (!allAgreed.value) {
+    message.warning("請勾選所有確認項目");
+    return;
+  }
 
   confirmLoading.value = true;
+  isDeleting.value = true;
+
   try {
+    // 1. 刪除 startmc.jar、libraries、versions
+    const targets = ["/startmc.jar", "/libraries", "/versions"];
+    await executeDelete({
+      params: { daemonId: props.daemonId, uuid: props.instanceId },
+      data: { targets }
+    });
+    message.success("舊核心檔案清理成功");
+    isDeleting.value = false;
+
+    // 2. 呼叫後端升級
+    const mcV = String(form.mcVersion).trim();
+    const lT = String(form.loaderType).trim();
+    const lV = isSimpleServer.value ? "NA" : String(form.loaderVersion).trim();
+
     await installModLoader().execute({
       params: {
         daemonId: props.daemonId,
@@ -248,10 +249,11 @@ const handleInstall = async () => {
     message.success("升級任務已啟動");
     isVisible.value = false;
   } catch (err: any) {
-    console.error("升級請求失敗:", err);
-    message.error("啟動失敗：" + (err.response?.data?.err || err.message));
+    console.error("升級流程失敗:", err);
+    message.error("升級失敗：" + (err.response?.data?.err || err.message));
   } finally {
     confirmLoading.value = false;
+    isDeleting.value = false;
   }
 };
 
@@ -287,43 +289,31 @@ defineExpose({ openDialog });
         </div>
       </div>
 
-      <!-- 第一步：清理舊核心 -->
-      <div class="step-card danger-zone">
+      <!-- 確認勾選區 -->
+      <div class="step-card config-zone" :class="{ 'is-locked': isModServer }">
         <div class="card-header">
-          <div class="header-content">
-            <h4 class="step-title danger">
-              <delete-outlined /> 第一步：清理舊核心檔案
-            </h4>
-            <p class="step-desc">為確保版本相容，將刪除 startmc.jar 與 libraries 資料夾</p>
-          </div>
-          <transition name="fade">
-            <a-tag v-if="hasCleaned" color="success" class="status-tag">
-              <check-circle-outlined /> 已完成
-            </a-tag>
-          </transition>
+          <h4 class="step-title">
+            <check-circle-outlined /> 升級前確認事項
+          </h4>
         </div>
-        <div class="card-action">
-          <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned || isModServer" class="custom-checkbox">
-            <span class="checkbox-text">我同意清理上述檔案</span>
+        <div class="checklist">
+          <a-checkbox v-model:checked="agreeDelete" :disabled="isModServer">
+            我同意刪除舊 Server Core 檔案（startmc.jar、libraries、versions）
           </a-checkbox>
-          <a-button
-            danger
-            block
-            :loading="isCleaning"
-            :disabled="!agreeClean || hasCleaned || isModServer"
-            class="action-btn"
-            @click="handleCleanServer"
-          >
-            {{ hasCleaned ? '舊核心已清理完畢' : '立即執行清理' }}
-          </a-button>
+          <a-checkbox v-model:checked="agreeBackup" :disabled="isModServer">
+            我已進行備份（強烈建議備份）
+          </a-checkbox>
+          <a-checkbox v-model:checked="agreeCompatibility" :disabled="isModServer">
+            我清楚升級伺服器核心可能導致存檔及插件等出現相容性問題
+          </a-checkbox>
         </div>
       </div>
 
-      <!-- 第二步：選擇 Server Core -->
-      <div class="step-card config-zone" :class="{ 'is-locked': !hasCleaned || isModServer }">
+      <!-- 選擇配置區（僅當全部勾選後才可操作） -->
+      <div class="step-card config-zone" :class="{ 'is-locked': !allAgreed || isModServer }">
         <div class="step-header-row">
           <h4 class="step-title">
-            <setting-outlined /> 第二步：選擇 Server Core
+            <setting-outlined /> 選擇 Server Core
           </h4>
           <a-checkbox v-model:checked="showSnapshots" class="snapshot-checkbox">
             顯示最近的快照版本
@@ -356,12 +346,12 @@ defineExpose({ openDialog });
             <a-button
               type="primary"
               :loading="confirmLoading"
-              :disabled="!hasCleaned || !form.mcVersion || isModServer"
+              :disabled="!allAgreed || !form.mcVersion || isModServer || isDeleting"
               class="submit-btn"
-              @click="handleInstall"
+              @click="handleUpgrade"
             >
               <template #icon><cloud-download-outlined /></template>
-              開始升級任務
+              {{ isDeleting ? '正在清理舊檔案...' : '開始升級任務' }}
             </a-button>
           </div>
         </a-form>
@@ -410,17 +400,16 @@ defineExpose({ openDialog });
 }
 .step-header-row .step-title { margin-bottom: 0; }
 .snapshot-checkbox { font-size: 12px; }
-.danger-zone { background: rgba(255, 77, 79, 0.04); border-color: rgba(255, 77, 79, 0.15); }
-.danger-zone .danger { color: #ff4d4f; }
-.card-action { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
-.checkbox-text { font-size: 12px; }
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
 .config-zone { background: rgba(22, 119, 255, 0.04); border-color: rgba(22, 119, 255, 0.15); }
 .config-zone.is-locked { opacity: 0.4; filter: grayscale(0.5); pointer-events: none; }
 .footer-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .submit-btn { min-width: 140px; font-weight: 500; border-radius: 6px; }
-.status-tag { border-radius: 6px; }
-.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
 :deep(.ant-form-item) { margin-bottom: 12px; }
 :deep(.ant-select-selector), :deep(.ant-input) { border-radius: 6px !important; }
 
