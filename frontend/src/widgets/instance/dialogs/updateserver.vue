@@ -321,7 +321,7 @@ defineExpose({ openDialog });
       <div class="step-card config-zone">
         <div class="card-header">
           <h4 class="step-title">
-            <check-circle-outlined /> 升級前確認事項
+            <check-circle-outlined /> 請同意以下事項
           </h4>
         </div>
         <div class="checklist">
