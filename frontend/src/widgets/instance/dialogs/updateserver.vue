@@ -332,7 +332,7 @@ defineExpose({ openDialog });
             我已進行備份（強烈建議備份）
           </a-checkbox>
           <a-checkbox v-model:checked="agreeCompatibility">
-            我清楚升級後可能存在存檔及插件等出現相容性問題
+            我清楚可能出現相容性問題(如：存檔及插件等)
           </a-checkbox>
         </div>
       </div>
