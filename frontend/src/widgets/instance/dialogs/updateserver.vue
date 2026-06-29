@@ -9,14 +9,12 @@ import {
 import axios from "axios";
 import { fileList, deleteFile } from "@/services/apis/fileManager";
 import { installModLoader } from "@/services/apis/instance";
-
 const PROXY = "https://get-modloader-version.lazycloud.one/?url=";
 const props = defineProps<{
   daemonId: string;
   instanceId: string;
   instanceInfo: any;
 }>();
-
 const isVisible = ref(false);
 const confirmLoading = ref(false);
 const isDeleting = ref(false);
@@ -24,42 +22,33 @@ const showSnapshots = ref(false);
 const isModServer = ref(false);
 const checkingModServer = ref(false);
 const baseVersion = ref<string | null>(null);
-
 const mcVersions = ref<string[]>([]);
 const loaderVersions = ref<{ version: string; tag?: string }[]>([]);
 const loadingLoaders = ref(false);
-
 const form = reactive({
   mcVersion: "",
   loaderType: "paper",
   loaderVersion: ""
 });
-
 const agreeDelete = ref(false);
 const agreeBackup = ref(false);
 const agreeCompatibility = ref(false);
-
 const isSimpleServer = computed(() => {
   return ["paper", "folia", "vanilla"].includes(form.loaderType);
 });
-
 const allAgreed = computed(() => {
   return agreeDelete.value && agreeBackup.value && agreeCompatibility.value;
 });
-
 const { execute: fetchFileList } = fileList();
 const { execute: executeDelete } = deleteFile();
-
 const proxyGet = async (targetUrl: string) => {
   const res = await axios.get(PROXY + encodeURIComponent(targetUrl));
   return res.data;
 };
-
 const fetchMcVersions = async () => {
   try {
     const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
     let versions: string[] = [];
-
     if (showSnapshots.value) {
       let snapshotCount = 0;
       for (const v of data.versions) {
@@ -75,19 +64,16 @@ const fetchMcVersions = async () => {
         .filter((v: any) => v.type === "release")
         .map((v: any) => v.id);
     }
-
     if (baseVersion.value) {
       versions = versions.filter(v => {
         return v.localeCompare(baseVersion.value!, undefined, { numeric: true, sensitivity: 'base' }) >= 0;
       });
     }
-
     mcVersions.value = versions;
   } catch (err) {
     message.error("獲取 Minecraft 版本清單失敗");
   }
 };
-
 const openDialog = async () => {
   if (props.instanceInfo.status !== 0) {
     return message.error("請先關閉伺服器再進行升級");
@@ -99,7 +85,6 @@ const openDialog = async () => {
   isModServer.value = false;
   baseVersion.value = null;
   checkingModServer.value = true;
-
   try {
     // 1. 檢查 libraries/net 下的模組目錄
     const libRes = await fetchFileList({
@@ -118,7 +103,6 @@ const openDialog = async () => {
     if (hasModFolder) {
       isModServer.value = true;
     }
-
     // 2. 額外檢查：若存在 neoforged 目錄，再深入檢查其內部是否有 neoforge 目錄
     const hasNeoforgedDir = libItems.some(
       (item: any) => item.name === "neoforged" && item.type === "dir"
@@ -146,7 +130,6 @@ const openDialog = async () => {
         // 忽略
       }
     }
-
     // 3. 檢查根目錄特殊檔案、mods 資料夾與 versions 目錄
     const rootRes = await fetchFileList({
       params: {
@@ -159,7 +142,6 @@ const openDialog = async () => {
       }
     });
     const rootItems = rootRes.value?.items || [];
-
     // 檢查特殊檔案
     const hasRunOrJvm = rootItems.some(
       (item: any) =>
@@ -168,7 +150,6 @@ const openDialog = async () => {
     if (hasRunOrJvm) {
       isModServer.value = true;
     }
-
     // 檢查 mods 目錄
     const hasModsDir = rootItems.some(
       (item: any) => item.name === "mods" && item.type === "dir"
@@ -176,7 +157,6 @@ const openDialog = async () => {
     if (hasModsDir) {
       isModServer.value = true;
     }
-
     // 4. 讀取 versions 目錄中的基底版本號
     const versionDir = rootItems.find(
       (item: any) => item.name === "versions" && item.type === "dir"
@@ -209,18 +189,15 @@ const openDialog = async () => {
   } finally {
     checkingModServer.value = false;
   }
-
   if (!isModServer.value) {
     await fetchMcVersions();
   } else {
     mcVersions.value = [];
   }
 };
-
 watch(showSnapshots, () => {
   fetchMcVersions();
 });
-
 watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) => {
   if (!newMc || !newType) {
     loaderVersions.value = [];
@@ -234,7 +211,6 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
     return;
   }
 });
-
 const handleUpgrade = async () => {
   if (!form.mcVersion) {
     message.warning("請選擇 Minecraft 版本");
@@ -244,10 +220,8 @@ const handleUpgrade = async () => {
     message.warning("請勾選所有確認項目");
     return;
   }
-
   confirmLoading.value = true;
   isDeleting.value = true;
-
   try {
     const targets = ["/startmc.jar", "/libraries", "/versions"];
     await executeDelete({
@@ -256,11 +230,9 @@ const handleUpgrade = async () => {
     });
     message.success("舊核心檔案清理成功");
     isDeleting.value = false;
-
     const mcV = String(form.mcVersion).trim();
     const lT = String(form.loaderType).trim();
     const lV = isSimpleServer.value ? "NA" : String(form.loaderVersion).trim();
-
     await installModLoader().execute({
       params: {
         daemonId: props.daemonId,
@@ -285,7 +257,6 @@ const handleUpgrade = async () => {
     isDeleting.value = false;
   }
 };
-
 defineExpose({ openDialog });
 </script>
 
@@ -299,8 +270,13 @@ defineExpose({ openDialog });
     destroy-on-close
     :width="520"
   >
-    <!-- Mod 伺服器提示，僅顯示錯誤訊息，不顯示其他元件 -->
-    <div v-if="isModServer" class="mod-server-notification">
+    <!-- 檢查中狀態 -->
+    <div v-if="checkingModServer" class="loading-check">
+      <p>正在檢查伺服器環境…</p>
+    </div>
+
+    <!-- Mod 伺服器提示，僅顯示錯誤訊息 -->
+    <div v-else-if="isModServer" class="mod-server-notification">
       <a-alert
         type="error"
         message="不支持 Mod 伺服器一鍵升級"
@@ -317,7 +293,6 @@ defineExpose({ openDialog });
           <p>升級 Minecraft 版本 / 更換 Server Core。支援 Paper / Folia / Vanilla</p>
         </div>
       </div>
-
       <div class="step-card config-zone">
         <div class="card-header">
           <h4 class="step-title">
@@ -336,7 +311,6 @@ defineExpose({ openDialog });
           </a-checkbox>
         </div>
       </div>
-
       <div class="step-card config-zone" :class="{ 'is-locked': !allAgreed }">
         <div class="step-header-row">
           <h4 class="step-title">
@@ -353,7 +327,6 @@ defineExpose({ openDialog });
               <a-select-option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</a-select-option>
             </a-select>
           </a-form-item>
-
           <a-form-item label="Server Core 類型">
             <a-select v-model:value="form.loaderType">
               <a-select-option value="paper">
@@ -367,7 +340,6 @@ defineExpose({ openDialog });
               </a-select-option>
             </a-select>
           </a-form-item>
-
           <div class="footer-actions">
             <a-button @click="isVisible = false">取消</a-button>
             <a-button
@@ -393,6 +365,12 @@ defineExpose({ openDialog });
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+.loading-check {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+  color: #888;
 }
 .mod-server-notification {
   display: flex;
