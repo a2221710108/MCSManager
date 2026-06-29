@@ -48,7 +48,7 @@ const searchQuery = ref("");
 const selectedVersion = ref<"1.21.11及以上" | "1.21.10及以下">("1.21.11及以上");
 const activeKeys = ref<string[]>([t("環境與時間")]);
 
-// ---------- 26.x 指令 (所有原有指令) ----------
+// ---------- 1.21.11及以上 指令 ----------
 const COMMAND_GROUPS_12111: CommandGroup[] = [
   {
     group: t("環境與時間"),
@@ -343,7 +343,7 @@ const COMMAND_GROUPS_12111: CommandGroup[] = [
   }
 ];
 
-// ---------- 1.12.10以下 指令 ----------
+// ---------- 1.21.10及以下 指令 ----------
 const COMMAND_GROUPS_12110: CommandGroup[] = [
   {
     group: t("環境與時間"),
@@ -602,6 +602,43 @@ const VERSION_COMMANDS: Record<string, CommandGroup[]> = {
 // 當前版本指令
 const currentVersionCommands = computed(() => VERSION_COMMANDS[selectedVersion.value] || COMMAND_GROUPS_12111);
 
+// --- 自動偵測伺服器版本 ---
+const autoVersionSet = ref(false);
+
+function parseMinecraftVersion(versionStr: string | undefined): number[] | null {
+  if (!versionStr) return null;
+  const match = versionStr.match(/(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!match) return null;
+  const major = parseInt(match[1], 10);
+  const minor = parseInt(match[2], 10);
+  const patch = match[3] ? parseInt(match[3], 10) : 0;
+  return [major, minor, patch];
+}
+
+function isVersionAtMost12110(versionStr: string | undefined): boolean {
+  const v = parseMinecraftVersion(versionStr);
+  if (!v) return false; // 無法解析，預設當作新版本
+  const [major, minor, patch] = v;
+  if (major < 1) return false;
+  if (major > 1) return false;
+  // major == 1
+  if (minor < 21) return true;
+  if (minor > 21) return false;
+  // minor == 21
+  return patch <= 10;
+}
+
+watch(
+  () => props.instanceInfo?.info?.version,
+  (newVersion) => {
+    if (!autoVersionSet.value && newVersion) {
+      selectedVersion.value = isVersionAtMost12110(newVersion) ? "1.21.10及以下" : "1.21.11及以上";
+      autoVersionSet.value = true;
+    }
+  },
+  { immediate: true }
+);
+
 // --- 搜尋過濾 ---
 const filteredGroups = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -694,7 +731,6 @@ defineExpose({ openDialog });
           </a-button>
         </div>
       </div>
-
      <div class="search-container">
   <a-input
     v-model:value="searchQuery"
@@ -705,7 +741,6 @@ defineExpose({ openDialog });
     <template #prefix><SearchOutlined /></template>
   </a-input>
 </div>
-
       <a-collapse v-model:activeKey="activeKeys" ghost expand-icon-position="right" class="custom-collapse">
         <a-collapse-panel v-for="group in filteredGroups" :key="group.group">
           <template #header>
@@ -797,12 +832,10 @@ defineExpose({ openDialog });
   background: rgba(140, 140, 140, 0.1);
   border: none;
 }
-
 /* 搜索框容器 */
 .search-box {
   padding: 0 12px 16px 12px;
 }
-
 /* 適配深色模式的搜索框 */
 .custom-search {
   /* 使用透明度疊加，這樣在深色背景下會變深，淺色下會變淺 */
@@ -811,29 +844,24 @@ defineExpose({ openDialog });
   border: 1px solid rgba(140, 140, 140, 0.1) !important;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 .custom-search:hover, .custom-search:focus-within {
   border-color: var(--ant-primary-color) !important;
   background: var(--ant-component-background, #ffffff) !important;
   box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
 }
-
 /* 針對輸入框內文字與圖標的深色模式優化 */
 .custom-search :deep(.ant-input),
 .custom-search :deep(.ant-input-prefix) {
   color: var(--ant-text-color) !important;
   background: transparent !important;
 }
-
 .custom-search :deep(.ant-input::placeholder) {
   color: var(--ant-text-color-placeholder);
 }
-
 /* 讓清除按鈕也適配 */
 .custom-search :deep(.ant-input-clear-icon) {
   color: var(--ant-text-color-secondary);
 }
-
 /* === 面板與核心樣式 === */
 .custom-collapse :deep(.ant-collapse-item) {
   border-bottom: 1px solid rgba(140, 140, 140, 0.1) !important;
@@ -927,7 +955,6 @@ defineExpose({ openDialog });
   height: 16px;
   border-radius: 3px;
 }
-
 /* === 響應式佈局 === */
 @media (max-width: 800px) {
   .cmd-list {
