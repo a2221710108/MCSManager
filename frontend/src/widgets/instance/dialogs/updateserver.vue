@@ -76,7 +76,7 @@ const fetchMcVersions = async () => {
 };
 const openDialog = async () => {
   if (props.instanceInfo.status !== 0) {
-    return message.error("請先關閉伺服器再進行升級");
+    return message.error("請先關閉伺服器");
   }
   isVisible.value = true;
   agreeDelete.value = false;
@@ -290,7 +290,7 @@ defineExpose({ openDialog });
         <cloud-download-outlined class="banner-icon" />
         <div class="banner-text">
           <h3>升/降級 Minecraft 版本</h3>
-          <p>升級 Minecraft 版本 / 更換 Server Core。支援 Paper / Folia / Vanilla</p>
+          <p>請注意：從 Paper / Folia 轉換成 Vanilla 很可能有相容性錯誤</p>
         </div>
       </div>
       <div class="step-card config-zone">
