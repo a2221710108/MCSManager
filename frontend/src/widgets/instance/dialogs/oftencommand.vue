@@ -49,7 +49,7 @@ const selectedVersion = ref<"1.21.11及以上" | "1.21.10及以下">("1.21.11及
 const activeKeys = ref<string[]>([t("環境與時間")]);
 
 // ---------- 26.x 指令 (所有原有指令) ----------
-const COMMAND_GROUPS_121111: CommandGroup[] = [
+const COMMAND_GROUPS_12111: CommandGroup[] = [
   {
     group: t("環境與時間"),
     icon: HistoryOutlined,
@@ -612,7 +612,7 @@ const VERSION_COMMANDS: Record<string, CommandGroup[]> = {
 };
 
 // 當前版本指令
-const currentVersionCommands = computed(() => VERSION_COMMANDS[selectedVersion.value] || COMMAND_GROUPS_26);
+const currentVersionCommands = computed(() => VERSION_COMMANDS[selectedVersion.value] || COMMAND_GROUPS_12111);
 
 // --- 搜尋過濾 ---
 const filteredGroups = computed(() => {
@@ -698,9 +698,8 @@ defineExpose({ openDialog });
             style="width: 100px; margin-right: 8px"
             size="small"
           >
-            <a-select-option value="1.21.x">1.21.x</a-select-option>
-            <a-select-option value="26.x">26.x</a-select-option>
-            <a-select-option value="1.12.x">1.12.x</a-select-option>
+            <a-select-option value="1.21.11及以上">1.21.11及以上</a-select-option>
+            <a-select-option value="1.21.10及以下">1.21.10及以下</a-select-option>
           </a-select>
           <a-button class="refresh-btn" size="small" @click="fetchPlayers" :loading="isFetchingPlayers">
             <template #icon><ReloadOutlined /></template>
