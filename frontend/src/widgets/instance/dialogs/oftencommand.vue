@@ -719,10 +719,10 @@ defineExpose({ openDialog });
         <span class="desc-text">{{ t("Minecraft 版本不同可能導致部分指令無法使用；玩家數據可能有 1-5 分鐘延遲，取決於 API 緩存") }}</span>
         <div class="toolbar-right">
           <a-select
-            v-model:value="selectedVersion"
-            style="width: 100px; margin-right: 8px"
-            size="small"
-          >
+  v-model:value="selectedVersion"
+  style="width: 160px; margin-right: 8px"
+  size="small"
+>
             <a-select-option value="1.21.11及以上">1.21.11及以上</a-select-option>
             <a-select-option value="1.21.10及以下">1.21.10及以下</a-select-option>
           </a-select>
