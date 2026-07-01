@@ -17,7 +17,7 @@ import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
 
 // --- 設定你的自建後端資訊 ---
-const BACKEND_URL = "https://rp.lazycloud.de"; 
+const BACKEND_URL = "https://rp.lazycloud.one"; 
 const BACKEND_API_KEY = "45fdby784Yts&Oagd2Y79ahY&,SDA"; // 替換為你 docker-compose 裡設定的金鑰
 const MAX_PACKS = 2; // 材質包歷史紀錄上限
 const MIN_MEMORY = 8192; // 最低記憶體限制 (8GB = 8192MB)
@@ -35,11 +35,16 @@ const { execute: fetchFileContent } = fileContent();
 // 獲取上傳憑證的 hook
 const { execute: getUploadMissionCfg } = uploadAddress();
 
+// 檢查內存大小是否達標
+const checkMemory = (): boolean => {
+  // 從 JSON 結構中可以看見，Docker 實例的記憶體放在 config.docker.memory (單位為 MB)
+  const memory = props.instanceInfo?.config?.docker?.memory ?? 0;
+  return memory >= MIN_MEMORY;
+};
+
 // 開啟對話框
 const openDialog = () => {
-  // 檢查內存大小
-  const memory = props.instanceInfo?.config?.maxMemory || 0;
-  if (memory < MIN_MEMORY) {
+  if (!checkMemory()) {
     message.error(t("需要鐵礦或效率II或以上的套餐才可以使用該功能"));
     return;
   }
