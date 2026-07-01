@@ -52,6 +52,7 @@ import CurseForgeInstall from "./dialogs/CurseForgeInstall.vue";
 import modloaderinstall from "./dialogs/modloaderinstall.vue";
 import chart from "./dialogs/chart.vue";
 import updateserver from "./dialogs/updateserver.vue";
+import respack from "./dialogs/respack.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -70,6 +71,7 @@ const cfInstallDialog = ref<InstanceType<typeof CurseForgeInstall>>();
 const modloaderinstallDialog = ref<InstanceType<typeof modloaderinstall>>();
 const chartDialog = ref<InstanceType<typeof chart>>();
 const updateserverDialog = ref<InstanceType<typeof updateserver>>();
+const respackDialog = ref<InstanceType<typeof respack>>();
 const terminalHook = useTerminal();
 
 const { toPage: toOtherPager } = useAppRouters();
@@ -210,6 +212,12 @@ const categorizedBtns = computed(() => {
           condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
         },
         {
+          title: t("上載材質包"),
+          icon: SaveOutlined,
+          click: () => { respackDialog.value?.openDialog(); },
+          condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
+        },
+        {
           title: t("存檔替換 / 匯入"),
           icon: SaveOutlined,
           click: () => { worldchangeDialog.value?.openDialog(); },
@@ -332,6 +340,7 @@ watch(instanceInfo, (cfg, oldCfg) => {
   <CurseForgeInstall ref="cfInstallDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
   <modloaderinstall ref="modloaderinstallDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
   <chart ref="chartDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
+  <respack ref="respacklog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
   <updateserver ref="updateserverDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
 </template>
 
