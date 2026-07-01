@@ -292,61 +292,67 @@ defineExpose({ openDialog });
 </script>
 
 <template>
-  <a-modal v-model:open="open" :title="t('材質包管理')" :footer="null" centered width="600px">
-    <div class="p-4">
-      <!-- 上傳區域 -->
-      <div v-if="!uploading" class="mb-6">
+  <a-modal v-model:open="open" :title="t('材質包管理')" :footer="null" centered width="600px" destroy-on-close>
+    <div class="modal-content-wrapper">
+      <div v-if="!uploading" class="upload-zone">
         <a-upload-dragger
           :show-upload-list="false"
           :before-upload="(file: any) => { handleUpload(file); return false; }"
           :disabled="historyList.length >= MAX_PACKS"
+          class="custom-dragger"
         >
           <p class="ant-upload-drag-icon">
-            <CloudUploadOutlined :style="{ color: historyList.length >= MAX_PACKS ? '#d9d9d9' : '#1890ff' }" />
+            <CloudUploadOutlined :style="{ color: historyList.length >= MAX_PACKS ? 'rgba(128, 128, 128, 0.4)' : '#1890ff' }" />
           </p>
-          <p class="ant-upload-text">{{ historyList.length >= MAX_PACKS ? t('已達材質包上限') : t('點擊或拖拽材質包 ZIP 檔至此') }}</p>
-          <p class="ant-upload-hint">{{ t('檔案將保存 35 天，可隨時續期 (上限 ' + MAX_PACKS + ' 個)') }}</p>
+          <p class="ant-upload-text">
+            {{ historyList.length >= MAX_PACKS ? t('已達材質包上限') : t('點擊或拖拽材質包 ZIP 檔至此') }}
+          </p>
+          <p class="ant-upload-hint">
+            {{ t('檔案將保存 35 天，可隨時續期 (上限 ' + MAX_PACKS + ' 個)') }}
+          </p>
         </a-upload-dragger>
         
-        <!-- 移除設定按鈕 -->
-        <a-button class="mt-4 w-full" danger @click="handleRemoveFromServer" :loading="processing">
+        <a-button class="remove-config-btn" danger @click="handleRemoveFromServer" :loading="processing">
           <template #icon><CloseCircleOutlined /></template>
           {{ t('移除伺服器材質包設定') }}
         </a-button>
       </div>
 
-      <!-- 上傳進度 -->
-      <div v-else class="py-8 flex flex-col items-center">
-        <LoadingOutlined spin class="mb-4" style="font-size: 24px; color: #1890ff;" />
-        <a-progress :percent="uploadProgress" status="active" class="w-3/4" />
+      <div v-else class="progress-zone">
+        <LoadingOutlined spin class="progress-spinner" />
+        <a-progress :percent="uploadProgress" status="active" class="progress-bar" />
       </div>
 
-      <!-- 歷史紀錄列表 -->
-      <div v-if="historyList.length > 0" class="mt-4">
-        <a-divider>{{ t('歷史材質包') }} ({{ historyList.length }} / {{ MAX_PACKS }})</a-divider>
-        <div class="space-y-3 max-h-[300px] overflow-y-auto">
-          <div v-for="file in historyList" :key="file.id" class="border rounded-lg p-3 flex flex-col">
-            <div class="flex justify-between items-center mb-2">
-              <span class="font-medium text-sm truncate" :title="file.original_filename">{{ file.original_filename }}</span>
-              <a-tag :color="getRemainingDays(file.expires_at) > 7 ? 'green' : 'orange'">
+      <div v-if="historyList.length > 0" class="history-zone">
+        <a-divider style="margin: 16px 0 12px 0;">
+          <span class="divider-title">{{ t('歷史材質包') }} ({{ historyList.length }} / {{ MAX_PACKS }})</span>
+        </a-divider>
+        
+        <div class="scroll-container">
+          <div v-for="file in historyList" :key="file.id" class="pack-card">
+            <div class="pack-header">
+              <span class="pack-title" :title="file.original_filename">{{ file.original_filename }}</span>
+              <a-tag :color="getRemainingDays(file.expires_at) > 7 ? 'green' : 'orange'" class="pack-tag">
                 {{ t('剩餘') }} {{ getRemainingDays(file.expires_at) }} {{ t('天') }}
               </a-tag>
             </div>
             
-            <div class="text-xs text-gray-500 mb-3">
-              <div><strong>SHA-1:</strong> {{ file.sha1.substring(0, 12) }}...</div>
+            <div class="pack-meta">
+              <a-typography-text type="secondary" code>
+                SHA-1: {{ file.sha1.substring(0, 12) }}...
+              </a-typography-text>
             </div>
 
-            <div class="flex gap-2 justify-end">
-              <a-button size="small" @click="handleRenew(file.id)" :loading="processing">
+            <div class="pack-actions">
+              <a-button size="small" class="action-btn" @click="handleRenew(file.id)" :loading="processing">
                 <template #icon><ReloadOutlined /></template>
                 {{ t('續期') }}
               </a-button>
-              <a-button size="small" danger @click="handleDelete(file.id)">
+              <a-button size="small" danger class="action-btn" @click="handleDelete(file.id)">
                 <template #icon><DeleteOutlined /></template>
                 {{ t('刪除') }}
               </a-button>
-              <a-button size="small" type="primary" @click="handleApplyToServer(file)" :loading="processing">
+              <a-button size="small" type="primary" class="action-btn action-btn-main" @click="handleApplyToServer(file)" :loading="processing">
                 <template #icon><LinkOutlined /></template>
                 {{ t('應用至伺服器') }}
               </a-button>
@@ -359,8 +365,164 @@ defineExpose({ openDialog });
 </template>
 
 <style scoped>
+.modal-content-wrapper {
+  padding: 12px 4px 4px 4px;
+}
+
+.upload-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.custom-dragger {
+  background: rgba(128, 128, 128, 0.02) !important;
+  border-radius: 8px !important;
+  transition: all 0.3s ease;
+  
+  &:hover:not(.ant-upload-disabled) {
+    background: rgba(24, 144, 255, 0.02) !important;
+  }
+}
+
+.remove-config-btn {
+  width: 100%;
+  border-radius: 6px !important;
+  height: 34px;
+}
+
+.progress-zone {
+  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.progress-spinner {
+  font-size: 28px;
+  color: #1890ff;
+}
+
+.progress-bar {
+  width: 80%;
+}
+
+.history-zone {
+  margin-top: 8px;
+}
+
+.divider-title {
+  font-size: 13px;
+  opacity: 0.85;
+  font-weight: 500;
+}
+
+.scroll-container {
+  max-height: 290px;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(128, 128, 128, 0.25);
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+}
+
+.pack-card {
+  border: 1px solid rgba(128, 128, 128, 0.15);
+  border-radius: 8px;
+  padding: 12px;
+  background-color: rgba(128, 128, 128, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: rgba(128, 128, 128, 0.06);
+    border-color: rgba(128, 128, 128, 0.25);
+  }
+}
+
+.pack-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.pack-title {
+  font-weight: 500;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.pack-tag {
+  flex-shrink: 0;
+  margin-right: 0 !important;
+  border-radius: 4px;
+}
+
+.pack-meta {
+  display: flex;
+  align-items: center;
+  
+  :deep(.ant-typography) {
+    font-size: 11px;
+    padding: 1px 6px;
+    background: rgba(128, 128, 128, 0.1);
+    border: none;
+  }
+}
+
+.pack-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  
+  .action-btn {
+    border-radius: 4px !important;
+    font-size: 12px;
+    
+    &.action-btn-main {
+      font-weight: 500;
+    }
+  }
+}
+
 :deep(.ant-progress-outer) {
   padding-right: 0 !important;
   margin-right: 0 !important;
+}
+
+@media (max-width: 576px) {
+  .pack-card {
+    padding: 12px;
+  }
+  
+  .pack-actions {
+    width: 100%;
+    
+    .action-btn {
+      flex: 1;
+      justify-content: center;
+    }
+  }
 }
 </style>
