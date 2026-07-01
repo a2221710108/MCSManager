@@ -281,7 +281,6 @@ defineExpose({ openDialog });
     destroy-on-close
   >
     <a-tabs v-model:activeKey="activeTab" type="card">
-      <!-- 在線管理 -->
       <a-tab-pane key="online" :tab="t('在線管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -296,58 +295,59 @@ defineExpose({ openDialog });
             </a-button>
           </a-tooltip>
         </div>
-        <a-divider style="margin: 12px 0" />
-        <a-list :data-source="onlinePlayers" :loading="isLoading">
-          <template #renderItem="{ item }">
-            <a-list-item>
-              <div class="player-card">
-                <div class="player-identity">
-                  <a-avatar :src="getAvatar(item.name_raw || item.name)" />
-                  <div class="player-name-group">
-                    <span :class="{ 'is-op': isOp(item.name_raw || item.name) }">
-                      {{ item.name_raw || item.name }}
-                    </span>
-                    <a-tag v-if="isOp(item.name_raw || item.name)" color="red" size="small">OP</a-tag>
+        <a-divider style="margin: 12px 0 16px 0" />
+        <div class="scroll-container">
+          <a-list :data-source="onlinePlayers" :loading="isLoading" :split="false">
+            <template #renderItem="{ item }">
+              <a-list-item class="player-list-item">
+                <div class="player-card">
+                  <div class="player-identity">
+                    <a-avatar :src="getAvatar(item.name_raw || item.name)" />
+                    <div class="player-name-group">
+                      <span :class="{ 'is-op': isOp(item.name_raw || item.name) }">
+                        {{ item.name_raw || item.name }}
+                      </span>
+                      <a-tag v-if="isOp(item.name_raw || item.name)" color="red" size="small">OP</a-tag>
+                    </div>
+                  </div>
+                  <div class="player-ops">
+                    <a-button-group :disabled="!isConnect || !isRunning">
+                      <a-tooltip :title="t('設為管理員')">
+                        <a-button @click="runCommand('op {player}', item.name_raw || item.name)">
+                          <template #icon><CrownFilled /></template>
+                        </a-button>
+                      </a-tooltip>
+                      <a-tooltip :title="t('撤銷管理員')">
+                        <a-button @click="runCommand('deop {player}', item.name_raw || item.name)">
+                          <template #icon><CrownOutlined /></template>
+                        </a-button>
+                      </a-tooltip>
+                      <a-tooltip :title="t('生存模式')">
+                        <a-button @click="runCommand('gamemode survival {player}', item.name_raw || item.name)">S</a-button>
+                      </a-tooltip>
+                      <a-tooltip :title="t('創造模式')">
+                        <a-button @click="runCommand('gamemode creative {player}', item.name_raw || item.name)">C</a-button>
+                      </a-tooltip>
+                      <a-tooltip :title="t('添加白名單')">
+                        <a-button @click="runCommand('whitelist add {player}', item.name_raw || item.name)">
+                          <template #icon><SolutionOutlined /></template>
+                        </a-button>
+                      </a-tooltip>
+                      <a-popconfirm :title="t('確定踢出玩家？')" @confirm="runCommand('kick {player}', item.name_raw || item.name)">
+                        <a-button danger><DisconnectOutlined /></a-button>
+                      </a-popconfirm>
+                      <a-popconfirm :title="t('確定封禁玩家？')" @confirm="runCommand('ban {player}', item.name_raw || item.name)">
+                        <a-button danger type="primary"><StopOutlined /></a-button>
+                      </a-popconfirm>
+                    </a-button-group>
                   </div>
                 </div>
-                <div class="player-ops">
-                  <a-button-group :disabled="!isConnect || !isRunning">
-                    <a-tooltip :title="t('設為管理員')">
-                      <a-button @click="runCommand('op {player}', item.name_raw || item.name)">
-                        <template #icon><CrownFilled /></template>
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="t('撤銷管理員')">
-                      <a-button @click="runCommand('deop {player}', item.name_raw || item.name)">
-                        <template #icon><CrownOutlined /></template>
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="t('生存模式')">
-                      <a-button @click="runCommand('gamemode survival {player}', item.name_raw || item.name)">S</a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="t('創造模式')">
-                      <a-button @click="runCommand('gamemode creative {player}', item.name_raw || item.name)">C</a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="t('添加白名單')">
-                      <a-button @click="runCommand('whitelist add {player}', item.name_raw || item.name)">
-                        <template #icon><SolutionOutlined /></template>
-                      </a-button>
-                    </a-tooltip>
-                    <a-popconfirm :title="t('確定踢出玩家？')" @confirm="runCommand('kick {player}', item.name_raw || item.name)">
-                      <a-button danger><DisconnectOutlined /></a-button>
-                    </a-popconfirm>
-                    <a-popconfirm :title="t('確定封禁玩家？')" @confirm="runCommand('ban {player}', item.name_raw || item.name)">
-                      <a-button danger type="primary"><StopOutlined /></a-button>
-                    </a-popconfirm>
-                  </a-button-group>
-                </div>
-              </div>
-            </a-list-item>
-          </template>
-        </a-list>
+              </a-list-item>
+            </template>
+          </a-list>
+        </div>
       </a-tab-pane>
 
-      <!-- 封禁管理 -->
       <a-tab-pane key="banned" :tab="t('封禁管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -358,39 +358,42 @@ defineExpose({ openDialog });
             {{ t("重新整理") }}
           </a-button>
         </div>
-        <a-divider style="margin: 12px 0" />
-        <a-list :data-source="bannedPlayers" :loading="isLoadingBanned" :locale="{ emptyText: t('暫無被封禁的玩家') }">
-          <template #renderItem="{ item }">
-            <a-list-item>
-              <div class="player-card">
-                <div class="player-identity">
-                  <a-avatar :src="getAvatar(item.name)" />
-                  <div class="player-name-group">
-                    <span>{{ item.name }}</span>
-                    <a-tag v-if="item.reason" color="orange">{{ item.reason }}</a-tag>
+        <a-divider style="margin: 12px 0 16px 0" />
+        <div class="scroll-container">
+          <a-list :data-source="bannedPlayers" :loading="isLoadingBanned" :split="false" :locale="{ emptyText: t('暫無被封禁的玩家') }">
+            <template #renderItem="{ item }">
+              <a-list-item class="player-list-item">
+                <div class="player-card">
+                  <div class="player-identity">
+                    <a-avatar :src="getAvatar(item.name)" />
+                    <div class="player-name-group">
+                      <span class="player-name-text">{{ item.name }}</span>
+                      <a-tag v-if="item.reason" color="orange" style="margin-top: 2px;">{{ item.reason }}</a-tag>
+                    </div>
+                  </div>
+                  <div class="player-ops">
+                    <a-button class="action-btn-danger" type="text" danger :disabled="!isConnect || !isRunning" @click="unbanPlayer(item.name)">
+                      <template #icon><UndoOutlined /></template>
+                      {{ t("解除封禁") }}
+                    </a-button>
                   </div>
                 </div>
-                <div class="player-ops">
-                  <a-button type="link" danger :disabled="!isConnect || !isRunning" @click="unbanPlayer(item.name)">
-                    <template #icon><UndoOutlined /></template>
-                    {{ t("解除封禁") }}
-                  </a-button>
-                </div>
-              </div>
-            </a-list-item>
-          </template>
-        </a-list>
-        <a-divider />
-        <a-input-group compact>
-          <a-input v-model:value="newBanName" :placeholder="t('輸入玩家名稱封禁')" style="width: calc(100% - 80px)" />
-          <a-button type="primary" danger :disabled="!isConnect || !isRunning" @click="banByName">
-            <template #icon><StopOutlined /></template>
-            {{ t("封禁") }}
-          </a-button>
-        </a-input-group>
+              </a-list-item>
+            </template>
+          </a-list>
+        </div>
+        <a-divider style="margin: 16px 0" />
+        <div class="footer-input-zone">
+          <a-input-group compact>
+            <a-input v-model:value="newBanName" :placeholder="t('輸入玩家名稱封禁')" style="width: calc(100% - 90px)" />
+            <a-button type="primary" danger :disabled="!isConnect || !isRunning" @click="banByName" style="width: 90px">
+              <template #icon><StopOutlined /></template>
+              {{ t("封禁") }}
+            </a-button>
+          </a-input-group>
+        </div>
       </a-tab-pane>
 
-      <!-- 白名單管理 -->
       <a-tab-pane key="whitelist" :tab="t('白名單管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -401,36 +404,39 @@ defineExpose({ openDialog });
             {{ t("重新整理") }}
           </a-button>
         </div>
-        <a-divider style="margin: 12px 0" />
-        <a-list :data-source="whitelistPlayers" :loading="isLoadingWhitelist" :locale="{ emptyText: t('白名單為空') }">
-          <template #renderItem="{ item }">
-            <a-list-item>
-              <div class="player-card">
-                <div class="player-identity">
-                  <a-avatar :src="getAvatar(item.name)" />
-                  <span>{{ item.name }}</span>
+        <a-divider style="margin: 12px 0 16px 0" />
+        <div class="scroll-container">
+          <a-list :data-source="whitelistPlayers" :loading="isLoadingWhitelist" :split="false" :locale="{ emptyText: t('白名單為空') }">
+            <template #renderItem="{ item }">
+              <a-list-item class="player-list-item">
+                <div class="player-card">
+                  <div class="player-identity">
+                    <a-avatar :src="getAvatar(item.name)" />
+                    <span class="player-name-text">{{ item.name }}</span>
+                  </div>
+                  <div class="player-ops">
+                    <a-button class="action-btn-danger" type="text" danger :disabled="!isConnect || !isRunning" @click="removeFromWhitelist(item.name)">
+                      <template #icon><DeleteOutlined /></template>
+                      {{ t("刪除") }}
+                    </a-button>
+                  </div>
                 </div>
-                <div class="player-ops">
-                  <a-button type="link" danger :disabled="!isConnect || !isRunning" @click="removeFromWhitelist(item.name)">
-                    <template #icon><DeleteOutlined /></template>
-                    {{ t("刪除") }}
-                  </a-button>
-                </div>
-              </div>
-            </a-list-item>
-          </template>
-        </a-list>
-        <a-divider />
-        <a-input-group compact>
-          <a-input v-model:value="newWhitelistName" :placeholder="t('輸入玩家名稱加入白名單')" style="width: calc(100% - 80px)" />
-          <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addToWhitelist">
-            <template #icon><SolutionOutlined /></template>
-            {{ t("新增") }}
-          </a-button>
-        </a-input-group>
+              </a-list-item>
+            </template>
+          </a-list>
+        </div>
+        <a-divider style="margin: 16px 0" />
+        <div class="footer-input-zone">
+          <a-input-group compact>
+            <a-input v-model:value="newWhitelistName" :placeholder="t('輸入玩家名稱加入白名單')" style="width: calc(100% - 90px)" />
+            <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addToWhitelist" style="width: 90px">
+              <template #icon><SolutionOutlined /></template>
+              {{ t("新增") }}
+            </a-button>
+          </a-input-group>
+        </div>
       </a-tab-pane>
 
-      <!-- ★ 新增 OP 管理分頁 ★ -->
       <a-tab-pane key="op" :tab="t('OP 管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -441,50 +447,37 @@ defineExpose({ openDialog });
             {{ t("重新整理") }}
           </a-button>
         </div>
-        <a-divider style="margin: 12px 0" />
-        <a-list
-          :data-source="opPlayers"
-          :loading="isLoadingOp"
-          :locale="{ emptyText: t('尚無管理員') }"
-        >
-          <template #renderItem="{ item }">
-            <a-list-item>
-              <div class="player-card">
-                <div class="player-identity">
-                  <a-avatar :src="getAvatar(item)" />
-                  <span>{{ item }}</span>
+        <a-divider style="margin: 12px 0 16px 0" />
+        <div class="scroll-container">
+          <a-list :data-source="opPlayers" :loading="isLoadingOp" :split="false" :locale="{ emptyText: t('尚無管理員') }">
+            <template #renderItem="{ item }">
+              <a-list-item class="player-list-item">
+                <div class="player-card">
+                  <div class="player-identity">
+                    <a-avatar :src="getAvatar(item)" />
+                    <span class="player-name-text">{{ item }}</span>
+                  </div>
+                  <div class="player-ops">
+                    <a-button class="action-btn-danger" type="text" danger :disabled="!isConnect || !isRunning" @click="removeOp(item)">
+                      <template #icon><DeleteOutlined /></template>
+                      {{ t("撤銷 OP") }}
+                    </a-button>
+                  </div>
                 </div>
-                <div class="player-ops">
-                  <a-button
-                    type="link"
-                    danger
-                    :disabled="!isConnect || !isRunning"
-                    @click="removeOp(item)"
-                  >
-                    <template #icon><DeleteOutlined /></template>
-                    {{ t("撤銷 OP") }}
-                  </a-button>
-                </div>
-              </div>
-            </a-list-item>
-          </template>
-        </a-list>
-        <a-divider />
-        <a-input-group compact>
-          <a-input
-            v-model:value="newOpName"
-            :placeholder="t('輸入玩家名稱授予 OP')"
-            style="width: calc(100% - 80px)"
-          />
-          <a-button
-            type="primary"
-            :disabled="!isConnect || !isRunning"
-            @click="addOp"
-          >
-            <template #icon><CrownFilled /></template>
-            {{ t("授予") }}
-          </a-button>
-        </a-input-group>
+              </a-list-item>
+            </template>
+          </a-list>
+        </div>
+        <a-divider style="margin: 16px 0" />
+        <div class="footer-input-zone">
+          <a-input-group compact>
+            <a-input v-model:value="newOpName" :placeholder="t('輸入玩家名稱授予 OP')" style="width: calc(100% - 90px)" />
+            <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addOp" style="width: 90px">
+              <template #icon><CrownFilled /></template>
+              {{ t("授予") }}
+            </a-button>
+          </a-input-group>
+        </div>
       </a-tab-pane>
     </a-tabs>
   </a-modal>
@@ -496,26 +489,94 @@ defineExpose({ openDialog });
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  padding: 0 4px;
 }
+
+.scroll-container {
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+  
+  /* 完美的滾動條樣式微調 */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+}
+
+.player-list-item {
+  padding: 8px 12px !important;
+  margin-bottom: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.01);
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
 .player-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
 }
+
 .player-identity {
   display: flex;
   align-items: center;
   gap: 12px;
+  
   .player-name-group {
     display: flex;
     flex-direction: column;
-    .is-op { color: #ff4d4f; font-weight: bold; }
+    align-items: flex-start;
+    
+    .is-op { 
+      color: #ff4d4f; 
+      font-weight: bold; 
+    }
+  }
+
+  .player-name-text {
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.85);
   }
 }
+
+.player-ops {
+  display: flex;
+  align-items: center;
+
+  .action-btn-danger {
+    border-radius: 4px;
+    padding: 4px 12px;
+    
+    &:hover:not([disabled]) {
+      background-color: rgba(255, 77, 79, 0.08);
+    }
+  }
+}
+
+.footer-input-zone {
+  padding: 0 4px;
+}
+
 .ml-12 { margin-left: 12px; }
 
 @media (max-width: 768px) {
+  .player-list-item {
+    padding: 12px !important;
+  }
   .player-card {
     flex-direction: column;
     align-items: flex-start;
@@ -523,6 +584,13 @@ defineExpose({ openDialog });
   }
   .player-ops {
     width: 100%;
+    justify-content: flex-end;
+    
+    .action-btn-danger {
+      width: 100%;
+      text-align: right;
+    }
+    
     :deep(.ant-btn-group) {
       display: flex;
       width: 100%;
