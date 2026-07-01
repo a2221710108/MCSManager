@@ -281,6 +281,7 @@ defineExpose({ openDialog });
     destroy-on-close
   >
     <a-tabs v-model:activeKey="activeTab" type="card">
+      <!-- 在線管理 -->
       <a-tab-pane key="online" :tab="t('在線管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -348,15 +349,24 @@ defineExpose({ openDialog });
         </div>
       </a-tab-pane>
 
+      <!-- 封禁管理 -->
       <a-tab-pane key="banned" :tab="t('封禁管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
             <StopOutlined /> {{ t("已封禁玩家") }}: {{ bannedPlayers.length }}
           </a-typography-text>
-          <a-button type="link" size="small" :loading="isLoadingBanned" @click="fetchBanList">
-            <template #icon><ReloadOutlined /></template>
-            {{ t("重新整理") }}
-          </a-button>
+          <div class="header-right-controls">
+            <a-input v-model:value="newBanName" :placeholder="t('輸入玩家名稱')" class="custom-input-top" size="small" />
+            <a-button type="primary" danger :disabled="!isConnect || !isRunning" @click="banByName" class="custom-btn-top" size="small">
+              <template #icon><StopOutlined /></template>
+              {{ t("封禁") }}
+            </a-button>
+            <a-divider type="vertical" style="height: 16px; margin: 0 4px;" />
+            <a-button type="link" size="small" :loading="isLoadingBanned" @click="fetchBanList">
+              <template #icon><ReloadOutlined /></template>
+              {{ t("重新整理") }}
+            </a-button>
+          </div>
         </div>
         <a-divider style="margin: 12px 0 16px 0" />
         <div class="scroll-container">
@@ -384,27 +394,26 @@ defineExpose({ openDialog });
             </template>
           </a-list>
         </div>
-        <a-divider style="margin: 16px 0" />
-        <div class="footer-input-zone">
-          <div class="input-action-group">
-            <a-input v-model:value="newBanName" :placeholder="t('輸入玩家名稱封禁')" class="custom-input" />
-            <a-button type="primary" danger :disabled="!isConnect || !isRunning" @click="banByName" class="custom-btn">
-              <template #icon><StopOutlined /></template>
-              {{ t("封禁") }}
-            </a-button>
-          </div>
-        </div>
       </a-tab-pane>
 
+      <!-- 白名單管理 -->
       <a-tab-pane key="whitelist" :tab="t('白名單管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
             <SolutionOutlined /> {{ t("白名單玩家") }}: {{ whitelistPlayers.length }}
           </a-typography-text>
-          <a-button type="link" size="small" :loading="isLoadingWhitelist" @click="fetchWhitelist">
-            <template #icon><ReloadOutlined /></template>
-            {{ t("重新整理") }}
-          </a-button>
+          <div class="header-right-controls">
+            <a-input v-model:value="newWhitelistName" :placeholder="t('輸入玩家名稱')" class="custom-input-top" size="small" />
+            <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addToWhitelist" class="custom-btn-top" size="small">
+              <template #icon><SolutionOutlined /></template>
+              {{ t("新增") }}
+            </a-button>
+            <a-divider type="vertical" style="height: 16px; margin: 0 4px;" />
+            <a-button type="link" size="small" :loading="isLoadingWhitelist" @click="fetchWhitelist">
+              <template #icon><ReloadOutlined /></template>
+              {{ t("重新整理") }}
+            </a-button>
+          </div>
         </div>
         <a-divider style="margin: 12px 0 16px 0" />
         <div class="scroll-container">
@@ -431,27 +440,26 @@ defineExpose({ openDialog });
             </template>
           </a-list>
         </div>
-        <a-divider style="margin: 16px 0" />
-        <div class="footer-input-zone">
-          <div class="input-action-group">
-            <a-input v-model:value="newWhitelistName" :placeholder="t('輸入玩家名稱加入白名單')" class="custom-input" />
-            <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addToWhitelist" class="custom-btn">
-              <template #icon><SolutionOutlined /></template>
-              {{ t("新增") }}
-            </a-button>
-          </div>
-        </div>
       </a-tab-pane>
 
+      <!-- OP 管理 -->
       <a-tab-pane key="op" :tab="t('OP 管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
             <UserOutlined /> {{ t("管理員名單") }}: {{ opPlayers.length }}
           </a-typography-text>
-          <a-button type="link" size="small" :loading="isLoadingOp" @click="fetchOpList">
-            <template #icon><ReloadOutlined /></template>
-            {{ t("重新整理") }}
-          </a-button>
+          <div class="header-right-controls">
+            <a-input v-model:value="newOpName" :placeholder="t('輸入玩家名稱')" class="custom-input-top" size="small" />
+            <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addOp" class="custom-btn-top" size="small">
+              <template #icon><CrownFilled /></template>
+              {{ t("授予") }}
+            </a-button>
+            <a-divider type="vertical" style="height: 16px; margin: 0 4px;" />
+            <a-button type="link" size="small" :loading="isLoadingOp" @click="fetchOpList">
+              <template #icon><ReloadOutlined /></template>
+              {{ t("重新整理") }}
+            </a-button>
+          </div>
         </div>
         <a-divider style="margin: 12px 0 16px 0" />
         <div class="scroll-container">
@@ -478,16 +486,6 @@ defineExpose({ openDialog });
             </template>
           </a-list>
         </div>
-        <a-divider style="margin: 16px 0" />
-        <div class="footer-input-zone">
-          <div class="input-action-group">
-            <a-input v-model:value="newOpName" :placeholder="t('輸入玩家名稱授予 OP')" class="custom-input" />
-            <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addOp" class="custom-btn">
-              <template #icon><CrownFilled /></template>
-              {{ t("授予") }}
-            </a-button>
-          </div>
-        </div>
       </a-tab-pane>
     </a-tabs>
   </a-modal>
@@ -500,6 +498,22 @@ defineExpose({ openDialog });
   align-items: center;
   margin-bottom: 8px;
   padding: 0 4px;
+  min-height: 24px;
+}
+
+.header-right-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 元素之間保持乾淨且協調的精緻間距 */
+
+  .custom-input-top {
+    width: 160px; /* 縮短輸入框寬度以完美適配頂部欄 */
+    border-radius: 4px !important;
+  }
+
+  .custom-btn-top {
+    border-radius: 4px !important;
+  }
 }
 
 .scroll-container {
@@ -561,12 +575,18 @@ defineExpose({ openDialog });
   display: flex;
   align-items: center;
 
-  /* 修正 Kick 按鈕在點擊/聚焦時出現右邊藍色線條的問題 */
+  :deep(.ant-btn-group) {
+    & > span:not(:first-child) > .ant-btn-primary,
+    & > .ant-btn-primary:not(:first-child) {
+      border-inline-start-color: #ff4d4f !important;
+    }
+  }
+
   .kick-btn {
     &:focus, &:active, &.ant-btn-focused {
       border-color: #ff4d4f !important;
       box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2) !important;
-      z-index: 2; /* 確保邊框層級在組合按鈕中正確覆蓋 */
+      z-index: 2;
     }
   }
 
@@ -580,32 +600,25 @@ defineExpose({ openDialog });
   }
 }
 
-.footer-input-zone {
-  padding: 0 4px;
-
-  .input-action-group {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-
-    .custom-input {
-      flex: 1;
-      max-width: 78%;
-      border-radius: 6px !important;
-    }
-
-    .custom-btn {
-      flex-shrink: 0;
-      min-width: 90px;
-      border-radius: 6px !important;
-    }
-  }
-}
-
 .ml-12 { margin-left: 12px; }
 
 @media (max-width: 768px) {
+  .header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .header-right-controls {
+    width: 100%;
+    justify-content: flex-start;
+    
+    .custom-input-top {
+      flex: 1;
+      width: auto;
+    }
+  }
+
   .player-list-item {
     padding: 12px !important;
   }
@@ -629,14 +642,6 @@ defineExpose({ openDialog });
       .ant-btn {
         flex: 1;
         padding: 4px 8px;
-      }
-    }
-  }
-  
-  .footer-input-zone {
-    .input-action-group {
-      .custom-input {
-        max-width: none;
       }
     }
   }
