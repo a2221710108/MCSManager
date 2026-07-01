@@ -281,6 +281,7 @@ defineExpose({ openDialog });
     destroy-on-close
   >
     <a-tabs v-model:activeKey="activeTab" type="card">
+      <!-- 在線管理 -->
       <a-tab-pane key="online" :tab="t('在線管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -348,6 +349,7 @@ defineExpose({ openDialog });
         </div>
       </a-tab-pane>
 
+      <!-- 封禁管理 -->
       <a-tab-pane key="banned" :tab="t('封禁管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -384,16 +386,17 @@ defineExpose({ openDialog });
         </div>
         <a-divider style="margin: 16px 0" />
         <div class="footer-input-zone">
-          <a-input-group compact>
-            <a-input v-model:value="newBanName" :placeholder="t('輸入玩家名稱封禁')" style="width: calc(100% - 90px)" />
-            <a-button type="primary" danger :disabled="!isConnect || !isRunning" @click="banByName" style="width: 90px">
+          <div class="input-action-group">
+            <a-input v-model:value="newBanName" :placeholder="t('輸入玩家名稱封禁')" class="custom-input" />
+            <a-button type="primary" danger :disabled="!isConnect || !isRunning" @click="banByName" class="custom-btn">
               <template #icon><StopOutlined /></template>
               {{ t("封禁") }}
             </a-button>
-          </a-input-group>
+          </div>
         </div>
       </a-tab-pane>
 
+      <!-- 白名單管理 -->
       <a-tab-pane key="whitelist" :tab="t('白名單管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -427,16 +430,17 @@ defineExpose({ openDialog });
         </div>
         <a-divider style="margin: 16px 0" />
         <div class="footer-input-zone">
-          <a-input-group compact>
-            <a-input v-model:value="newWhitelistName" :placeholder="t('輸入玩家名稱加入白名單')" style="width: calc(100% - 90px)" />
-            <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addToWhitelist" style="width: 90px">
+          <div class="input-action-group">
+            <a-input v-model:value="newWhitelistName" :placeholder="t('輸入玩家名稱加入白名單')" class="custom-input" />
+            <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addToWhitelist" class="custom-btn">
               <template #icon><SolutionOutlined /></template>
               {{ t("新增") }}
             </a-button>
-          </a-input-group>
+          </div>
         </div>
       </a-tab-pane>
 
+      <!-- OP 管理 -->
       <a-tab-pane key="op" :tab="t('OP 管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -470,13 +474,13 @@ defineExpose({ openDialog });
         </div>
         <a-divider style="margin: 16px 0" />
         <div class="footer-input-zone">
-          <a-input-group compact>
-            <a-input v-model:value="newOpName" :placeholder="t('輸入玩家名稱授予 OP')" style="width: calc(100% - 90px)" />
-            <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addOp" style="width: 90px">
+          <div class="input-action-group">
+            <a-input v-model:value="newOpName" :placeholder="t('輸入玩家名稱授予 OP')" class="custom-input" />
+            <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addOp" class="custom-btn">
               <template #icon><CrownFilled /></template>
               {{ t("授予") }}
             </a-button>
-          </a-input-group>
+          </div>
         </div>
       </a-tab-pane>
     </a-tabs>
@@ -497,7 +501,6 @@ defineExpose({ openDialog });
   overflow-y: auto;
   padding-right: 4px;
   
-  /* 完美的滾動條樣式微調 */
   &::-webkit-scrollbar {
     width: 6px;
   }
@@ -569,6 +572,25 @@ defineExpose({ openDialog });
 
 .footer-input-zone {
   padding: 0 4px;
+
+  .input-action-group {
+    display: flex;
+    align-items: center;
+    gap: 12px; /* 輸入框與按鈕之間的精緻留白間距 */
+    width: 100%;
+
+    .custom-input {
+      flex: 1;
+      max-width: 78%; /* 讓輸入框比例稍微縮短點點，視覺比例更平衡 */
+      border-radius: 6px !important; /* 強制回復完整的雙邊圓弧角 */
+    }
+
+    .custom-btn {
+      flex-shrink: 0;
+      min-width: 90px;
+      border-radius: 6px !important; /* 強制回復完整的雙邊圓弧角 */
+    }
+  }
 }
 
 .ml-12 { margin-left: 12px; }
@@ -597,6 +619,14 @@ defineExpose({ openDialog });
       .ant-btn {
         flex: 1;
         padding: 4px 8px;
+      }
+    }
+  }
+  
+  .footer-input-zone {
+    .input-action-group {
+      .custom-input {
+        max-width: none; /* 行動裝置下放寬輸入框填滿剩餘空間 */
       }
     }
   }
