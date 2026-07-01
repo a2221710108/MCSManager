@@ -314,7 +314,7 @@ defineExpose({ openDialog });
         
         <a-button class="remove-config-btn" danger @click="handleRemoveFromServer" :loading="processing">
           <template #icon><CloseCircleOutlined /></template>
-          {{ t('移除伺服器材質包設定') }}
+          <span>{{ t('移除伺服器材質包設定') }}</span>
         </a-button>
       </div>
 
@@ -388,7 +388,24 @@ defineExpose({ openDialog });
 .remove-config-btn {
   width: 100%;
   border-radius: 6px !important;
-  height: 34px;
+  height: 36px;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  
+  /* 確保按鈕內的圖標和文字完美水平、垂直置中 */
+  :deep(.anticon) {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    margin-top: 0 !important;
+  }
+  
+  span {
+    display: inline-block;
+    line-height: 1;
+  }
 }
 
 .progress-zone {
