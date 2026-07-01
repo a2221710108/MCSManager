@@ -281,7 +281,6 @@ defineExpose({ openDialog });
     destroy-on-close
   >
     <a-tabs v-model:activeKey="activeTab" type="card">
-      <!-- 在線管理 -->
       <a-tab-pane key="online" :tab="t('在線管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -335,7 +334,7 @@ defineExpose({ openDialog });
                         </a-button>
                       </a-tooltip>
                       <a-popconfirm :title="t('確定踢出玩家？')" @confirm="runCommand('kick {player}', item.name_raw || item.name)">
-                        <a-button danger><DisconnectOutlined /></a-button>
+                        <a-button danger class="kick-btn"><DisconnectOutlined /></a-button>
                       </a-popconfirm>
                       <a-popconfirm :title="t('確定封禁玩家？')" @confirm="runCommand('ban {player}', item.name_raw || item.name)">
                         <a-button danger type="primary"><StopOutlined /></a-button>
@@ -349,7 +348,6 @@ defineExpose({ openDialog });
         </div>
       </a-tab-pane>
 
-      <!-- 封禁管理 -->
       <a-tab-pane key="banned" :tab="t('封禁管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -398,7 +396,6 @@ defineExpose({ openDialog });
         </div>
       </a-tab-pane>
 
-      <!-- 白名單管理 -->
       <a-tab-pane key="whitelist" :tab="t('白名單管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -446,7 +443,6 @@ defineExpose({ openDialog });
         </div>
       </a-tab-pane>
 
-      <!-- OP 管理 -->
       <a-tab-pane key="op" :tab="t('OP 管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
@@ -564,6 +560,15 @@ defineExpose({ openDialog });
 .player-ops {
   display: flex;
   align-items: center;
+
+  /* 修正 Kick 按鈕在點擊/聚焦時出現右邊藍色線條的問題 */
+  .kick-btn {
+    &:focus, &:active, &.ant-btn-focused {
+      border-color: #ff4d4f !important;
+      box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2) !important;
+      z-index: 2; /* 確保邊框層級在組合按鈕中正確覆蓋 */
+    }
+  }
 
   .action-btn-danger {
     border-radius: 4px;
