@@ -17,7 +17,7 @@ import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
 
 // --- 設定你的自建後端資訊 ---
-const BACKEND_URL = "https://rp.lazycloud.one"; 
+const BACKEND_URL = "https://rp.lazycloud.de"; 
 const BACKEND_API_KEY = "45fdby784Yts&Oagd2Y79ahY&,SDA"; // 替換為你 docker-compose 裡設定的金鑰
 const MAX_PACKS = 2; // 材質包歷史紀錄上限
 const MIN_MEMORY = 8192; // 最低記憶體限制 (8GB = 8192MB)
