@@ -369,7 +369,9 @@ defineExpose({ openDialog });
                   <div class="player-identity">
                     <a-avatar :src="getAvatar(item.name)" />
                     <div class="player-name-group">
-                      <span class="player-name-text">{{ item.name }}</span>
+                      <span :class="{ 'is-op': isOp(item.name) }">
+                        {{ item.name }}
+                      </span>
                       <a-tag v-if="item.reason" color="orange" style="margin-top: 2px;">{{ item.reason }}</a-tag>
                     </div>
                   </div>
@@ -415,7 +417,11 @@ defineExpose({ openDialog });
                 <div class="player-card">
                   <div class="player-identity">
                     <a-avatar :src="getAvatar(item.name)" />
-                    <span class="player-name-text">{{ item.name }}</span>
+                    <div class="player-name-group">
+                      <span :class="{ 'is-op': isOp(item.name) }">
+                        {{ item.name }}
+                      </span>
+                    </div>
                   </div>
                   <div class="player-ops">
                     <a-button class="action-btn-danger" type="text" danger :disabled="!isConnect || !isRunning" @click="removeFromWhitelist(item.name)">
@@ -459,7 +465,11 @@ defineExpose({ openDialog });
                 <div class="player-card">
                   <div class="player-identity">
                     <a-avatar :src="getAvatar(item)" />
-                    <span class="player-name-text">{{ item }}</span>
+                    <div class="player-name-group">
+                      <span class="is-op">
+                        {{ item }}
+                      </span>
+                    </div>
                   </div>
                   <div class="player-ops">
                     <a-button class="action-btn-danger" type="text" danger :disabled="!isConnect || !isRunning" @click="removeOp(item)">
@@ -505,7 +515,7 @@ defineExpose({ openDialog });
     width: 6px;
   }
   &::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.15);
+    background-color: rgba(128, 128, 128, 0.25);
     border-radius: 3px;
   }
   &::-webkit-scrollbar-track {
@@ -516,14 +526,14 @@ defineExpose({ openDialog });
 .player-list-item {
   padding: 8px 12px !important;
   margin-bottom: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(128, 128, 128, 0.15);
   border-radius: 8px;
-  background-color: rgba(0, 0, 0, 0.01);
+  background-color: rgba(128, 128, 128, 0.03);
   transition: all 0.2s ease;
 
   &:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-    border-color: rgba(0, 0, 0, 0.1);
+    background-color: rgba(128, 128, 128, 0.08);
+    border-color: rgba(128, 128, 128, 0.25);
   }
 }
 
@@ -549,11 +559,6 @@ defineExpose({ openDialog });
       font-weight: bold; 
     }
   }
-
-  .player-name-text {
-    font-weight: 500;
-    color: rgba(0, 0, 0, 0.85);
-  }
 }
 
 .player-ops {
@@ -565,7 +570,7 @@ defineExpose({ openDialog });
     padding: 4px 12px;
     
     &:hover:not([disabled]) {
-      background-color: rgba(255, 77, 79, 0.08);
+      background-color: rgba(255, 77, 79, 0.12);
     }
   }
 }
@@ -576,19 +581,19 @@ defineExpose({ openDialog });
   .input-action-group {
     display: flex;
     align-items: center;
-    gap: 12px; /* 輸入框與按鈕之間的精緻留白間距 */
+    gap: 12px;
     width: 100%;
 
     .custom-input {
       flex: 1;
-      max-width: 78%; /* 讓輸入框比例稍微縮短點點，視覺比例更平衡 */
-      border-radius: 6px !important; /* 強制回復完整的雙邊圓弧角 */
+      max-width: 78%;
+      border-radius: 6px !important;
     }
 
     .custom-btn {
       flex-shrink: 0;
       min-width: 90px;
-      border-radius: 6px !important; /* 強制回復完整的雙邊圓弧角 */
+      border-radius: 6px !important;
     }
   }
 }
@@ -626,7 +631,7 @@ defineExpose({ openDialog });
   .footer-input-zone {
     .input-action-group {
       .custom-input {
-        max-width: none; /* 行動裝置下放寬輸入框填滿剩餘空間 */
+        max-width: none;
       }
     }
   }
