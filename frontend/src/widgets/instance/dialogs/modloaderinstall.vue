@@ -1,233 +1,250 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { t } from "@/lang/i18n";
-import type { InstanceDetail } from "@/types";
-import { message } from "ant-design-vue";
-import type { UseTerminalHook } from "../../../hooks/useTerminal";
-import { fileContent } from "@/services/apis/fileManager"; // 引入檔案讀取服務
+import { ref, reactive, watch, computed } from "vue";
+import { message, Modal } from "ant-design-vue";
 import {
-  UserOutlined,
-  CrownOutlined,
-  StopOutlined,
-  LogoutOutlined,
-  ReloadOutlined,
-  SmileOutlined,
-  DisconnectOutlined,
-  SolutionOutlined,
-  CrownFilled,
-  UndoOutlined,
+  CloudDownloadOutlined,
+  CheckCircleOutlined,
   DeleteOutlined,
-  PlusSquareOutlined,
-  MinusSquareOutlined
+  SettingOutlined
 } from "@ant-design/icons-vue";
+import axios from "axios";
+import { fileList, deleteFile } from "@/services/apis/fileManager";
+import { installModLoader } from "@/services/apis/instance";
 
+// --- 配置區 ---
+const PROXY = "https://get-modloader-version.lazycloud.one/?url=";
 const props = defineProps<{
-  instanceInfo?: InstanceDetail;
-  instanceId?: string;
-  daemonId?: string;
-  useTerminalHook: UseTerminalHook;
+  daemonId: string;
+  instanceId: string;
+  instanceInfo: any;
 }>();
+const isVisible = ref(false);
+const confirmLoading = ref(false);
+const isCleaning = ref(false);
+const agreeClean = ref(false);
+const hasCleaned = ref(false);
+const showSnapshots = ref(false); // 顯示快照版本
 
-const open = ref(false);
-const onlinePlayers = ref<any[]>([]);
-const isLoading = ref(false);
-const opPlayers = ref<string[]>([]);
+// 數據存儲
+const mcVersions = ref<string[]>([]);
+const loaderVersions = ref<{version: string, tag?: string}[]>([]);
+const loadingLoaders = ref(false);
+const form = reactive({
+  mcVersion: "",
+  loaderType: "forge",
+  loaderVersion: ""
+});
 
-// 封禁與白名單資料
-const bannedPlayers = ref<any[]>([]);
-const whitelistPlayers = ref<any[]>([]);
-const isLoadingBanned = ref(false);
-const isLoadingWhitelist = ref(false);
+// 判斷是否為無需 Loader 版本的類型 (Paper, Folia, Vanilla)
+const isSimpleServer = computed(() => {
+  return ["paper", "folia", "vanilla"].includes(form.loaderType);
+});
 
-// 輸入框內容
-const newBanName = ref("");
-const newWhitelistName = ref("");
+// MCSManager 內建 API 執行器
+const { execute: fetchFileList } = fileList();
+const { execute: executeDelete } = deleteFile();
 
-// 分頁切換
-const activeTab = ref("online");
+/**
+ * 封裝代理請求工具
+ */
+const proxyGet = async (targetUrl: string) => {
+  const res = await axios.get(PROXY + encodeURIComponent(targetUrl));
+  return res.data;
+};
 
-// 從父組件傳入的 Hook 中解構出需要的屬性，包括伺服器運行狀態
-const { sendCommand, isConnect, isRunning } = props.useTerminalHook;
-
-// ---------- 使用專案內建的檔案讀取服務 ----------
-const { execute: fetchFileContent } = fileContent();
-
-const pingConfig = computed(() => ({
-  ip: props.instanceInfo?.config?.pingConfig.ip || "",
-  port: props.instanceInfo?.config?.pingConfig.port || 25565
-}));
-
-// ---------- 取得線上玩家 ----------
-const fetchPlayers = async () => {
-  if (!pingConfig.value.ip) return;
-  isLoading.value = true;
+/**
+ * 獲取 Minecraft 版本清單（可根據 showSnapshots 決定是否過濾）
+ */
+const fetchMcVersions = async () => {
   try {
-    const res = await fetch(
-      `https://api.mcstatus.io/v2/status/java/${pingConfig.value.ip}:${pingConfig.value.port}?t=${Date.now()}`
-    );
-    const data = await res.json();
-    onlinePlayers.value = [];
-    if (data.online && data.players && data.players.list) {
-      onlinePlayers.value = data.players.list;
+    const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
+    if (showSnapshots.value) {
+      let snapshotCount = 0;
+      const list: string[] = [];
+      for (const v of data.versions) {
+        if (v.type === 'release') {
+          list.push(v.id);
+        } else if (v.type === 'snapshot' && snapshotCount < 30) {
+          list.push(v.id);
+          snapshotCount++;
+        }
+      }
+      mcVersions.value = list;
     } else {
-      onlinePlayers.value = [];
-      if (data.online) message.warn(t("伺服器已開啟但未公開玩家名單"));
+      mcVersions.value = data.versions
+        .filter((v: any) => v.type === "release")
+        .map((v: any) => v.id);
     }
   } catch (err) {
-    console.error("Fetch players error:", err);
-    message.error(t("無法獲取玩家名單"));
-  } finally {
-    isLoading.value = false;
+    message.error("獲取 Minecraft 版本清單失敗");
   }
 };
 
-// ---------- 讀取 JSON 檔案（使用 fileContent 服務）----------
-const readJsonFile = async (fileName: string): Promise<any[]> => {
+/**
+ * 打開彈窗並初始化 Minecraft 版本列表
+ */
+const openDialog = async () => {
+  if (props.instanceInfo.status !== 0) {
+    return message.error("請先關閉伺服器再進行安裝");
+  }
+  isVisible.value = true;
+  await fetchMcVersions();
+};
+
+/**
+ * 監聽 showSnapshots 變化，重新取得版本列表
+ */
+watch(showSnapshots, () => {
+  fetchMcVersions();
+});
+
+/**
+ * 監聽選擇變化，自動獲取對應的 Loader 版本
+ */
+watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) => {
+  if (!newMc || !newType) {
+    loaderVersions.value = [];
+    form.loaderVersion = "";
+    return;
+  }
+
+  // 如果選擇的是 Paper / Folia / Vanilla，則不請求版本，直接清空並返回
+  if (isSimpleServer.value) {
+    loaderVersions.value = [];
+    form.loaderVersion = "";
+    loadingLoaders.value = false;
+    return;
+  }
+
+  loadingLoaders.value = true;
+  const tempVersions: {version: string, tag?: string}[] = [];
   try {
-    const res: any = await fetchFileContent({
-      params: { daemonId: props.daemonId ?? "", uuid: props.instanceId ?? "" },
-      data: { target: fileName }  // 例如 "banned-players.json" 或 "whitelist.json"
+    let target = "";
+    if (newType === "forge") {
+      target = `https://bmclapi2.bangbang93.com/forge/minecraft/${newMc}`;
+      const data = await proxyGet(target);
+      if (Array.isArray(data)) {
+        const sortedData = data.sort((a: any, b: any) => {
+          return b.version.localeCompare(a.version, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        sortedData.slice(0, 30).forEach((v: any) => {
+          tempVersions.push({
+            version: v.version,
+            tag: v.category === "recommended" ? "⭐" : ""
+          });
+        });
+      }
+    }
+    else if (newType === "neoforge") {
+      target = `https://bmclapi2.bangbang93.com/neoforge/list/${newMc}`;
+      const data = await proxyGet(target);
+      if (Array.isArray(data)) {
+        data.reverse().slice(0, 30).forEach((v: any) => {
+          const vStr = typeof v === 'string' ? v : (v.version || JSON.stringify(v));
+          tempVersions.push({ version: vStr, tag: "" });
+        });
+      }
+    }
+    else if (newType === "fabric") {
+      target = `https://meta.fabricmc.net/v2/versions/loader/${newMc}`;
+      const data = await proxyGet(target);
+      if (Array.isArray(data)) {
+        data.slice(0, 30).forEach((v: any) => {
+          tempVersions.push({
+            version: v.loader.version,
+            tag: v.loader.stable ? "" : "[舊版]"
+          });
+        });
+      }
+    }
+    form.loaderVersion = "";
+    loaderVersions.value = tempVersions;
+  } catch (err) {
+    console.error("Loader Fetch Error:", err);
+    loaderVersions.value = [];
+  } finally {
+    loadingLoaders.value = false;
+  }
+});
+
+/**
+ * 環境清理邏輯
+ */
+const handleCleanServer = async () => {
+  Modal.confirm({
+    title: "確定要清空伺服器嗎？",
+    content: "這將刪除除本地備份外的所有檔案，請確認已備份！",
+    okText: "確認清空",
+    okType: "danger",
+    onOk: async () => {
+      try {
+        isCleaning.value = true;
+        const res = await fetchFileList({
+          params: {
+            daemonId: props.daemonId,
+            uuid: props.instanceId,
+            target: "/",
+            page: 0,
+            page_size: 100,
+            file_name: ""
+          }
+        });
+
+        const items = res.value?.items || [];
+        const targets = items
+          .filter((i: any) => i.name !== "LazyCloud_backup")
+          .map((i: any) => "/" + i.name);
+        if (targets.length > 0) {
+          await executeDelete({
+            params: { daemonId: props.daemonId, uuid: props.instanceId },
+            data: { targets }
+          });
+        }
+
+        message.success("已清空伺服器檔案");
+        hasCleaned.value = true;
+      } catch (err) {
+        message.error("清空失敗");
+      } finally {
+        isCleaning.value = false;
+      }
+    }
+  });
+};
+
+/**
+ * 提交安裝任務
+ */
+const handleInstall = async () => {
+  const mcV = String(form.mcVersion).trim();
+  const lT = String(form.loaderType).trim();
+  // 若為 Paper / Folia / Vanilla，則傳送 "NA"，否則取表單值
+  const lV = isSimpleServer.value ? "NA" : String(form.loaderVersion).trim();
+
+  confirmLoading.value = true;
+  try {
+    await installModLoader().execute({
+      params: {
+        daemonId: props.daemonId,
+        uuid: props.instanceId,
+        task_name: "modloader_install"
+      },
+      data: {
+        instanceUuid: props.instanceId,
+        taskName: "modloader_install",
+        mcVersion: mcV,
+        loaderType: lT,
+        loaderVersion: lV
+      }
     });
-    // 處理可能回傳的字串或物件格式
-    let rawText = "";
-    if (typeof res === "string") {
-      rawText = res;
-    } else if (res && typeof res === "object") {
-      rawText = res._value || res.value || res.data || res.content || "";
-    }
-    if (!rawText) return [];
-    const data = JSON.parse(rawText);
-    return Array.isArray(data) ? data : [];
-  } catch (err) {
-    console.error(`Failed to read ${fileName}`, err);
-    return [];
-  }
-};
-
-const fetchBanList = async () => {
-  isLoadingBanned.value = true;
-  try {
-    bannedPlayers.value = await readJsonFile("banned-players.json");
-  } finally {
-    isLoadingBanned.value = false;
-  }
-};
-
-const fetchWhitelist = async () => {
-  isLoadingWhitelist.value = true;
-  try {
-    whitelistPlayers.value = await readJsonFile("whitelist.json");
-  } finally {
-    isLoadingWhitelist.value = false;
-  }
-};
-
-const refreshRestrictionLists = () => {
-  fetchBanList();
-  fetchWhitelist();
-};
-
-// ---------- 發送指令前統一檢查伺服器狀態 ----------
-const checkServerRunning = (): boolean => {
-  if (!isRunning.value) {
-    message.error(t("伺服器未在運行中，無法發送指令"));
-    return false;
-  }
-  return true;
-};
-
-// ---------- 發送指令（含自動刷新列表）----------
-const runCommand = async (cmd: string, playerName: string) => {
-  const fullCommand = cmd.replace("{player}", playerName);
-  if (!isConnect.value) {
-    return message.error(t("終端連線尚未就緒，請稍後"));
-  }
-  if (!checkServerRunning()) return; // 新增檢查
-  try {
-    await sendCommand(fullCommand);
-    message.success(`${t("指令已發送")}: ${fullCommand}`);
-    // 若指令包含 ban/pardon/whitelist，自動刷新限制列表
-    if (/^(ban|pardon|whitelist)\b/.test(fullCommand)) {
-      setTimeout(() => refreshRestrictionLists(), 1500);
-    }
+    message.success("安裝任務已啟動");
+    isVisible.value = false;
   } catch (err: any) {
-    console.error("LazyCloud PlayerManager Command Error:", err);
-    const errorMsg = err.message || String(err);
-    message.error(`${t("執行失敗")}: ${errorMsg}`);
+    console.error("安裝請求失敗:", err);
+    message.error("啟動失敗：" + (err.response?.data?.err || err.message));
+  } finally {
+    confirmLoading.value = false;
   }
-};
-
-// 手動新增封禁
-const banByName = async () => {
-  const name = newBanName.value.trim();
-  if (!name) return message.warning(t("請輸入玩家名稱"));
-  if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
-  if (!checkServerRunning()) return;
-  try {
-    await sendCommand(`ban ${name}`);
-    message.success(`${t("已封禁")}: ${name}`);
-    newBanName.value = "";
-    setTimeout(() => refreshRestrictionLists(), 1500);
-  } catch (err) {
-    console.error(err);
-    message.error(t("發送命令失敗"));
-  }
-};
-
-// 手動加入白名單
-const addToWhitelist = async () => {
-  const name = newWhitelistName.value.trim();
-  if (!name) return message.warning(t("請輸入玩家名稱"));
-  if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
-  if (!checkServerRunning()) return;
-  try {
-    await sendCommand(`whitelist add ${name}`);
-    message.success(`${t("已加入白名單")}: ${name}`);
-    newWhitelistName.value = "";
-    setTimeout(() => refreshRestrictionLists(), 1500);
-  } catch (err) {
-    console.error(err);
-    message.error(t("發送命令失敗"));
-  }
-};
-
-// 解除封禁
-const unbanPlayer = async (name: string) => {
-  if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
-  if (!checkServerRunning()) return;
-  try {
-    await sendCommand(`pardon ${name}`);
-    message.success(`${t("已解除封禁")}: ${name}`);
-    setTimeout(() => refreshRestrictionLists(), 1500);
-  } catch (err) {
-    console.error(err);
-    message.error(t("發送命令失敗"));
-  }
-};
-
-// 移除白名單
-const removeFromWhitelist = async (name: string) => {
-  if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
-  if (!checkServerRunning()) return;
-  try {
-    await sendCommand(`whitelist remove ${name}`);
-    message.success(`${t("已從白名單移除")}: ${name}`);
-    setTimeout(() => refreshRestrictionLists(), 1500);
-  } catch (err) {
-    console.error(err);
-    message.error(t("發送命令失敗"));
-  }
-};
-
-// ---------- 輔助函式 ----------
-const isOp = (name: string) => opPlayers.value.includes(name);
-const getAvatar = (name: string) => `https://minotar.net/avatar/${name}/32`;
-
-const openDialog = () => {
-  open.value = true;
-  activeTab.value = "online";
-  fetchPlayers();
-  refreshRestrictionLists();
 };
 
 defineExpose({ openDialog });
@@ -235,334 +252,183 @@ defineExpose({ openDialog });
 
 <template>
   <a-modal
-    v-model:open="open"
-    :title="t('玩家管理')"
-    :footer="null"
-    :width="650"
+    v-model:open="isVisible"
     centered
+    :title="null"
+    :footer="null"
+    :mask-closable="false"
     destroy-on-close
+    :width="520"
   >
-    <a-tabs v-model:activeKey="activeTab" type="card">
-      <!-- 在線管理 -->
-      <a-tab-pane key="online" :tab="t('在線管理')">
-        <div class="header-actions">
-          <a-typography-text type="secondary">
-            <SmileOutlined /> {{ t("當前在線") }}: {{ onlinePlayers.length }}
-            <a-badge
-              v-if="isConnect"
-              status="processing"
-              color="green"
-              class="ml-12"
-              text="Socket Ready"
-            />
-          </a-typography-text>
-          <a-tooltip placement="left">
-            <template #title>
-              {{ t("數據可能有 1-5 分鐘延遲，取決於 API 緩存時間") }}
-            </template>
-            <a-button
-              type="link"
-              size="small"
-              :loading="isLoading"
-              @click="fetchPlayers"
-            >
-              <template #icon><ReloadOutlined /></template>
-              {{ t("重新整理") }}
-            </a-button>
-          </a-tooltip>
+    <div class="install-container">
+      <div class="header-banner">
+        <cloud-download-outlined class="banner-icon" />
+        <div class="banner-text">
+          <h3>Server Core 自動化安裝</h3>
+          <p>如安裝過舊的 Minecraft 版本可能安裝失敗；如 安裝失敗 或 獲取版本 失敗請稍後重試</p>
         </div>
-        <a-divider style="margin: 12px 0" />
-        <a-list :data-source="onlinePlayers" :loading="isLoading">
-          <template #renderItem="{ item }">
-            <a-list-item>
-              <div class="player-card">
-                <div class="player-identity">
-                  <a-avatar :src="getAvatar(item.name_raw || item.name)" />
-                  <div class="player-name-group">
-                    <span
-                      :class="{ 'is-op': isOp(item.name_raw || item.name) }"
-                    >
-                      {{ item.name_raw || item.name }}
-                    </span>
-                    <a-tag
-                      v-if="isOp(item.name_raw || item.name)"
-                      color="red"
-                      size="small"
-                    >
-                      OP
-                    </a-tag>
-                  </div>
-                </div>
-                <div class="player-ops">
-                  <!-- 按鈕禁用條件加入 !isRunning -->
-                  <a-button-group :disabled="!isConnect || !isRunning">
-                    <a-tooltip :title="t('設為管理員')">
-                      <a-button
-                        @click="
-                          runCommand('op {player}', item.name_raw || item.name)
-                        "
-                      >
-                        <template #icon><CrownFilled /></template>
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="t('撤銷管理員')">
-                      <a-button
-                        @click="
-                          runCommand(
-                            'deop {player}',
-                            item.name_raw || item.name
-                          )
-                        "
-                      >
-                        <template #icon><CrownOutlined /></template>
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="t('生存模式')">
-                      <a-button
-                        @click="
-                          runCommand(
-                            'gamemode survival {player}',
-                            item.name_raw || item.name
-                          )
-                        "
-                      >
-                        S
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="t('創造模式')">
-                      <a-button
-                        @click="
-                          runCommand(
-                            'gamemode creative {player}',
-                            item.name_raw || item.name
-                          )
-                        "
-                      >
-                        C
-                      </a-button>
-                    </a-tooltip>
-                    <a-tooltip :title="t('添加白名單')">
-                      <a-button
-                        @click="
-                          runCommand(
-                            'whitelist add {player}',
-                            item.name_raw || item.name
-                          )
-                        "
-                      >
-                        <template #icon><SolutionOutlined /></template>
-                      </a-button>
-                    </a-tooltip>
-                    <a-popconfirm
-                      :title="t('確定踢出玩家？')"
-                      @confirm="
-                        runCommand(
-                          'kick {player}',
-                          item.name_raw || item.name
-                        )
-                      "
-                    >
-                      <a-button danger><DisconnectOutlined /></a-button>
-                    </a-popconfirm>
-                    <a-popconfirm
-                      :title="t('確定封禁玩家？')"
-                      @confirm="
-                        runCommand(
-                          'ban {player}',
-                          item.name_raw || item.name
-                        )
-                      "
-                    >
-                      <a-button danger type="primary"
-                        ><StopOutlined
-                      /></a-button>
-                    </a-popconfirm>
-                  </a-button-group>
-                </div>
-              </div>
-            </a-list-item>
-          </template>
-        </a-list>
-      </a-tab-pane>
+      </div>
 
-      <!-- 封禁管理 -->
-      <a-tab-pane key="banned" :tab="t('封禁管理')">
-        <div class="header-actions">
-          <a-typography-text type="secondary">
-            <StopOutlined /> {{ t("已封禁玩家") }}: {{ bannedPlayers.length }}
-          </a-typography-text>
-          <a-button
-            type="link"
-            size="small"
-            :loading="isLoadingBanned"
-            @click="fetchBanList"
-          >
-            <template #icon><ReloadOutlined /></template>
-            {{ t("重新整理") }}
-          </a-button>
+      <div class="step-card danger-zone">
+        <div class="card-header">
+          <div class="header-content">
+            <h4 class="step-title danger">
+              <delete-outlined /> 第一步：清空伺服器
+            </h4>
+            <p class="step-desc">為確保安裝過程無衝突，需要清空目前的實例檔案</p>
+          </div>
+          <transition name="fade">
+            <a-tag v-if="hasCleaned" color="success" class="status-tag">
+              <check-circle-outlined /> 已完成
+            </a-tag>
+          </transition>
         </div>
-        <a-divider style="margin: 12px 0" />
-        <a-list
-          :data-source="bannedPlayers"
-          :loading="isLoadingBanned"
-          :locale="{ emptyText: t('暫無被封禁的玩家') }"
-        >
-          <template #renderItem="{ item }">
-            <a-list-item>
-              <div class="player-card">
-                <div class="player-identity">
-                  <a-avatar :src="getAvatar(item.name)" />
-                  <div class="player-name-group">
-                    <span>{{ item.name }}</span>
-                    <a-tag v-if="item.reason" color="orange">{{ item.reason }}</a-tag>
-                  </div>
-                </div>
-                <div class="player-ops">
-                  <a-button
-                    type="link"
-                    danger
-                    :disabled="!isConnect || !isRunning"
-                    @click="unbanPlayer(item.name)"
-                  >
-                    <template #icon><UndoOutlined /></template>
-                    {{ t("解除封禁") }}
-                  </a-button>
-                </div>
-              </div>
-            </a-list-item>
-          </template>
-        </a-list>
-        <a-divider />
-        <a-input-group compact>
-          <a-input
-            v-model:value="newBanName"
-            :placeholder="t('輸入玩家名稱封禁')"
-            style="width: calc(100% - 80px)"
-          />
+        <div class="card-action">
+          <a-checkbox v-model:checked="agreeClean" :disabled="hasCleaned" class="custom-checkbox">
+            <span class="checkbox-text">我同意清空伺服器檔案</span>
+          </a-checkbox>
           <a-button
-            type="primary"
             danger
-            :disabled="!isConnect || !isRunning"
-            @click="banByName"
+            block
+            :loading="isCleaning"
+            :disabled="!agreeClean || hasCleaned"
+            class="action-btn"
+            @click="handleCleanServer"
           >
-            <template #icon><StopOutlined /></template>
-            {{ t("封禁") }}
-          </a-button>
-        </a-input-group>
-      </a-tab-pane>
-
-      <!-- 白名單管理 -->
-      <a-tab-pane key="whitelist" :tab="t('白名單管理')">
-        <div class="header-actions">
-          <a-typography-text type="secondary">
-            <SolutionOutlined /> {{ t("白名單玩家") }}:
-            {{ whitelistPlayers.length }}
-          </a-typography-text>
-          <a-button
-            type="link"
-            size="small"
-            :loading="isLoadingWhitelist"
-            @click="fetchWhitelist"
-          >
-            <template #icon><ReloadOutlined /></template>
-            {{ t("重新整理") }}
+            {{ hasCleaned ? '伺服器檔案已清空' : '立即執行檔案清空' }}
           </a-button>
         </div>
-        <a-divider style="margin: 12px 0" />
-        <a-list
-          :data-source="whitelistPlayers"
-          :loading="isLoadingWhitelist"
-          :locale="{ emptyText: t('白名單為空') }"
-        >
-          <template #renderItem="{ item }">
-            <a-list-item>
-              <div class="player-card">
-                <div class="player-identity">
-                  <a-avatar :src="getAvatar(item.name)" />
-                  <span>{{ item.name }}</span>
-                </div>
-                <div class="player-ops">
-                  <a-button
-                    type="link"
-                    danger
-                    :disabled="!isConnect || !isRunning"
-                    @click="removeFromWhitelist(item.name)"
-                  >
-                    <template #icon><DeleteOutlined /></template>
-                    {{ t("刪除") }}
-                  </a-button>
-                </div>
-              </div>
-            </a-list-item>
-          </template>
-        </a-list>
-        <a-divider />
-        <a-input-group compact>
-          <a-input
-            v-model:value="newWhitelistName"
-            :placeholder="t('輸入玩家名稱加入白名單')"
-            style="width: calc(100% - 80px)"
-          />
-          <a-button
-            type="primary"
-            :disabled="!isConnect || !isRunning"
-            @click="addToWhitelist"
-          >
-            <template #icon><SolutionOutlined /></template>
-            {{ t("新增") }}
-          </a-button>
-        </a-input-group>
-      </a-tab-pane>
-    </a-tabs>
+      </div>
+
+      <div class="step-card config-zone" :class="{ 'is-locked': !hasCleaned }">
+        <!-- 第二步標題與最右邊的勾選框 -->
+        <div class="step-header-row">
+          <h4 class="step-title">
+            <setting-outlined /> 第二步：選擇 Server Core
+          </h4>
+          <a-checkbox v-model:checked="showSnapshots" class="snapshot-checkbox">
+            顯示最近的快照版本
+          </a-checkbox>
+        </div>
+        <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與 Server Core</p>
+
+        <a-form layout="vertical" class="mt-4">
+          <a-form-item label="Minecraft 版本">
+            <a-select v-model:value="form.mcVersion" show-search placeholder="請選擇版本">
+              <a-select-option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</a-select-option>
+            </a-select>
+          </a-form-item>
+
+          <a-row :gutter="12">
+            <a-col :span="10">
+              <a-form-item label="Server Core 類型">
+                <a-select v-model:value="form.loaderType">
+                  <!-- 圖標為外部圖片 URL，請自行填入對應圖片鏈接 -->
+                  <a-select-option value="forge">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/forge.png" alt="forge" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Forge
+                  </a-select-option>
+                  <a-select-option value="neoforge">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/neoforge.png" alt="neoforge" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> NeoForge
+                  </a-select-option>
+                  <a-select-option value="fabric">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/fabric.png" alt="fabric" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Fabric
+                  </a-select-option>
+                  <a-select-option value="paper">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/paper.png" alt="paper" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Paper
+                  </a-select-option>
+                  <a-select-option value="folia">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/folia.png" alt="folia" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Folia
+                  </a-select-option>
+                  <a-select-option value="vanilla">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/minecraft.png" alt="vanilla" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Vanilla
+                  </a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="14">
+              <a-form-item label="ModLoader 版本">
+                <a-select
+                  v-model:value="form.loaderVersion"
+                  :loading="loadingLoaders"
+                  :disabled="isSimpleServer"
+                  :placeholder="isSimpleServer ? '此 Server Core 無需選擇此項' : '請先選擇遊戲版本'"
+                >
+                  <a-select-option v-for="l in loaderVersions" :key="l.version" :value="l.version">
+                    {{ l.version }} <small style="color: #888">{{ l.tag }}</small>
+                  </a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <div class="footer-actions">
+            <a-button @click="isVisible = false">取消</a-button>
+            <a-button
+              type="primary"
+              :loading="confirmLoading"
+              :disabled="!hasCleaned || !form.mcVersion || (!isSimpleServer && !form.loaderVersion)"
+              class="submit-btn"
+              @click="handleInstall"
+            >
+              <template #icon><cloud-download-outlined /></template>
+              {{ hasCleaned ? '開始安裝任務' : '請先完成第一步' }}
+            </a-button>
+          </div>
+        </a-form>
+      </div>
+    </div>
   </a-modal>
 </template>
 
-<style lang="scss" scoped>
-.header-actions {
+<style scoped>
+.install-container { padding: 4px 0; display: flex; flex-direction: column; gap: 16px; }
+.header-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 8px 8px 8px;
+}
+.banner-icon { font-size: 32px; color: #1677ff; }
+.banner-text h3 { margin: 0; font-weight: 600; font-size: 18px; }
+.banner-text p { margin: 0; font-size: 12px; color: #8c8c8c; }
+.step-card {
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(140, 140, 140, 0.15);
+  transition: all 0.3s ease;
+}
+.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.step-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.step-desc { font-size: 12px; opacity: 0.6; margin: 0; line-height: 1.5; }
+.step-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
 }
-.player-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
+.step-header-row .step-title {
+  margin-bottom: 0;
 }
-.player-identity {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  .player-name-group {
-    display: flex;
-    flex-direction: column;
-    .is-op {
-      color: #ff4d4f;
-      font-weight: bold;
-    }
-  }
+.snapshot-checkbox {
+  font-size: 12px;
 }
-.ml-12 {
-  margin-left: 12px;
-}
-
-@media (max-width: 768px) {
-  .player-card {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  .player-ops {
-    width: 100%;
-    :deep(.ant-btn-group) {
-      display: flex;
-      width: 100%;
-      .ant-btn {
-        flex: 1;
-        padding: 4px 8px;
-      }
-    }
-  }
-}
+.danger-zone { background: rgba(255, 77, 79, 0.04); border-color: rgba(255, 77, 79, 0.15); }
+.danger-zone .danger { color: #ff4d4f; }
+.card-action { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.checkbox-text { font-size: 12px; }
+.config-zone { background: rgba(22, 119, 255, 0.04); border-color: rgba(22, 119, 255, 0.15); }
+.config-zone.is-locked { opacity: 0.4; filter: grayscale(0.5); pointer-events: none; }
+.footer-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.submit-btn { min-width: 140px; font-weight: 500; border-radius: 6px; }
+.status-tag { border-radius: 6px; }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+:deep(.ant-form-item) { margin-bottom: 12px; }
+:deep(.ant-select-selector), :deep(.ant-input) { border-radius: 6px !important; }
 </style>
