@@ -1,24 +1,21 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { t } from "@/lang/i18n";
 import type { InstanceDetail } from "@/types";
 import { message } from "ant-design-vue";
 import type { UseTerminalHook } from "../../../hooks/useTerminal";
-import { fileContent } from "@/services/apis/fileManager"; // 引入檔案讀取服務
+import { fileContent } from "@/services/apis/fileManager";
 import {
-  UserOutlined,
-  CrownOutlined,
-  StopOutlined,
-  LogoutOutlined,
-  ReloadOutlined,
   SmileOutlined,
+  ReloadOutlined,
+  StopOutlined,
   DisconnectOutlined,
   SolutionOutlined,
   CrownFilled,
+  CrownOutlined,
   UndoOutlined,
   DeleteOutlined,
-  PlusSquareOutlined,
-  MinusSquareOutlined
+  UserOutlined
 } from "@ant-design/icons-vue";
 
 const props = defineProps<{
@@ -31,6 +28,7 @@ const props = defineProps<{
 const open = ref(false);
 const onlinePlayers = ref<any[]>([]);
 const isLoading = ref(false);
+// 真實 OP 名單（從 ops.json 取得，用於標記線上玩家與 OP 分頁顯示）
 const opPlayers = ref<string[]>([]);
 
 // 封禁與白名單資料
@@ -39,17 +37,20 @@ const whitelistPlayers = ref<any[]>([]);
 const isLoadingBanned = ref(false);
 const isLoadingWhitelist = ref(false);
 
+// OP 分頁加載狀態
+const isLoadingOp = ref(false);
+
 // 輸入框內容
 const newBanName = ref("");
 const newWhitelistName = ref("");
+const newOpName = ref("");
 
 // 分頁切換
 const activeTab = ref("online");
 
-// 從父組件傳入的 Hook 中解構出需要的屬性，包括伺服器運行狀態
 const { sendCommand, isConnect, isRunning } = props.useTerminalHook;
 
-// ---------- 使用專案內建的檔案讀取服務 ----------
+// ---------- 檔案讀取 ----------
 const { execute: fetchFileContent } = fileContent();
 
 const pingConfig = computed(() => ({
@@ -57,7 +58,7 @@ const pingConfig = computed(() => ({
   port: props.instanceInfo?.config?.pingConfig.port || 25565
 }));
 
-// ---------- 取得線上玩家 ----------
+// 取得線上玩家
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) return;
   isLoading.value = true;
@@ -70,7 +71,6 @@ const fetchPlayers = async () => {
     if (data.online && data.players && data.players.list) {
       onlinePlayers.value = data.players.list;
     } else {
-      onlinePlayers.value = [];
       if (data.online) message.warn(t("伺服器已開啟但未公開玩家名單"));
     }
   } catch (err) {
@@ -81,23 +81,21 @@ const fetchPlayers = async () => {
   }
 };
 
-// ---------- 讀取 JSON 檔案（使用 fileContent 服務）----------
+// ---------- 通用 JSON 檔案讀取 ----------
 const readJsonFile = async (fileName: string): Promise<any[]> => {
   try {
     const res: any = await fetchFileContent({
       params: { daemonId: props.daemonId ?? "", uuid: props.instanceId ?? "" },
-      data: { target: fileName }  // 例如 "banned-players.json" 或 "whitelist.json"
+      data: { target: fileName }
     });
-    // 處理可能回傳的字串或物件格式
     let rawText = "";
-    if (typeof res === "string") {
-      rawText = res;
-    } else if (res && typeof res === "object") {
+    if (typeof res === "string") rawText = res;
+    else if (res && typeof res === "object") {
       rawText = res._value || res.value || res.data || res.content || "";
     }
     if (!rawText) return [];
-    const data = JSON.parse(rawText);
-    return Array.isArray(data) ? data : [];
+    const parsed = JSON.parse(rawText);
+    return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
     console.error(`Failed to read ${fileName}`, err);
     return [];
@@ -122,12 +120,23 @@ const fetchWhitelist = async () => {
   }
 };
 
+const fetchOpList = async () => {
+  isLoadingOp.value = true;
+  try {
+    const data = await readJsonFile("ops.json");
+    opPlayers.value = data.map((item: any) => item.name);
+  } finally {
+    isLoadingOp.value = false;
+  }
+};
+
 const refreshRestrictionLists = () => {
   fetchBanList();
   fetchWhitelist();
+  fetchOpList();
 };
 
-// ---------- 發送指令前統一檢查伺服器狀態 ----------
+// ---------- 伺服器狀態檢查 ----------
 const checkServerRunning = (): boolean => {
   if (!isRunning.value) {
     message.error(t("伺服器未在運行中，無法發送指令"));
@@ -136,28 +145,28 @@ const checkServerRunning = (): boolean => {
   return true;
 };
 
-// ---------- 發送指令（含自動刷新列表）----------
+// ---------- 通用指令發送 ----------
 const runCommand = async (cmd: string, playerName: string) => {
   const fullCommand = cmd.replace("{player}", playerName);
   if (!isConnect.value) {
     return message.error(t("終端連線尚未就緒，請稍後"));
   }
-  if (!checkServerRunning()) return; // 新增檢查
+  if (!checkServerRunning()) return;
   try {
     await sendCommand(fullCommand);
     message.success(`${t("指令已發送")}: ${fullCommand}`);
-    // 若指令包含 ban/pardon/whitelist，自動刷新限制列表
-    if (/^(ban|pardon|whitelist)\b/.test(fullCommand)) {
+    // 影響名單的指令自動刷新
+    if (/^(ban|pardon|whitelist|op|deop)\b/.test(fullCommand)) {
       setTimeout(() => refreshRestrictionLists(), 1500);
     }
   } catch (err: any) {
-    console.error("LazyCloud PlayerManager Command Error:", err);
+    console.error("Command error:", err);
     const errorMsg = err.message || String(err);
     message.error(`${t("執行失敗")}: ${errorMsg}`);
   }
 };
 
-// 手動新增封禁
+// ---------- 批量操作 ----------
 const banByName = async () => {
   const name = newBanName.value.trim();
   if (!name) return message.warning(t("請輸入玩家名稱"));
@@ -167,14 +176,12 @@ const banByName = async () => {
     await sendCommand(`ban ${name}`);
     message.success(`${t("已封禁")}: ${name}`);
     newBanName.value = "";
-    setTimeout(() => refreshRestrictionLists(), 1500);
+    setTimeout(refreshRestrictionLists, 1500);
   } catch (err) {
-    console.error(err);
     message.error(t("發送命令失敗"));
   }
 };
 
-// 手動加入白名單
 const addToWhitelist = async () => {
   const name = newWhitelistName.value.trim();
   if (!name) return message.warning(t("請輸入玩家名稱"));
@@ -184,42 +191,65 @@ const addToWhitelist = async () => {
     await sendCommand(`whitelist add ${name}`);
     message.success(`${t("已加入白名單")}: ${name}`);
     newWhitelistName.value = "";
-    setTimeout(() => refreshRestrictionLists(), 1500);
+    setTimeout(refreshRestrictionLists, 1500);
   } catch (err) {
-    console.error(err);
     message.error(t("發送命令失敗"));
   }
 };
 
-// 解除封禁
 const unbanPlayer = async (name: string) => {
   if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
   if (!checkServerRunning()) return;
   try {
     await sendCommand(`pardon ${name}`);
     message.success(`${t("已解除封禁")}: ${name}`);
-    setTimeout(() => refreshRestrictionLists(), 1500);
+    setTimeout(refreshRestrictionLists, 1500);
   } catch (err) {
-    console.error(err);
     message.error(t("發送命令失敗"));
   }
 };
 
-// 移除白名單
 const removeFromWhitelist = async (name: string) => {
   if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
   if (!checkServerRunning()) return;
   try {
     await sendCommand(`whitelist remove ${name}`);
     message.success(`${t("已從白名單移除")}: ${name}`);
-    setTimeout(() => refreshRestrictionLists(), 1500);
+    setTimeout(refreshRestrictionLists, 1500);
   } catch (err) {
-    console.error(err);
     message.error(t("發送命令失敗"));
   }
 };
 
-// ---------- 輔助函式 ----------
+// OP 管理
+const addOp = async () => {
+  const name = newOpName.value.trim();
+  if (!name) return message.warning(t("請輸入玩家名稱"));
+  if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
+  if (!checkServerRunning()) return;
+  try {
+    await sendCommand(`op ${name}`);
+    message.success(`${t("已授予 OP")}: ${name}`);
+    newOpName.value = "";
+    setTimeout(refreshRestrictionLists, 1500);
+  } catch (err) {
+    message.error(t("發送命令失敗"));
+  }
+};
+
+const removeOp = async (name: string) => {
+  if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
+  if (!checkServerRunning()) return;
+  try {
+    await sendCommand(`deop ${name}`);
+    message.success(`${t("已撤銷 OP")}: ${name}`);
+    setTimeout(refreshRestrictionLists, 1500);
+  } catch (err) {
+    message.error(t("發送命令失敗"));
+  }
+};
+
+// ---------- 輔助 ----------
 const isOp = (name: string) => opPlayers.value.includes(name);
 const getAvatar = (name: string) => `https://minotar.net/avatar/${name}/32`;
 
@@ -229,6 +259,14 @@ const openDialog = () => {
   fetchPlayers();
   refreshRestrictionLists();
 };
+
+// 監聽分頁切換以刷新對應數據
+watch(activeTab, (tab) => {
+  if (tab === "online") fetchPlayers();
+  else if (tab === "banned") fetchBanList();
+  else if (tab === "whitelist") fetchWhitelist();
+  else if (tab === "op") fetchOpList();
+});
 
 defineExpose({ openDialog });
 </script>
@@ -248,24 +286,11 @@ defineExpose({ openDialog });
         <div class="header-actions">
           <a-typography-text type="secondary">
             <SmileOutlined /> {{ t("當前在線") }}: {{ onlinePlayers.length }}
-            <a-badge
-              v-if="isConnect"
-              status="processing"
-              color="green"
-              class="ml-12"
-              text="Socket Ready"
-            />
+            <a-badge v-if="isConnect" status="processing" color="green" class="ml-12" text="Socket Ready" />
           </a-typography-text>
           <a-tooltip placement="left">
-            <template #title>
-              {{ t("數據可能有 1-5 分鐘延遲，取決於 API 緩存時間") }}
-            </template>
-            <a-button
-              type="link"
-              size="small"
-              :loading="isLoading"
-              @click="fetchPlayers"
-            >
+            <template #title>{{ t("數據可能有 1-5 分鐘延遲，取決於 API 緩存時間") }}</template>
+            <a-button type="link" size="small" :loading="isLoading" @click="fetchPlayers">
               <template #icon><ReloadOutlined /></template>
               {{ t("重新整理") }}
             </a-button>
@@ -279,103 +304,40 @@ defineExpose({ openDialog });
                 <div class="player-identity">
                   <a-avatar :src="getAvatar(item.name_raw || item.name)" />
                   <div class="player-name-group">
-                    <span
-                      :class="{ 'is-op': isOp(item.name_raw || item.name) }"
-                    >
+                    <span :class="{ 'is-op': isOp(item.name_raw || item.name) }">
                       {{ item.name_raw || item.name }}
                     </span>
-                    <a-tag
-                      v-if="isOp(item.name_raw || item.name)"
-                      color="red"
-                      size="small"
-                    >
-                      OP
-                    </a-tag>
+                    <a-tag v-if="isOp(item.name_raw || item.name)" color="red" size="small">OP</a-tag>
                   </div>
                 </div>
                 <div class="player-ops">
-                  <!-- 按鈕禁用條件加入 !isRunning -->
                   <a-button-group :disabled="!isConnect || !isRunning">
                     <a-tooltip :title="t('設為管理員')">
-                      <a-button
-                        @click="
-                          runCommand('op {player}', item.name_raw || item.name)
-                        "
-                      >
+                      <a-button @click="runCommand('op {player}', item.name_raw || item.name)">
                         <template #icon><CrownFilled /></template>
                       </a-button>
                     </a-tooltip>
                     <a-tooltip :title="t('撤銷管理員')">
-                      <a-button
-                        @click="
-                          runCommand(
-                            'deop {player}',
-                            item.name_raw || item.name
-                          )
-                        "
-                      >
+                      <a-button @click="runCommand('deop {player}', item.name_raw || item.name)">
                         <template #icon><CrownOutlined /></template>
                       </a-button>
                     </a-tooltip>
                     <a-tooltip :title="t('生存模式')">
-                      <a-button
-                        @click="
-                          runCommand(
-                            'gamemode survival {player}',
-                            item.name_raw || item.name
-                          )
-                        "
-                      >
-                        S
-                      </a-button>
+                      <a-button @click="runCommand('gamemode survival {player}', item.name_raw || item.name)">S</a-button>
                     </a-tooltip>
                     <a-tooltip :title="t('創造模式')">
-                      <a-button
-                        @click="
-                          runCommand(
-                            'gamemode creative {player}',
-                            item.name_raw || item.name
-                          )
-                        "
-                      >
-                        C
-                      </a-button>
+                      <a-button @click="runCommand('gamemode creative {player}', item.name_raw || item.name)">C</a-button>
                     </a-tooltip>
                     <a-tooltip :title="t('添加白名單')">
-                      <a-button
-                        @click="
-                          runCommand(
-                            'whitelist add {player}',
-                            item.name_raw || item.name
-                          )
-                        "
-                      >
+                      <a-button @click="runCommand('whitelist add {player}', item.name_raw || item.name)">
                         <template #icon><SolutionOutlined /></template>
                       </a-button>
                     </a-tooltip>
-                    <a-popconfirm
-                      :title="t('確定踢出玩家？')"
-                      @confirm="
-                        runCommand(
-                          'kick {player}',
-                          item.name_raw || item.name
-                        )
-                      "
-                    >
+                    <a-popconfirm :title="t('確定踢出玩家？')" @confirm="runCommand('kick {player}', item.name_raw || item.name)">
                       <a-button danger><DisconnectOutlined /></a-button>
                     </a-popconfirm>
-                    <a-popconfirm
-                      :title="t('確定封禁玩家？')"
-                      @confirm="
-                        runCommand(
-                          'ban {player}',
-                          item.name_raw || item.name
-                        )
-                      "
-                    >
-                      <a-button danger type="primary"
-                        ><StopOutlined
-                      /></a-button>
+                    <a-popconfirm :title="t('確定封禁玩家？')" @confirm="runCommand('ban {player}', item.name_raw || item.name)">
+                      <a-button danger type="primary"><StopOutlined /></a-button>
                     </a-popconfirm>
                   </a-button-group>
                 </div>
@@ -391,22 +353,13 @@ defineExpose({ openDialog });
           <a-typography-text type="secondary">
             <StopOutlined /> {{ t("已封禁玩家") }}: {{ bannedPlayers.length }}
           </a-typography-text>
-          <a-button
-            type="link"
-            size="small"
-            :loading="isLoadingBanned"
-            @click="fetchBanList"
-          >
+          <a-button type="link" size="small" :loading="isLoadingBanned" @click="fetchBanList">
             <template #icon><ReloadOutlined /></template>
             {{ t("重新整理") }}
           </a-button>
         </div>
         <a-divider style="margin: 12px 0" />
-        <a-list
-          :data-source="bannedPlayers"
-          :loading="isLoadingBanned"
-          :locale="{ emptyText: t('暫無被封禁的玩家') }"
-        >
+        <a-list :data-source="bannedPlayers" :loading="isLoadingBanned" :locale="{ emptyText: t('暫無被封禁的玩家') }">
           <template #renderItem="{ item }">
             <a-list-item>
               <div class="player-card">
@@ -418,12 +371,7 @@ defineExpose({ openDialog });
                   </div>
                 </div>
                 <div class="player-ops">
-                  <a-button
-                    type="link"
-                    danger
-                    :disabled="!isConnect || !isRunning"
-                    @click="unbanPlayer(item.name)"
-                  >
+                  <a-button type="link" danger :disabled="!isConnect || !isRunning" @click="unbanPlayer(item.name)">
                     <template #icon><UndoOutlined /></template>
                     {{ t("解除封禁") }}
                   </a-button>
@@ -434,17 +382,8 @@ defineExpose({ openDialog });
         </a-list>
         <a-divider />
         <a-input-group compact>
-          <a-input
-            v-model:value="newBanName"
-            :placeholder="t('輸入玩家名稱封禁')"
-            style="width: calc(100% - 80px)"
-          />
-          <a-button
-            type="primary"
-            danger
-            :disabled="!isConnect || !isRunning"
-            @click="banByName"
-          >
+          <a-input v-model:value="newBanName" :placeholder="t('輸入玩家名稱封禁')" style="width: calc(100% - 80px)" />
+          <a-button type="primary" danger :disabled="!isConnect || !isRunning" @click="banByName">
             <template #icon><StopOutlined /></template>
             {{ t("封禁") }}
           </a-button>
@@ -455,25 +394,15 @@ defineExpose({ openDialog });
       <a-tab-pane key="whitelist" :tab="t('白名單管理')">
         <div class="header-actions">
           <a-typography-text type="secondary">
-            <SolutionOutlined /> {{ t("白名單玩家") }}:
-            {{ whitelistPlayers.length }}
+            <SolutionOutlined /> {{ t("白名單玩家") }}: {{ whitelistPlayers.length }}
           </a-typography-text>
-          <a-button
-            type="link"
-            size="small"
-            :loading="isLoadingWhitelist"
-            @click="fetchWhitelist"
-          >
+          <a-button type="link" size="small" :loading="isLoadingWhitelist" @click="fetchWhitelist">
             <template #icon><ReloadOutlined /></template>
             {{ t("重新整理") }}
           </a-button>
         </div>
         <a-divider style="margin: 12px 0" />
-        <a-list
-          :data-source="whitelistPlayers"
-          :loading="isLoadingWhitelist"
-          :locale="{ emptyText: t('白名單為空') }"
-        >
+        <a-list :data-source="whitelistPlayers" :loading="isLoadingWhitelist" :locale="{ emptyText: t('白名單為空') }">
           <template #renderItem="{ item }">
             <a-list-item>
               <div class="player-card">
@@ -482,12 +411,7 @@ defineExpose({ openDialog });
                   <span>{{ item.name }}</span>
                 </div>
                 <div class="player-ops">
-                  <a-button
-                    type="link"
-                    danger
-                    :disabled="!isConnect || !isRunning"
-                    @click="removeFromWhitelist(item.name)"
-                  >
+                  <a-button type="link" danger :disabled="!isConnect || !isRunning" @click="removeFromWhitelist(item.name)">
                     <template #icon><DeleteOutlined /></template>
                     {{ t("刪除") }}
                   </a-button>
@@ -498,18 +422,67 @@ defineExpose({ openDialog });
         </a-list>
         <a-divider />
         <a-input-group compact>
+          <a-input v-model:value="newWhitelistName" :placeholder="t('輸入玩家名稱加入白名單')" style="width: calc(100% - 80px)" />
+          <a-button type="primary" :disabled="!isConnect || !isRunning" @click="addToWhitelist">
+            <template #icon><SolutionOutlined /></template>
+            {{ t("新增") }}
+          </a-button>
+        </a-input-group>
+      </a-tab-pane>
+
+      <!-- ★ 新增 OP 管理分頁 ★ -->
+      <a-tab-pane key="op" :tab="t('OP 管理')">
+        <div class="header-actions">
+          <a-typography-text type="secondary">
+            <UserOutlined /> {{ t("管理員名單") }}: {{ opPlayers.length }}
+          </a-typography-text>
+          <a-button type="link" size="small" :loading="isLoadingOp" @click="fetchOpList">
+            <template #icon><ReloadOutlined /></template>
+            {{ t("重新整理") }}
+          </a-button>
+        </div>
+        <a-divider style="margin: 12px 0" />
+        <a-list
+          :data-source="opPlayers"
+          :loading="isLoadingOp"
+          :locale="{ emptyText: t('尚無管理員') }"
+        >
+          <template #renderItem="{ item }">
+            <a-list-item>
+              <div class="player-card">
+                <div class="player-identity">
+                  <a-avatar :src="getAvatar(item)" />
+                  <span>{{ item }}</span>
+                </div>
+                <div class="player-ops">
+                  <a-button
+                    type="link"
+                    danger
+                    :disabled="!isConnect || !isRunning"
+                    @click="removeOp(item)"
+                  >
+                    <template #icon><DeleteOutlined /></template>
+                    {{ t("撤銷 OP") }}
+                  </a-button>
+                </div>
+              </div>
+            </a-list-item>
+          </template>
+        </a-list>
+        <a-divider />
+        <a-input-group compact>
           <a-input
-            v-model:value="newWhitelistName"
-            :placeholder="t('輸入玩家名稱加入白名單')"
+            v-model:value="newOpName"
+            :placeholder="t('輸入玩家名稱授予 OP')"
             style="width: calc(100% - 80px)"
           />
           <a-button
             type="primary"
             :disabled="!isConnect || !isRunning"
-            @click="addToWhitelist"
+            @click="addOp"
           >
-            <template #icon><SolutionOutlined /></template>
-            {{ t("新增") }}
+            <template #icon><CrownFilled /></template>
+            {{ t("授予") }}
           </a-button>
         </a-input-group>
       </a-tab-pane>
@@ -537,15 +510,10 @@ defineExpose({ openDialog });
   .player-name-group {
     display: flex;
     flex-direction: column;
-    .is-op {
-      color: #ff4d4f;
-      font-weight: bold;
-    }
+    .is-op { color: #ff4d4f; font-weight: bold; }
   }
 }
-.ml-12 {
-  margin-left: 12px;
-}
+.ml-12 { margin-left: 12px; }
 
 @media (max-width: 768px) {
   .player-card {
