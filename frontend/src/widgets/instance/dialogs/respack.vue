@@ -7,7 +7,8 @@ import {
   LoadingOutlined,
   DeleteOutlined,
   ReloadOutlined,
-  LinkOutlined
+  LinkOutlined,
+  CloseCircleOutlined
 } from "@ant-design/icons-vue";
 
 // 引入 MCSM 的檔案讀取與上傳服務
@@ -18,8 +19,10 @@ import { parseForwardAddress } from "@/tools/protocol";
 // --- 設定你的自建後端資訊 ---
 const BACKEND_URL = "https://rp.lazycloud.one"; 
 const BACKEND_API_KEY = "45fdby784Yts&Oagd2Y79ahY&,SDA"; // 替換為你 docker-compose 裡設定的金鑰
+const MAX_PACKS = 2; // 材質包歷史紀錄上限
+const MIN_MEMORY = 8192; // 最低記憶體限制 (8GB = 8192MB)
 
-const props = defineProps<{ daemonId: string; instanceId: string }>();
+const props = defineProps<{ daemonId: string; instanceId: string; instanceInfo?: any }>();
 
 const open = ref(false);
 const uploading = ref(false);
@@ -34,6 +37,12 @@ const { execute: getUploadMissionCfg } = uploadAddress();
 
 // 開啟對話框
 const openDialog = () => {
+  // 檢查內存大小
+  const memory = props.instanceInfo?.config?.maxMemory || 0;
+  if (memory < MIN_MEMORY) {
+    message.error(t("需要鐵礦或效率II或以上的套餐才可以使用該功能"));
+    return;
+  }
   open.value = true;
   fetchHistory();
 };
@@ -63,6 +72,11 @@ const getRemainingDays = (expireAt: string) => {
 
 // 處理檔案上傳至自建後端
 const handleUpload = async (file: File) => {
+  // 檢查歷史紀錄上限
+  if (historyList.value.length >= MAX_PACKS) {
+    return message.error(t(`最多只能保存 ${MAX_PACKS} 個材質包，請先刪除舊的材質包`));
+  }
+
   if (!file.name.endsWith('.zip')) {
     return message.error(t("請上傳 ZIP 格式的材質包"));
   }
@@ -138,6 +152,39 @@ const handleDelete = async (fileId: string) => {
   });
 };
 
+// 核心公用：覆蓋寫回 server.properties
+const saveServerProperties = async (newContent: string, msgKey: string, successMsg: string) => {
+  const blob = new Blob([newContent], { type: 'text/plain' });
+  const uploadFile = new File([blob], "server.properties", { type: 'text/plain' });
+
+  const mission = await getUploadMissionCfg({ 
+    params: { 
+      upload_dir: "/", 
+      daemonId: props.daemonId, 
+      uuid: props.instanceId, 
+      file_name: "server.properties" 
+    }
+  });
+  
+  const config = mission.value;
+  if (!config?.addr) throw new Error("取得上傳憑證失敗");
+
+  await new Promise<void>((resolve, reject) => {
+    uploadService.append(uploadFile, parseForwardAddress(config.addr, "http"), config.password, { overwrite: true }, (task) => {
+      task.instanceInfo = { instanceId: props.instanceId, daemonId: props.daemonId };
+    });
+    
+    const unwatch = watch(() => uploadService.uiData.value.current, (curr: any) => {
+      if (!curr) { 
+        unwatch(); 
+        resolve(); 
+      }
+    });
+  });
+
+  message.success({ content: t(successMsg), key: msgKey, duration: 5 });
+};
+
 // 應用到伺服器 (純前端處理 server.properties)
 const handleApplyToServer = async (file: any) => {
   processing.value = true;
@@ -145,7 +192,6 @@ const handleApplyToServer = async (file: any) => {
   message.loading({ content: t("正在讀取伺服器設定檔..."), key: msgKey });
 
   try {
-    // 1. 讀取 server.properties
     const res: any = await fetchFileContent({
       params: { daemonId: props.daemonId, uuid: props.instanceId },
       data: { target: "server.properties" }
@@ -159,7 +205,6 @@ const handleApplyToServer = async (file: any) => {
 
     if (!rawText) throw new Error("無法讀取 server.properties 內容");
 
-    // 2. 解析並替換字串
     message.loading({ content: t("正在寫入材質包設定..."), key: msgKey });
     const downloadUrl = `${BACKEND_URL}/files/${file.id}`;
     const sha1 = file.sha1;
@@ -183,43 +228,59 @@ const handleApplyToServer = async (file: any) => {
     if (!shaFound) lines.push(`resource-pack-sha1=${sha1}`);
     
     const newContent = lines.join('\n');
-
-    // 3. 將修改後的內容轉為 Blob 並透過 MCSM 上傳 API 覆蓋回去
-    const blob = new Blob([newContent], { type: 'text/plain' });
-    const uploadFile = new File([blob], "server.properties", { type: 'text/plain' });
-
-    const mission = await getUploadMissionCfg({ 
-      params: { 
-        upload_dir: "/", 
-        daemonId: props.daemonId, 
-        uuid: props.instanceId, 
-        file_name: "server.properties" 
-      }
-    });
-    
-    const config = mission.value;
-    if (!config?.addr) throw new Error("取得上傳憑證失敗");
-
-    await new Promise<void>((resolve, reject) => {
-      uploadService.append(uploadFile, parseForwardAddress(config.addr, "http"), config.password, { overwrite: true }, (task) => {
-        task.instanceInfo = { instanceId: props.instanceId, daemonId: props.daemonId };
-      });
-      
-      const unwatch = watch(() => uploadService.uiData.value.current, (curr: any) => {
-        if (!curr) { 
-          unwatch(); 
-          resolve(); 
-        }
-      });
-    });
-
-    message.success({ content: t("材質包設定已寫入，請重啟伺服器後才會生效！"), key: msgKey, duration: 5 });
+    await saveServerProperties(newContent, msgKey, "材質包設定已寫入，請重啟伺服器後才會生效！");
 
   } catch (err: any) {
     message.error({ content: t("應用失敗: ") + err.message, key: msgKey });
   } finally {
     processing.value = false;
   }
+};
+
+// 移除伺服器的材質包設定
+const handleRemoveFromServer = async () => {
+  Modal.confirm({
+    title: t("確認移除材質包設定？"),
+    content: t("這將清除伺服器 server.properties 中的材質包連結與 SHA-1，玩家進服將不再下載材質包。"),
+    okType: "danger",
+    onOk: async () => {
+      processing.value = true;
+      const msgKey = "remove_rp_task";
+      message.loading({ content: t("正在讀取伺服器設定檔..."), key: msgKey });
+
+      try {
+        const res: any = await fetchFileContent({
+          params: { daemonId: props.daemonId, uuid: props.instanceId },
+          data: { target: "server.properties" }
+        });
+
+        let rawText = "";
+        if (typeof res === "string") rawText = res;
+        else if (res && typeof res === "object") {
+          rawText = res._value || res.value || res.data || res.content || "";
+        }
+
+        if (!rawText) throw new Error("無法讀取 server.properties 內容");
+
+        message.loading({ content: t("正在清除材質包設定..."), key: msgKey });
+        
+        // 過濾掉材質包相關的行
+        let lines = rawText.split('\n');
+        lines = lines.filter(line => {
+          const trimmed = line.trim();
+          return !trimmed.startsWith('resource-pack=') && !trimmed.startsWith('resource-pack-sha1=');
+        });
+        
+        const newContent = lines.join('\n');
+        await saveServerProperties(newContent, msgKey, "材質包設定已移除，請重啟伺服器後才會生效！");
+
+      } catch (err: any) {
+        message.error({ content: t("移除失敗: ") + err.message, key: msgKey });
+      } finally {
+        processing.value = false;
+      }
+    }
+  });
 };
 
 defineExpose({ openDialog });
@@ -233,13 +294,20 @@ defineExpose({ openDialog });
         <a-upload-dragger
           :show-upload-list="false"
           :before-upload="(file: any) => { handleUpload(file); return false; }"
+          :disabled="historyList.length >= MAX_PACKS"
         >
           <p class="ant-upload-drag-icon">
-            <CloudUploadOutlined style="color: #1890ff" />
+            <CloudUploadOutlined :style="{ color: historyList.length >= MAX_PACKS ? '#d9d9d9' : '#1890ff' }" />
           </p>
-          <p class="ant-upload-text">{{ t('點擊或拖拽材質包 ZIP 檔至此') }}</p>
-          <p class="ant-upload-hint">{{ t('檔案將保存 35 天，可隨時續期') }}</p>
+          <p class="ant-upload-text">{{ historyList.length >= MAX_PACKS ? t('已達材質包上限') : t('點擊或拖拽材質包 ZIP 檔至此') }}</p>
+          <p class="ant-upload-hint">{{ t('檔案將保存 35 天，可隨時續期 (上限 ' + MAX_PACKS + ' 個)') }}</p>
         </a-upload-dragger>
+        
+        <!-- 移除設定按鈕 -->
+        <a-button class="mt-4 w-full" danger @click="handleRemoveFromServer" :loading="processing">
+          <template #icon><CloseCircleOutlined /></template>
+          {{ t('移除伺服器材質包設定') }}
+        </a-button>
       </div>
 
       <!-- 上傳進度 -->
@@ -250,7 +318,7 @@ defineExpose({ openDialog });
 
       <!-- 歷史紀錄列表 -->
       <div v-if="historyList.length > 0" class="mt-4">
-        <a-divider>{{ t('歷史材質包') }}</a-divider>
+        <a-divider>{{ t('歷史材質包') }} ({{ historyList.length }} / {{ MAX_PACKS }})</a-divider>
         <div class="space-y-3 max-h-[300px] overflow-y-auto">
           <div v-for="file in historyList" :key="file.id" class="border rounded-lg p-3 flex flex-col">
             <div class="flex justify-between items-center mb-2">
