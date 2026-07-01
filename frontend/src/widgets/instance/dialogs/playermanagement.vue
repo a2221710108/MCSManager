@@ -4,6 +4,7 @@ import { t } from "@/lang/i18n";
 import type { InstanceDetail } from "@/types";
 import { message } from "ant-design-vue";
 import type { UseTerminalHook } from "../../../hooks/useTerminal";
+import { fileContent } from "@/services/apis/fileManager"; // 引入檔案讀取服務
 import {
   UserOutlined,
   CrownOutlined,
@@ -47,6 +48,9 @@ const activeTab = ref("online");
 
 const { sendCommand, isConnect } = props.useTerminalHook;
 
+// ---------- 使用專案內建的檔案讀取服務 ----------
+const { execute: fetchFileContent } = fileContent();
+
 const pingConfig = computed(() => ({
   ip: props.instanceInfo?.config?.pingConfig.ip || "",
   port: props.instanceInfo?.config?.pingConfig.port || 25565
@@ -76,18 +80,25 @@ const fetchPlayers = async () => {
   }
 };
 
-// ---------- 讀取 JSON 檔案（需根據實際後端 API 調整） ----------
-const fetchJsonFile = async (fileName: string): Promise<any[]> => {
+// ---------- 讀取 JSON 檔案（使用 fileContent 服務）----------
+const readJsonFile = async (fileName: string): Promise<any[]> => {
   try {
-    // 方案一：直接嘗試常見的檔案內容 API（可根據後端路徑調整）
-    const url = `/api/instances/${props.instanceId}/files/${fileName}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const res: any = await fetchFileContent({
+      params: { daemonId: props.daemonId ?? "", uuid: props.instanceId ?? "" },
+      data: { target: fileName }  // 例如 "banned-players.json" 或 "whitelist.json"
+    });
+    // 處理可能回傳的字串或物件格式
+    let rawText = "";
+    if (typeof res === "string") {
+      rawText = res;
+    } else if (res && typeof res === "object") {
+      rawText = res._value || res.value || res.data || res.content || "";
+    }
+    if (!rawText) return [];
+    const data = JSON.parse(rawText);
     return Array.isArray(data) ? data : [];
   } catch (err) {
-    // 方案二：若方案一失敗，可改用終端指令「whitelist list」或「banlist」解析（本示例跳過）
-    console.error(`Failed to load ${fileName}`, err);
+    console.error(`Failed to read ${fileName}`, err);
     return [];
   }
 };
@@ -95,7 +106,7 @@ const fetchJsonFile = async (fileName: string): Promise<any[]> => {
 const fetchBanList = async () => {
   isLoadingBanned.value = true;
   try {
-    bannedPlayers.value = await fetchJsonFile("banned-players.json");
+    bannedPlayers.value = await readJsonFile("banned-players.json");
   } finally {
     isLoadingBanned.value = false;
   }
@@ -104,7 +115,7 @@ const fetchBanList = async () => {
 const fetchWhitelist = async () => {
   isLoadingWhitelist.value = true;
   try {
-    whitelistPlayers.value = await fetchJsonFile("whitelist.json");
+    whitelistPlayers.value = await readJsonFile("whitelist.json");
   } finally {
     isLoadingWhitelist.value = false;
   }
