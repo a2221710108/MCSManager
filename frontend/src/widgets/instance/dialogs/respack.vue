@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { t } from "@/lang/i18n";
 import { message, Modal } from "ant-design-vue";
 import {
@@ -11,8 +11,7 @@ import {
 } from "@ant-design/icons-vue";
 
 // 引入 MCSM 的檔案讀取與上傳服務
-import { fileContent } from "@/services/apis/fileManager";
-import { uploadAddress } from "@/services/apis/fileManager"; 
+import { fileContent, uploadAddress } from "@/services/apis/fileManager";
 import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
 
@@ -206,7 +205,7 @@ const handleApplyToServer = async (file: any) => {
         task.instanceInfo = { instanceId: props.instanceId, daemonId: props.daemonId };
       });
       
-      const unwatch = watch(() => uploadService.uiData.value.current, (curr) => {
+      const unwatch = watch(() => uploadService.uiData.value.current, (curr: any) => {
         if (!curr) { 
           unwatch(); 
           resolve(); 
