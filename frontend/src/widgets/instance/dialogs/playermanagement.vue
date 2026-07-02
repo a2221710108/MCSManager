@@ -373,7 +373,7 @@ const openFormBuilder = () => {
     formConfig.value.server_description = "";
     formConfig.value.fields = [
       { label: "Discord", type: "input", required: false },
-      { label: "你在哪裡看見我們？", type: "radio", required: false, options: ["朋友推薦", "Threads", "Facebook", "LIhKG", "Minecraft討論區", "其他"] }
+      { label: "你在哪裡看見我們？", type: "radio", required: false, options: ["朋友推薦", "Threads"] }
     ];
   }
   formBuilderOpen.value = true;
