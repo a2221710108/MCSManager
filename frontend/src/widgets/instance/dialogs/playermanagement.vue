@@ -302,7 +302,7 @@ const getAvatar = (name: string) => `https://minotar.net/avatar/${name}/32`;
 // 白名單申請審核系統 (獨立模組)
 // ==========================================
 // 請確保這裡替換為你的 Worker URL
-const WORKER_URL = "https://mc-whitelist.leolu55165088.workers.dev";
+const WORKER_URL = "https://join.lazycloud.de";
 
 const applyFormData = ref<any>(null);
 const applications = ref<any[]>([]);
@@ -316,7 +316,7 @@ const formConfig = ref<any>({
   server_description: "",
   fields: [
     { label: "Discord", type: "input", required: false },
-    { label: "你在哪裡看見我們？", type: "radio", required: false, options: ["朋友推薦", "Threads", "Facebook", "LIhKG", "Minecraft討論區", "其他"] }
+    { label: "你在哪裡看見我們？", type: "radio", required: false, options: ["朋友推薦", "Threads"] }
   ]
 });
 
