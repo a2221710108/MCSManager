@@ -736,9 +736,9 @@ defineExpose({ openDialog });
           </a-list>
         </div>
       </a-tab-pane>
-
+<!-- 人生冇意義 想死 -->
       <!-- 申請審核系統 -->
-      <a-tab-pane key="apply" :tab="t('申請管理')">
+      <a-tab-pane key="apply" :tab="t('白名單申請')">
         <div class="header-actions">
           <a-typography-text type="secondary">
             <FormOutlined /> {{ t("表單狀態") }}:
