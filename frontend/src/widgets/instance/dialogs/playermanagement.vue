@@ -15,7 +15,14 @@ import {
   CrownOutlined,
   UndoOutlined,
   DeleteOutlined,
-  UserOutlined
+  UserOutlined,
+  // 新增的圖標
+  FormOutlined,
+  PlusOutlined,
+  LinkOutlined,
+  EditOutlined,
+  CloseCircleOutlined,
+  FieldTimeOutlined
 } from "@ant-design/icons-vue";
 
 const props = defineProps<{
@@ -30,29 +37,23 @@ const onlinePlayers = ref<any[]>([]);
 const isLoading = ref(false);
 // 真實 OP 名單（從 ops.json 取得，用於標記線上玩家與 OP 分頁顯示）
 const opPlayers = ref<string[]>([]);
-
 // 封禁與白名單資料
 const bannedPlayers = ref<any[]>([]);
 const whitelistPlayers = ref<any[]>([]);
 const isLoadingBanned = ref(false);
 const isLoadingWhitelist = ref(false);
-
 // OP 分頁加載狀態
 const isLoadingOp = ref(false);
-
 // 輸入框內容
 const newBanName = ref("");
 const newWhitelistName = ref("");
 const newOpName = ref("");
-
 // 分頁切換
 const activeTab = ref("online");
-
 const { sendCommand, isConnect, isRunning } = props.useTerminalHook;
 
 // ---------- 檔案讀取 ----------
 const { execute: fetchFileContent } = fileContent();
-
 const pingConfig = computed(() => ({
   ip: props.instanceInfo?.config?.pingConfig.ip || "",
   port: props.instanceInfo?.config?.pingConfig.port || 25565
@@ -71,7 +72,7 @@ const fetchPlayers = async () => {
     if (data.online && data.players && data.players.list) {
       onlinePlayers.value = data.players.list;
     } else {
-      if (data.online) message.warn(t("伺服器已開啟但未公開玩家名單"));
+      if (data.online) message.warning(t("伺服器已開啟但未公開玩家名單"));
     }
   } catch (err) {
     console.error("Fetch players error:", err);
@@ -253,11 +254,183 @@ const removeOp = async (name: string) => {
 const isOp = (name: string) => opPlayers.value.includes(name);
 const getAvatar = (name: string) => `https://minotar.net/avatar/${name}/32`;
 
+// ==========================================
+// 白名單申請審核系統 (獨立模組)
+// ==========================================
+// 請確保這裡替換為你的 Worker URL
+const WORKER_URL = "https://mc-whitelist.leolu55165088.workers.dev";
+
+const applyFormData = ref<any>(null);
+const applications = ref<any[]>([]);
+const isLoadingApps = ref(false);
+const formBuilderOpen = ref(false);
+const appFilter = ref('pending');
+const formConfig = ref<any>({
+  server_name: "",
+  fields: [
+    { label: "Discord 名稱", type: "input", required: false },
+    { label: "聯絡方式", type: "input", required: false },
+    { label: "申請理由", type: "textarea", required: false }
+  ]
+});
+
+const loadApplyData = async () => {
+  if (!props.instanceId) return;
+  try {
+    const res = await fetch(`${WORKER_URL}/api/form/${props.instanceId}`);
+    const data = await res.json();
+    if (data.status === 'active') {
+      applyFormData.value = data;
+      await loadApplications();
+    } else {
+      applyFormData.value = null;
+      applications.value = [];
+    }
+  } catch (err) {
+    console.error("Load apply data error:", err);
+  }
+};
+
+const loadApplications = async () => {
+  if (!props.instanceId) return;
+  isLoadingApps.value = true;
+  try {
+    const res = await fetch(`${WORKER_URL}/api/apps/${props.instanceId}`);
+    const data = await res.json();
+    applications.value = data.filter((app: any) => app.status === appFilter.value);
+  } catch (err) {
+    console.error("Load applications error:", err);
+  } finally {
+    isLoadingApps.value = false;
+  }
+};
+
+watch(appFilter, () => {
+  if (applyFormData.value) loadApplications();
+});
+
+const openFormBuilder = () => {
+  if (applyFormData.value) {
+    formConfig.value.server_name = applyFormData.value.server_name || "";
+    formConfig.value.fields = JSON.parse(applyFormData.value.form_config).map((f: any) => ({ ...f, required: f.required || false }));
+  } else {
+    formConfig.value.server_name = props.instanceInfo?.nickname || "Minecraft Server";
+    formConfig.value.fields = [
+      { label: "Discord 名稱", type: "input", required: false },
+      { label: "聯絡方式", type: "input", required: false },
+      { label: "申請理由", type: "textarea", required: false }
+    ];
+  }
+  formBuilderOpen.value = true;
+};
+
+const addCustomField = () => {
+  if (formConfig.value.fields.length >= 5) {
+    message.warning(t("最多只能新增 5 個自定義欄位"));
+    return;
+  }
+  formConfig.value.fields.push({ label: "新欄位", type: "input", required: false, options: ["選項1"] });
+};
+
+const publishForm = async () => {
+  try {
+    await fetch(`${WORKER_URL}/api/form/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instance_id: props.instanceId,
+        server_name: formConfig.value.server_name,
+        fields: formConfig.value.fields
+      })
+    });
+    message.success(t("表單已發佈！"));
+    formBuilderOpen.value = false;
+    loadApplyData();
+  } catch (err) {
+    message.error(t("發佈失敗"));
+  }
+};
+
+const copyApplyUrl = () => {
+  if (!applyFormData.value) return;
+  const url = `${WORKER_URL}/${applyFormData.value.short_id}`;
+  navigator.clipboard.writeText(url);
+  message.success(t("連結已複製到剪貼簿"));
+};
+
+const resetExpiry = async () => {
+  await fetch(`${WORKER_URL}/api/form/reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ instance_id: props.instanceId })
+  });
+  message.success(t("有效期已重置為 35 天"));
+  loadApplyData();
+};
+
+const closeForm = async () => {
+  await fetch(`${WORKER_URL}/api/form/close`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ instance_id: props.instanceId })
+  });
+  message.success(t("已關閉申請頁並清除所有相關資料"));
+  applyFormData.value = null;
+  applications.value = [];
+};
+
+const approveApp = async (item: any) => {
+  if (!checkServerRunning()) return;
+  if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
+  try {
+    await sendCommand(`whitelist add ${item.mc_username}`);
+    await fetch(`${WORKER_URL}/api/app/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.id, status: "approved" })
+    });
+    message.success(`${t("已通過並加入白名單")}: ${item.mc_username}`);
+    loadApplications();
+  } catch (err) {
+    message.error(t("操作失敗"));
+  }
+};
+
+const rejectApp = async (item: any) => {
+  await fetch(`${WORKER_URL}/api/app/update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: item.id, status: "rejected" })
+  });
+  message.success(`${t("已拒絕申請")}: ${item.mc_username}`);
+  loadApplications();
+};
+
+const parseAppData = (item: any) => {
+  try {
+    const data = JSON.parse(item.form_data);
+    return Object.entries(data).map(([key, val]) => ({
+      label: key,
+      value: Array.isArray(val) ? val.join(", ") : (val as string)
+    }));
+  } catch {
+    return [];
+  }
+};
+
+const getPreviewFields = (item: any) => parseAppData(item).slice(0, 3);
+const getDetailFields = (item: any) => parseAppData(item).slice(3);
+const toggleDetail = (item: any) => item.showDetail = !item.showDetail;
+
+const formatTime = (timestamp: number) => new Date(timestamp).toLocaleString();
+const formatExpiry = (timestamp: number) => new Date(timestamp).toLocaleDateString();
+
 const openDialog = () => {
   open.value = true;
   activeTab.value = "online";
   fetchPlayers();
   refreshRestrictionLists();
+  loadApplyData(); // 載入申請資料
 };
 
 // 監聽分頁切換以刷新對應數據
@@ -266,6 +439,7 @@ watch(activeTab, (tab) => {
   else if (tab === "banned") fetchBanList();
   else if (tab === "whitelist") fetchWhitelist();
   else if (tab === "op") fetchOpList();
+  else if (tab === "apply") loadApplyData();
 });
 
 defineExpose({ openDialog });
@@ -487,7 +661,148 @@ defineExpose({ openDialog });
           </a-list>
         </div>
       </a-tab-pane>
+
+      <!-- 白名單申請審核系統 -->
+      <a-tab-pane key="apply" :tab="t('申請管理')">
+        <div class="header-actions">
+          <a-typography-text type="secondary">
+            <FormOutlined /> {{ t("表單狀態") }}:
+            <a-tag v-if="applyFormData" color="green">開啟中</a-tag>
+            <a-tag v-else color="red">未建立</a-tag>
+            <span v-if="applyFormData" class="ml-12 text-xs">
+              <FieldTimeOutlined /> 到期: {{ formatExpiry(applyFormData.expires_at) }}
+            </span>
+          </a-typography-text>
+          <div class="header-right-controls">
+            <a-button v-if="!applyFormData" type="primary" size="small" @click="openFormBuilder">
+              <template #icon><PlusOutlined /></template>
+              {{ t("創建申請表單") }}
+            </a-button>
+            <a-button-group v-else size="small">
+              <a-button @click="copyApplyUrl">
+                <template #icon><LinkOutlined /></template>
+                {{ t("連結") }}
+              </a-button>
+              <a-button @click="openFormBuilder">
+                <template #icon><EditOutlined /></template>
+                {{ t("編輯") }}
+              </a-button>
+              <a-button @click="resetExpiry">{{ t("重置35天") }}</a-button>
+              <a-button danger @click="closeForm">
+                <template #icon><CloseCircleOutlined /></template>
+                {{ t("關閉刪除") }}
+              </a-button>
+            </a-button-group>
+          </div>
+        </div>
+
+        <a-divider style="margin: 12px 0 16px 0" />
+
+        <div v-if="applyFormData">
+          <div class="header-actions" style="margin-bottom: 12px;">
+            <a-radio-group v-model:value="appFilter" size="small">
+              <a-radio-button value="pending">待審核</a-radio-button>
+              <a-radio-button value="approved">已通過</a-radio-button>
+              <a-radio-button value="rejected">已拒絕</a-radio-button>
+            </a-radio-group>
+            <a-button type="link" size="small" :loading="isLoadingApps" @click="loadApplications">
+              <template #icon><ReloadOutlined /></template>
+              {{ t("重新整理") }}
+            </a-button>
+          </div>
+          
+          <div class="scroll-container">
+            <a-list :data-source="applications" :loading="isLoadingApps" :split="false" :locale="{ emptyText: t('暫無申請記錄') }">
+              <template #renderItem="{ item }">
+                <a-list-item class="player-list-item">
+                  <div class="player-card" style="flex-direction: column; align-items: flex-start; gap: 12px; width: 100%;">
+                    <div class="player-card" style="width: 100%;">
+                      <div class="player-identity">
+                        <a-avatar :src="getAvatar(item.mc_username)" />
+                        <div class="player-name-group">
+                          <span>{{ item.mc_username }}</span>
+                          <span class="text-xs text-gray-400">{{ formatTime(item.created_at) }}</span>
+                        </div>
+                      </div>
+                      <div class="player-ops">
+                        <template v-if="item.status === 'pending'">
+                          <a-button type="primary" size="small" :disabled="!isConnect || !isRunning" @click="approveApp(item)">
+                            {{ t("通過") }}
+                          </a-button>
+                          <a-button danger size="small" @click="rejectApp(item)">{{ t("拒絕") }}</a-button>
+                        </template>
+                        <a-tag v-else :color="item.status === 'approved' ? 'green' : 'red'">{{ item.status }}</a-tag>
+                        <a-button type="link" size="small" @click="toggleDetail(item)">
+                          {{ item.showDetail ? t("收起") : t("詳情") }}
+                        </a-button>
+                      </div>
+                    </div>
+                    
+                    <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 4px; width: 100%;">
+                      <div v-for="(field, index) in getPreviewFields(item)" :key="index" style="margin-bottom: 4px;">
+                        <span style="color: #8c8c8c; margin-right: 8px;">{{ field.label }}:</span>
+                        <span>{{ field.value }}</span>
+                      </div>
+                      <div v-if="item.showDetail">
+                        <a-divider style="margin: 8px 0" />
+                        <div v-for="(field, index) in getDetailFields(item)" :key="index" style="margin-bottom: 4px;">
+                          <span style="color: #8c8c8c; margin-right: 8px;">{{ field.label }}:</span>
+                          <span>{{ field.value }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </a-list-item>
+              </template>
+            </a-list>
+          </div>
+        </div>
+      </a-tab-pane>
     </a-tabs>
+  </a-modal>
+
+  <!-- 表單編輯器彈窗 -->
+  <a-modal v-model:open="formBuilderOpen" :title="t('配置申請表單')" @ok="publishForm" width="600px" centered>
+    <a-form layout="vertical">
+      <a-form-item label="伺服器名稱 (標題)">
+        <a-input v-model:value="formConfig.server_name" placeholder="My Minecraft Server" />
+      </a-form-item>
+      
+      <a-divider>表單欄位 (上限 6 個，Minecraft 名稱固定為必填)</a-divider>
+      
+      <div style="padding: 8px; background: #f5f5f5; border-radius: 4px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <a-tag color="blue">必填</a-tag>
+        <span>Minecraft 名稱</span>
+      </div>
+
+      <div v-for="(field, index) in formConfig.fields" :key="index" style="margin-bottom: 12px; border-bottom: 1px dashed #eee; padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <a-input v-model:value="field.label" placeholder="欄位名稱" style="width: 40%" />
+          <a-select v-model:value="field.type" style="width: 120px">
+            <a-select-option value="input">單行文字</a-select-option>
+            <a-select-option value="textarea">多行文字</a-select-option>
+            <a-select-option value="radio">單選</a-select-option>
+            <a-select-option value="checkbox">多選</a-select-option>
+          </a-select>
+          <a-checkbox v-model:checked="field.required">必填</a-checkbox>
+          <a-button danger size="small" @click="formConfig.fields.splice(index, 1)"><DeleteOutlined /></a-button>
+        </div>
+        
+        <template v-if="field.type === 'radio' || field.type === 'checkbox'">
+          <div style="padding-left: 16px; border-left: 2px solid #eee; margin-top: 8px;">
+            <div v-for="(opt, i) in (field.options || ['新選項'])" :key="i" style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <a-input v-model:value="field.options[i]" size="small" style="width: 200px" />
+              <a-button type="link" danger size="small" @click="field.options.splice(i, 1)"><DeleteOutlined /></a-button>
+            </div>
+            <a-button type="dashed" size="small" @click="field.options.push('新選項')">+ 新增選項</a-button>
+          </div>
+        </template>
+      </div>
+
+      <a-button type="dashed" block :disabled="formConfig.fields.length >= 5" @click="addCustomField">
+        <PlusOutlined /> 新增自定義欄位 (最多 5 個)
+      </a-button>
+    </a-form>
   </a-modal>
 </template>
 
@@ -500,27 +815,22 @@ defineExpose({ openDialog });
   padding: 0 4px;
   min-height: 24px;
 }
-
 .header-right-controls {
   display: flex;
   align-items: center;
   gap: 8px; /* 元素之間保持乾淨且協調的精緻間距 */
-
   .custom-input-top {
     width: 160px; /* 縮短輸入框寬度以完美適配頂部欄 */
     border-radius: 4px !important;
   }
-
   .custom-btn-top {
     border-radius: 4px !important;
   }
 }
-
 .scroll-container {
   max-height: 380px;
   overflow-y: auto;
   padding-right: 4px;
-  
   &::-webkit-scrollbar {
     width: 6px;
   }
@@ -532,7 +842,6 @@ defineExpose({ openDialog });
     background-color: transparent;
   }
 }
-
 .player-list-item {
   padding: 8px 12px !important;
   margin-bottom: 8px;
@@ -540,48 +849,40 @@ defineExpose({ openDialog });
   border-radius: 8px;
   background-color: rgba(128, 128, 128, 0.03);
   transition: all 0.2s ease;
-
   &:hover {
     background-color: rgba(128, 128, 128, 0.08);
     border-color: rgba(128, 128, 128, 0.25);
   }
 }
-
 .player-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
 }
-
 .player-identity {
   display: flex;
   align-items: center;
   gap: 12px;
-  
   .player-name-group {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    
-    .is-op { 
-      color: #ff4d4f; 
-      font-weight: bold; 
+    .is-op {
+      color: #ff4d4f;
+      font-weight: bold;
     }
   }
 }
-
 .player-ops {
   display: flex;
   align-items: center;
-
   :deep(.ant-btn-group) {
     & > span:not(:first-child) > .ant-btn-primary,
     & > .ant-btn-primary:not(:first-child) {
       border-inline-start-color: #ff4d4f !important;
     }
   }
-
   .kick-btn {
     &:focus, &:active, &.ant-btn-focused {
       border-color: #ff4d4f !important;
@@ -589,36 +890,29 @@ defineExpose({ openDialog });
       z-index: 2;
     }
   }
-
   .action-btn-danger {
     border-radius: 4px;
     padding: 4px 12px;
-    
     &:hover:not([disabled]) {
       background-color: rgba(255, 77, 79, 0.12);
     }
   }
 }
-
 .ml-12 { margin-left: 12px; }
-
 @media (max-width: 768px) {
   .header-actions {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
   }
-
   .header-right-controls {
     width: 100%;
     justify-content: flex-start;
-    
     .custom-input-top {
       flex: 1;
       width: auto;
     }
   }
-
   .player-list-item {
     padding: 12px !important;
   }
@@ -630,12 +924,10 @@ defineExpose({ openDialog });
   .player-ops {
     width: 100%;
     justify-content: flex-end;
-    
     .action-btn-danger {
       width: 100%;
       text-align: right;
     }
-    
     :deep(.ant-btn-group) {
       display: flex;
       width: 100%;
