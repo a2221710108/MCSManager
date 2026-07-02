@@ -314,7 +314,8 @@ const openFormBuilder = () => {
     formConfig.value.server_name = applyFormData.value.server_name || "";
     formConfig.value.fields = JSON.parse(applyFormData.value.form_config).map((f: any) => ({ ...f, required: f.required || false }));
   } else {
-    formConfig.value.server_name = props.instanceInfo?.nickname || "Minecraft Server";
+    // 修改這行：使用預設字串或透過 as any 繞過嚴格型別檢查
+    formConfig.value.server_name = (props.instanceInfo as any)?.nickname || "Minecraft Server";
     formConfig.value.fields = [
       { label: "Discord 名稱", type: "input", required: false },
       { label: "聯絡方式", type: "input", required: false },
