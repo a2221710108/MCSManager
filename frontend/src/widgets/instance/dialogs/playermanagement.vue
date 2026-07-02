@@ -16,7 +16,6 @@ import {
   UndoOutlined,
   DeleteOutlined,
   UserOutlined,
-  // 新增的圖標
   FormOutlined,
   PlusOutlined,
   LinkOutlined,
@@ -35,31 +34,24 @@ const props = defineProps<{
 const open = ref(false);
 const onlinePlayers = ref<any[]>([]);
 const isLoading = ref(false);
-// 真實 OP 名單（從 ops.json 取得，用於標記線上玩家與 OP 分頁顯示）
 const opPlayers = ref<string[]>([]);
-// 封禁與白名單資料
 const bannedPlayers = ref<any[]>([]);
 const whitelistPlayers = ref<any[]>([]);
 const isLoadingBanned = ref(false);
 const isLoadingWhitelist = ref(false);
-// OP 分頁加載狀態
 const isLoadingOp = ref(false);
-// 輸入框內容
 const newBanName = ref("");
 const newWhitelistName = ref("");
 const newOpName = ref("");
-// 分頁切換
 const activeTab = ref("online");
 const { sendCommand, isConnect, isRunning } = props.useTerminalHook;
 
-// ---------- 檔案讀取 ----------
 const { execute: fetchFileContent } = fileContent();
 const pingConfig = computed(() => ({
   ip: props.instanceInfo?.config?.pingConfig.ip || "",
   port: props.instanceInfo?.config?.pingConfig.port || 25565
 }));
 
-// 取得線上玩家
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) return;
   isLoading.value = true;
@@ -82,7 +74,6 @@ const fetchPlayers = async () => {
   }
 };
 
-// ---------- 通用 JSON 檔案讀取 ----------
 const readJsonFile = async (fileName: string): Promise<any[]> => {
   try {
     const res: any = await fetchFileContent({
@@ -137,7 +128,6 @@ const refreshRestrictionLists = () => {
   fetchOpList();
 };
 
-// ---------- 伺服器狀態檢查 ----------
 const checkServerRunning = (): boolean => {
   if (!isRunning.value) {
     message.error(t("伺服器未在運行中，無法發送指令"));
@@ -146,7 +136,6 @@ const checkServerRunning = (): boolean => {
   return true;
 };
 
-// ---------- 通用指令發送 ----------
 const runCommand = async (cmd: string, playerName: string) => {
   const fullCommand = cmd.replace("{player}", playerName);
   if (!isConnect.value) {
@@ -156,7 +145,6 @@ const runCommand = async (cmd: string, playerName: string) => {
   try {
     await sendCommand(fullCommand);
     message.success(`${t("指令已發送")}: ${fullCommand}`);
-    // 影響名單的指令自動刷新
     if (/^(ban|pardon|whitelist|op|deop)\b/.test(fullCommand)) {
       setTimeout(() => refreshRestrictionLists(), 1500);
     }
@@ -167,7 +155,6 @@ const runCommand = async (cmd: string, playerName: string) => {
   }
 };
 
-// ---------- 批量操作 ----------
 const banByName = async () => {
   const name = newBanName.value.trim();
   if (!name) return message.warning(t("請輸入玩家名稱"));
@@ -222,7 +209,6 @@ const removeFromWhitelist = async (name: string) => {
   }
 };
 
-// OP 管理
 const addOp = async () => {
   const name = newOpName.value.trim();
   if (!name) return message.warning(t("請輸入玩家名稱"));
@@ -250,15 +236,13 @@ const removeOp = async (name: string) => {
   }
 };
 
-// ---------- 輔助 ----------
 const isOp = (name: string) => opPlayers.value.includes(name);
 const getAvatar = (name: string) => `https://minotar.net/avatar/${name}/32`;
 
 // ==========================================
 // 白名單申請審核系統 (獨立模組)
 // ==========================================
-// 請確保這裡替換為你的 Worker URL
-const WORKER_URL = "https://mc-whitelist.leolu55165088.workers.dev";
+const WorkER_URL = "https://mc-whitelist.leolu55165088.workers.dev"; 
 
 const applyFormData = ref<any>(null);
 const applications = ref<any[]>([]);
@@ -277,7 +261,7 @@ const formConfig = ref<any>({
 const loadApplyData = async () => {
   if (!props.instanceId) return;
   try {
-    const res = await fetch(`${WORKER_URL}/api/form/${props.instanceId}`);
+    const res = await fetch(`${WorkER_URL}/api/form/${props.instanceId}`);
     const data = await res.json();
     if (data.status === 'active') {
       applyFormData.value = data;
@@ -295,7 +279,7 @@ const loadApplications = async () => {
   if (!props.instanceId) return;
   isLoadingApps.value = true;
   try {
-    const res = await fetch(`${WORKER_URL}/api/apps/${props.instanceId}`);
+    const res = await fetch(`${WorkER_URL}/api/apps/${props.instanceId}`);
     const data = await res.json();
     applications.value = data.filter((app: any) => app.status === appFilter.value);
   } catch (err) {
@@ -314,7 +298,7 @@ const openFormBuilder = () => {
     formConfig.value.server_name = applyFormData.value.server_name || "";
     formConfig.value.fields = JSON.parse(applyFormData.value.form_config).map((f: any) => ({ ...f, required: f.required || false }));
   } else {
-    // 修改這行：使用預設字串或透過 as any 繞過嚴格型別檢查
+    // 修復 TypeScript 型別報錯
     formConfig.value.server_name = (props.instanceInfo as any)?.nickname || "Minecraft Server";
     formConfig.value.fields = [
       { label: "Discord 名稱", type: "input", required: false },
@@ -333,9 +317,16 @@ const addCustomField = () => {
   formConfig.value.fields.push({ label: "新欄位", type: "input", required: false, options: ["選項1"] });
 };
 
+// 修復：切換為單選/多選時自動初始化 options
+const onFieldTypeChange = (field: any, newType: string) => {
+  if ((newType === 'radio' || newType === 'checkbox') && !field.options) {
+    field.options = ['選項1', '選項2'];
+  }
+};
+
 const publishForm = async () => {
   try {
-    await fetch(`${WORKER_URL}/api/form/publish`, {
+    await fetch(`${WorkER_URL}/api/form/publish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -354,13 +345,13 @@ const publishForm = async () => {
 
 const copyApplyUrl = () => {
   if (!applyFormData.value) return;
-  const url = `${WORKER_URL}/${applyFormData.value.short_id}`;
+  const url = `${WorkER_URL}/${applyFormData.value.short_id}`;
   navigator.clipboard.writeText(url);
   message.success(t("連結已複製到剪貼簿"));
 };
 
 const resetExpiry = async () => {
-  await fetch(`${WORKER_URL}/api/form/reset`, {
+  await fetch(`${WorkER_URL}/api/form/reset`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ instance_id: props.instanceId })
@@ -370,7 +361,7 @@ const resetExpiry = async () => {
 };
 
 const closeForm = async () => {
-  await fetch(`${WORKER_URL}/api/form/close`, {
+  await fetch(`${WorkER_URL}/api/form/close`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ instance_id: props.instanceId })
@@ -385,7 +376,7 @@ const approveApp = async (item: any) => {
   if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
   try {
     await sendCommand(`whitelist add ${item.mc_username}`);
-    await fetch(`${WORKER_URL}/api/app/update`, {
+    await fetch(`${WorkER_URL}/api/app/update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: item.id, status: "approved" })
@@ -398,7 +389,7 @@ const approveApp = async (item: any) => {
 };
 
 const rejectApp = async (item: any) => {
-  await fetch(`${WORKER_URL}/api/app/update`, {
+  await fetch(`${WorkER_URL}/api/app/update`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id: item.id, status: "rejected" })
@@ -431,10 +422,9 @@ const openDialog = () => {
   activeTab.value = "online";
   fetchPlayers();
   refreshRestrictionLists();
-  loadApplyData(); // 載入申請資料
+  loadApplyData();
 };
 
-// 監聽分頁切換以刷新對應數據
 watch(activeTab, (tab) => {
   if (tab === "online") fetchPlayers();
   else if (tab === "banned") fetchBanList();
@@ -779,7 +769,8 @@ defineExpose({ openDialog });
       <div v-for="(field, index) in formConfig.fields" :key="index" style="margin-bottom: 12px; border-bottom: 1px dashed #eee; padding-bottom: 12px;">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
           <a-input v-model:value="field.label" placeholder="欄位名稱" style="width: 40%" />
-          <a-select v-model:value="field.type" style="width: 120px">
+          <!-- 修復：綁定 @change 事件防止 options 未初始化 -->
+          <a-select v-model:value="field.type" style="width: 120px" @change="(val) => onFieldTypeChange(field, val)">
             <a-select-option value="input">單行文字</a-select-option>
             <a-select-option value="textarea">多行文字</a-select-option>
             <a-select-option value="radio">單選</a-select-option>
@@ -819,9 +810,9 @@ defineExpose({ openDialog });
 .header-right-controls {
   display: flex;
   align-items: center;
-  gap: 8px; /* 元素之間保持乾淨且協調的精緻間距 */
+  gap: 8px;
   .custom-input-top {
-    width: 160px; /* 縮短輸入框寬度以完美適配頂部欄 */
+    width: 160px;
     border-radius: 4px !important;
   }
   .custom-btn-top {
