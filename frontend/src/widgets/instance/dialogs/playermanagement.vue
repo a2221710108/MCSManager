@@ -318,7 +318,7 @@ const addCustomField = () => {
 };
 
 // 修復：切換為單選/多選時自動初始化 options
-const onFieldTypeChange = (field: any, newType: string) => {
+const onFieldTypeChange = (field: any, newType: any) => {
   if ((newType === 'radio' || newType === 'checkbox') && !field.options) {
     field.options = ['選項1', '選項2'];
   }
