@@ -19,7 +19,7 @@ import { parseForwardAddress } from "@/tools/protocol";
 // --- 設定你的自建後端資訊 ---
 const BACKEND_URL = "https://rp.lazycloud.de"; 
 const BACKEND_API_KEY = "45fdby784Yts&Oagd2Y79ahY&,SDA"; // 替換為你 docker-compose 裡設定的金鑰
-const MAX_PACKS = 2; // 材質包歷史紀錄上限
+const MAX_PACKS = 2; // 資源包歷史紀錄上限
 const MIN_MEMORY = 8192; // 最低記憶體限制 (8GB = 8192MB)
 
 const props = defineProps<{ daemonId: string; instanceId: string; instanceInfo?: any }>();
@@ -79,11 +79,11 @@ const getRemainingDays = (expireAt: string) => {
 const handleUpload = async (file: File) => {
   // 檢查歷史紀錄上限
   if (historyList.value.length >= MAX_PACKS) {
-    return message.error(t(`最多只能保存 ${MAX_PACKS} 個材質包，請先刪除舊的材質包`));
+    return message.error(t(`最多只能保存 ${MAX_PACKS} 個資源包，請先刪除舊的資源包`));
   }
 
   if (!file.name.endsWith('.zip')) {
-    return message.error(t("請上傳 ZIP 格式的材質包"));
+    return message.error(t("請上傳 ZIP 格式的資源包"));
   }
 
   uploading.value = true;
@@ -106,7 +106,7 @@ const handleUpload = async (file: File) => {
   xhr.onload = () => {
     uploading.value = false;
     if (xhr.status === 200) {
-      message.success(t("材質包上載成功！"));
+      message.success(t("資源包上載成功！"));
       fetchHistory(); 
     } else {
       message.error(t("上載失敗: ") + xhr.responseText);
@@ -137,8 +137,8 @@ const handleRenew = async (fileId: string) => {
 // 刪除
 const handleDelete = async (fileId: string) => {
   Modal.confirm({
-    title: t("確認刪除這個材質包？"),
-    content: t("刪除後將無法恢復，且已應用此材質包的伺服器將無法下載。"),
+    title: t("確認刪除這個資源包？"),
+    content: t("刪除後將無法恢復，且已應用此資源包的伺服器將無法下載。"),
     okType: "danger",
     onOk: async () => {
       try {
@@ -147,7 +147,7 @@ const handleDelete = async (fileId: string) => {
           headers: { "X-Uploader-Id": props.instanceId }
         });
         if (res.ok) {
-          message.success(t("材質包已刪除"));
+          message.success(t("資源包已刪除"));
           fetchHistory();
         }
       } catch (err) {
@@ -210,7 +210,7 @@ const handleApplyToServer = async (file: any) => {
 
     if (!rawText) throw new Error("無法讀取 server.properties 內容");
 
-    message.loading({ content: t("正在寫入材質包設定..."), key: msgKey });
+    message.loading({ content: t("正在寫入資源包設定..."), key: msgKey });
     const downloadUrl = `${BACKEND_URL}/files/${file.id}`;
     const sha1 = file.sha1;
     
@@ -233,7 +233,7 @@ const handleApplyToServer = async (file: any) => {
     if (!shaFound) lines.push(`resource-pack-sha1=${sha1}`);
     
     const newContent = lines.join('\n');
-    await saveServerProperties(newContent, msgKey, "材質包設定已寫入，請重啟伺服器後才會生效！");
+    await saveServerProperties(newContent, msgKey, "資源包設定已寫入，請重啟伺服器後才會生效！");
 
   } catch (err: any) {
     message.error({ content: t("應用失敗: ") + err.message, key: msgKey });
@@ -242,11 +242,11 @@ const handleApplyToServer = async (file: any) => {
   }
 };
 
-// 移除伺服器的材質包設定
+// 移除伺服器的資源包設定
 const handleRemoveFromServer = async () => {
   Modal.confirm({
-    title: t("確認移除材質包設定？"),
-    content: t("這將清除伺服器 server.properties 中的材質包連結與 SHA-1，玩家進服將不再下載材質包。"),
+    title: t("確認移除資源包設定？"),
+    content: t("這將清除伺服器 server.properties 中的資源包連結與 SHA-1，玩家進服將不再下載資源包。"),
     okType: "danger",
     onOk: async () => {
       processing.value = true;
@@ -267,9 +267,9 @@ const handleRemoveFromServer = async () => {
 
         if (!rawText) throw new Error("無法讀取 server.properties 內容");
 
-        message.loading({ content: t("正在清除材質包設定..."), key: msgKey });
+        message.loading({ content: t("正在清除資源包設定..."), key: msgKey });
         
-        // 過濾掉材質包相關的行
+        // 過濾掉資源包相關的行
         let lines = rawText.split('\n');
         lines = lines.filter(line => {
           const trimmed = line.trim();
@@ -277,7 +277,7 @@ const handleRemoveFromServer = async () => {
         });
         
         const newContent = lines.join('\n');
-        await saveServerProperties(newContent, msgKey, "材質包設定已移除，請重啟伺服器後才會生效！");
+        await saveServerProperties(newContent, msgKey, "資源包設定已移除，請重啟伺服器後才會生效！");
 
       } catch (err: any) {
         message.error({ content: t("移除失敗: ") + err.message, key: msgKey });
@@ -292,7 +292,7 @@ defineExpose({ openDialog });
 </script>
 
 <template>
-  <a-modal v-model:open="open" :title="t('材質包管理')" :footer="null" centered width="600px" destroy-on-close>
+  <a-modal v-model:open="open" :title="t('資源包管理')" :footer="null" centered width="600px" destroy-on-close>
     <div class="modal-content-wrapper">
       <div v-if="!uploading" class="upload-zone">
         <a-upload-dragger
@@ -305,7 +305,7 @@ defineExpose({ openDialog });
             <CloudUploadOutlined :style="{ color: historyList.length >= MAX_PACKS ? 'rgba(128, 128, 128, 0.4)' : '#1890ff' }" />
           </p>
           <p class="ant-upload-text">
-            {{ historyList.length >= MAX_PACKS ? t('已達材質包上限') : t('點擊或拖拽材質包 ZIP 檔至此') }}
+            {{ historyList.length >= MAX_PACKS ? t('已達資源包上限') : t('點擊或拖拽資源包 ZIP 檔至此') }}
           </p>
           <p class="ant-upload-hint">
             {{ t('檔案將保存 35 天，可隨時續期 (上限 ' + MAX_PACKS + ' 個, 最大 500MB)') }}
@@ -314,7 +314,7 @@ defineExpose({ openDialog });
         
         <a-button class="remove-config-btn" danger @click="handleRemoveFromServer" :loading="processing">
           <template #icon><CloseCircleOutlined /></template>
-          <span>{{ t('移除伺服器材質包設定') }}</span>
+          <span>{{ t('移除伺服器資源包設定') }}</span>
         </a-button>
       </div>
 
@@ -325,7 +325,7 @@ defineExpose({ openDialog });
 
       <div v-if="historyList.length > 0" class="history-zone">
         <a-divider style="margin: 16px 0 12px 0;">
-          <span class="divider-title">{{ t('歷史材質包') }} ({{ historyList.length }} / {{ MAX_PACKS }})</span>
+          <span class="divider-title">{{ t('歷史資源包') }} ({{ historyList.length }} / {{ MAX_PACKS }})</span>
         </a-divider>
         
         <div class="scroll-container">
