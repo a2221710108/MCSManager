@@ -45,7 +45,7 @@ const checkMemory = (): boolean => {
 // 開啟對話框
 const openDialog = () => {
   if (!checkMemory()) {
-    message.error(t("需要鐵礦或效率II或以上的套餐才可以使用該功能"));
+    message.error(t("請至少升級至 鐵礦 或 效率II 套餐"));
     return;
   }
   open.value = true;
@@ -106,16 +106,16 @@ const handleUpload = async (file: File) => {
   xhr.onload = () => {
     uploading.value = false;
     if (xhr.status === 200) {
-      message.success(t("材質包上傳成功！"));
+      message.success(t("材質包上載成功！"));
       fetchHistory(); 
     } else {
-      message.error(t("上傳失敗: ") + xhr.responseText);
+      message.error(t("上載失敗: ") + xhr.responseText);
     }
   };
 
   xhr.onerror = () => {
     uploading.value = false;
-    message.error(t("上傳失敗，請檢查網路連線"));
+    message.error(t("上載失敗，請檢查網路連線"));
   };
 
   xhr.send(formData);
@@ -126,7 +126,7 @@ const handleRenew = async (fileId: string) => {
   try {
     const res = await fetch(`${BACKEND_URL}/api/renew/${fileId}`, { method: "PUT" });
     if (res.ok) {
-      message.success(t("已成功續期 35 天！"));
+      message.success(t("已成功重置有效期！"));
       fetchHistory();
     }
   } catch (err) {
@@ -308,7 +308,7 @@ defineExpose({ openDialog });
             {{ historyList.length >= MAX_PACKS ? t('已達材質包上限') : t('點擊或拖拽材質包 ZIP 檔至此') }}
           </p>
           <p class="ant-upload-hint">
-            {{ t('檔案將保存 35 天，可隨時續期 (上限 ' + MAX_PACKS + ' 個)') }}
+            {{ t('檔案將保存 35 天，可隨時續期 (上限 ' + MAX_PACKS + ' 個, 最大 500MB)') }}
           </p>
         </a-upload-dragger>
         
