@@ -11,7 +11,7 @@ import {
   CloseCircleOutlined
 } from "@ant-design/icons-vue";
 
-// 引入 MCSM 的檔案讀取與上傳服務
+// 引入 MCSM 的檔案讀取與上載服務
 import { fileContent, uploadAddress } from "@/services/apis/fileManager";
 import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
@@ -32,7 +32,7 @@ const uploadProgress = ref(0);
 
 // 獲取 MCSM 檔案內容的 hook
 const { execute: fetchFileContent } = fileContent();
-// 獲取上傳憑證的 hook
+// 獲取上載憑證的 hook
 const { execute: getUploadMissionCfg } = uploadAddress();
 
 // 檢查內存大小是否達標
@@ -52,7 +52,7 @@ const openDialog = () => {
   fetchHistory();
 };
 
-// 獲取當前實例的歷史上傳紀錄
+// 獲取當前實例的歷史上載紀錄
 const fetchHistory = async () => {
   try {
     const res = await fetch(`${BACKEND_URL}/api/files?uploaderId=${props.instanceId}`, {
@@ -75,7 +75,7 @@ const getRemainingDays = (expireAt: string) => {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 };
 
-// 處理檔案上傳至自建後端
+// 處理檔案上載至自建後端
 const handleUpload = async (file: File) => {
   // 檢查歷史紀錄上限
   if (historyList.value.length >= MAX_PACKS) {
@@ -83,7 +83,7 @@ const handleUpload = async (file: File) => {
   }
 
   if (!file.name.endsWith('.zip')) {
-    return message.error(t("請上傳 ZIP 格式的資源包"));
+    return message.error(t("請上載 ZIP 格式的資源包"));
   }
 
   uploading.value = true;
@@ -172,7 +172,7 @@ const saveServerProperties = async (newContent: string, msgKey: string, successM
   });
   
   const config = mission.value;
-  if (!config?.addr) throw new Error("取得上傳憑證失敗");
+  if (!config?.addr) throw new Error("取得上載憑證失敗");
 
   await new Promise<void>((resolve, reject) => {
     uploadService.append(uploadFile, parseForwardAddress(config.addr, "http"), config.password, { overwrite: true }, (task) => {
@@ -325,7 +325,7 @@ defineExpose({ openDialog });
 
       <div v-if="historyList.length > 0" class="history-zone">
         <a-divider style="margin: 16px 0 12px 0;">
-          <span class="divider-title">{{ t('歷史資源包') }} ({{ historyList.length }} / {{ MAX_PACKS }})</span>
+          <span class="divider-title">{{ t('已上載的資源包') }} ({{ historyList.length }} / {{ MAX_PACKS }})</span>
         </a-divider>
         
         <div class="scroll-container">
