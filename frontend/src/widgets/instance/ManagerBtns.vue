@@ -212,7 +212,7 @@ const categorizedBtns = computed(() => {
           condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
         },
         {
-          title: t("上載材質包"),
+          title: t("資源包管理"),
           icon: SaveOutlined,
           click: () => { respackDialog.value?.openDialog(); },
           condition: () => instanceInfo.value?.config.type.includes(TYPE_MINECRAFT_JAVA) ?? false
