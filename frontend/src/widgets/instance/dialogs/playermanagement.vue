@@ -16,14 +16,12 @@ import {
   UndoOutlined,
   DeleteOutlined,
   UserOutlined,
-  // 新增的圖標
   FormOutlined,
   PlusOutlined,
   LinkOutlined,
   EditOutlined,
   CloseCircleOutlined,
-  FieldTimeOutlined,
-  SearchOutlined
+  FieldTimeOutlined
 } from "@ant-design/icons-vue";
 
 const props = defineProps<{
@@ -36,35 +34,27 @@ const props = defineProps<{
 const open = ref(false);
 const onlinePlayers = ref<any[]>([]);
 const isLoading = ref(false);
-// 真實 OP 名單（從 ops.json 取得，用於標記線上玩家與 OP 分頁顯示）
 const opPlayers = ref<string[]>([]);
-// 封禁與白名單資料
 const bannedPlayers = ref<any[]>([]);
 const whitelistPlayers = ref<any[]>([]);
 const isLoadingBanned = ref(false);
 const isLoadingWhitelist = ref(false);
-// OP 分頁加載狀態
 const isLoadingOp = ref(false);
-// 輸入框內容
 const newBanName = ref("");
 const newWhitelistName = ref("");
 const newOpName = ref("");
-// 分頁切換
 const activeTab = ref("online");
 const { sendCommand, isConnect, isRunning } = props.useTerminalHook;
 
-// 白名單開關狀態
 const whitelistStatus = ref("false");
 const isLoadingWhitelistStatus = ref(false);
 
-// ---------- 檔案讀取 ----------
 const { execute: fetchFileContent } = fileContent();
 const pingConfig = computed(() => ({
   ip: props.instanceInfo?.config?.pingConfig.ip || "",
   port: props.instanceInfo?.config?.pingConfig.port || 25565
 }));
 
-// 取得線上玩家
 const fetchPlayers = async () => {
   if (!pingConfig.value.ip) return;
   isLoading.value = true;
@@ -87,7 +77,6 @@ const fetchPlayers = async () => {
   }
 };
 
-// ---------- 通用 JSON 檔案讀取 ----------
 const readJsonFile = async (fileName: string): Promise<any[]> => {
   try {
     const res: any = await fetchFileContent({
@@ -127,7 +116,6 @@ const fetchWhitelist = async () => {
   await fetchWhitelistStatus();
 };
 
-// 讀取 server.properties 中的 white-list= 狀態
 const fetchWhitelistStatus = async () => {
   isLoadingWhitelistStatus.value = true;
   try {
@@ -150,7 +138,6 @@ const fetchWhitelistStatus = async () => {
   }
 };
 
-// 切換白名單開關
 const toggleWhitelistStatus = async () => {
   if (!isConnect.value) return message.error(t("終端連線尚未就緒"));
   if (!checkServerRunning()) return;
@@ -180,7 +167,6 @@ const refreshRestrictionLists = () => {
   fetchOpList();
 };
 
-// ---------- 伺服器狀態檢查 ----------
 const checkServerRunning = (): boolean => {
   if (!isRunning.value) {
     message.error(t("伺服器未在運行中，無法發送指令"));
@@ -189,28 +175,22 @@ const checkServerRunning = (): boolean => {
   return true;
 };
 
-// ---------- 通用指令發送 ----------
 const runCommand = async (cmd: string, playerName: string) => {
   const fullCommand = cmd.replace("{player}", playerName);
-  if (!isConnect.value) {
-    return message.error(t("終端連線尚未就緒，請稍後"));
-  }
+  if (!isConnect.value) return message.error(t("終端連線尚未就緒，請稍後"));
   if (!checkServerRunning()) return;
   try {
     await sendCommand(fullCommand);
     message.success(`${t("指令已發送")}: ${fullCommand}`);
-    // 影響名單的指令自動刷新
     if (/^(ban|pardon|whitelist|op|deop)\b/.test(fullCommand)) {
       setTimeout(() => refreshRestrictionLists(), 1500);
     }
   } catch (err: any) {
     console.error("Command error:", err);
-    const errorMsg = err.message || String(err);
-    message.error(`${t("執行失敗")}: ${errorMsg}`);
+    message.error(`${t("執行失敗")}: ${err.message || String(err)}`);
   }
 };
 
-// ---------- 批量操作 ----------
 const banByName = async () => {
   const name = newBanName.value.trim();
   if (!name) return message.warning(t("請輸入玩家名稱"));
@@ -265,7 +245,6 @@ const removeFromWhitelist = async (name: string) => {
   }
 };
 
-// OP 管理
 const addOp = async () => {
   const name = newOpName.value.trim();
   if (!name) return message.warning(t("請輸入玩家名稱"));
@@ -292,15 +271,14 @@ const removeOp = async (name: string) => {
     message.error(t("發送命令失敗"));
   }
 };
-// 人生冇意義 想死
-// ---------- 輔助 ----------
+
 const isOp = (name: string) => opPlayers.value.includes(name);
 const getAvatar = (name: string) => `https://minotar.net/avatar/${name}/32`;
 
 // ==========================================
 // 白名單申請審核系統 (獨立模組)
 // ==========================================
-const WORKER_URL = "https://join.lazycloud.de"; 
+const WORKER_URL = "https://join.lazycloud.de";
 
 const applyFormData = ref<any>(null);
 const applications = ref<any[]>([]);
@@ -308,6 +286,9 @@ const isLoadingApps = ref(false);
 const formBuilderOpen = ref(false);
 const appFilter = ref('pending');
 const searchQuery = ref('');
+
+// 修復響應性：使用獨立陣列來記錄哪些 ID 被展開了，確保畫面 100% 更新
+const expandedIds = ref<number[]>([]);
 
 const formConfig = ref<any>({
   server_name: "",
@@ -320,7 +301,7 @@ const formConfig = ref<any>({
 
 const filteredApplications = computed(() => {
   if (!searchQuery.value) return applications.value;
-  return applications.value.filter(app => 
+  return applications.value.filter(app =>
     app.mc_username.toLowerCase().includes(searchQuery.value.toLowerCase())
   );
 });
@@ -337,7 +318,9 @@ const loadApplyData = async () => {
       applyFormData.value = null;
       applications.value = [];
     }
-  } catch (err) { console.error("Load apply data error:", err); }
+  } catch (err) {
+    console.error("Load apply data error:", err);
+  }
 };
 
 const loadApplications = async () => {
@@ -347,11 +330,16 @@ const loadApplications = async () => {
     const res = await fetch(`${WORKER_URL}/api/apps/${props.instanceId}`);
     const data = await res.json();
     applications.value = data.filter((app: any) => app.status === appFilter.value);
-  } catch (err) { console.error("Load applications error:", err); } 
-  finally { isLoadingApps.value = false; }
+  } catch (err) {
+    console.error("Load applications error:", err);
+  } finally {
+    isLoadingApps.value = false;
+  }
 };
 
-watch(appFilter, () => { if (applyFormData.value) loadApplications(); });
+watch(appFilter, () => {
+  if (applyFormData.value) loadApplications();
+});
 
 const openFormBuilder = () => {
   if (applyFormData.value) {
@@ -395,7 +383,9 @@ const publishForm = async () => {
     message.success(t("表單已發佈！"));
     formBuilderOpen.value = false;
     loadApplyData();
-  } catch (err) { message.error(t("發佈失敗")); }
+  } catch (err) {
+    message.error(t("發佈失敗"));
+  }
 };
 
 const copyApplyUrl = () => {
@@ -406,7 +396,8 @@ const copyApplyUrl = () => {
 
 const resetExpiry = async () => {
   await fetch(`${WORKER_URL}/api/form/reset`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ instance_id: props.instanceId })
   });
   message.success(t("有效期已重置為 35 天"));
@@ -415,7 +406,8 @@ const resetExpiry = async () => {
 
 const closeForm = async () => {
   await fetch(`${WORKER_URL}/api/form/close`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ instance_id: props.instanceId })
   });
   message.success(t("已關閉申請頁並清除所有相關資料"));
@@ -429,17 +421,21 @@ const approveApp = async (item: any) => {
   try {
     await sendCommand(`whitelist add ${item.mc_username}`);
     await fetch(`${WORKER_URL}/api/app/update`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: item.id, status: "approved" })
     });
     message.success(`${t("已通過並加入白名單")}: ${item.mc_username}`);
     loadApplications();
-  } catch (err) { message.error(t("操作失敗")); }
+  } catch (err) {
+    message.error(t("操作失敗"));
+  }
 };
 
 const rejectApp = async (item: any) => {
   await fetch(`${WORKER_URL}/api/app/update`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id: item.id, status: "rejected" })
   });
   message.success(`${t("已拒絕申請")}: ${item.mc_username}`);
@@ -453,12 +449,23 @@ const parseAppData = (item: any) => {
       label: key,
       value: Array.isArray(val) ? val.join(", ") : (val as string)
     }));
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 };
 
 const getPreviewFields = (item: any) => parseAppData(item).slice(0, 3);
 const getDetailFields = (item: any) => parseAppData(item).slice(3);
-const toggleDetail = (item: any) => item.showDetail = !item.showDetail;
+
+// 改為控制 expandedIds 陣列，保證雙向綁定響應
+const toggleDetail = (id: number) => {
+  if (expandedIds.value.includes(id)) {
+    expandedIds.value = expandedIds.value.filter(i => i !== id);
+  } else {
+    expandedIds.value.push(id);
+  }
+};
+
 const formatTime = (timestamp: number) => new Date(timestamp).toLocaleString();
 const formatExpiry = (timestamp: number) => new Date(timestamp).toLocaleDateString();
 
@@ -719,7 +726,10 @@ defineExpose({ openDialog });
                           <a-button danger size="small" @click="rejectApp(item)">{{ t("拒絕") }}</a-button>
                         </template>
                         <a-tag v-else :color="item.status === 'approved' ? 'green' : 'red'">{{ item.status }}</a-tag>
-                        <a-button type="link" size="small" @click="toggleDetail(item)">{{ item.showDetail ? t("收起") : t("詳情") }}</a-button>
+                        <!-- 傳入 item.id 來切換陣列 -->
+                        <a-button type="link" size="small" @click="toggleDetail(item.id)">
+                          {{ expandedIds.includes(item.id) ? t("收起") : t("詳情") }}
+                        </a-button>
                       </div>
                     </div>
                     
@@ -728,8 +738,12 @@ defineExpose({ openDialog });
                         <span style="color: rgba(128,128,128,0.8); margin-right: 8px;">{{ field.label }}:</span>
                         <span>{{ field.value }}</span>
                       </div>
-                      <div v-if="item.showDetail">
+                      
+                      <div v-if="expandedIds.includes(item.id)">
                         <a-divider style="margin: 8px 0" />
+                        <div v-if="getDetailFields(item).length === 0" style="margin-bottom: 4px; color: rgba(128,128,128,0.8);">
+                          無其他隱藏資料
+                        </div>
                         <div v-for="(field, index) in getDetailFields(item)" :key="index" style="margin-bottom: 4px;">
                           <span style="color: rgba(128,128,128,0.8); margin-right: 8px;">{{ field.label }}:</span>
                           <span>{{ field.value }}</span>
@@ -758,13 +772,11 @@ defineExpose({ openDialog });
       
       <a-divider>表單欄位 (上限 6 個，Minecraft 名稱固定為必填)</a-divider>
       
-      <!-- 修改為使用透明度顏色，自動適應深淺色模式 -->
       <div style="padding: 8px; background-color: rgba(128, 128, 128, 0.1); border-radius: 4px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
         <a-tag color="blue">必填</a-tag>
         <span>Minecraft 名稱</span>
       </div>
 
-      <!-- 修改為使用透明度顏色，自動適應深淺色模式 -->
       <div v-for="(field, index) in formConfig.fields" :key="index" style="margin-bottom: 12px; border-bottom: 1px dashed rgba(128, 128, 128, 0.3); padding-bottom: 12px;">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
           <a-input v-model:value="field.label" placeholder="欄位名稱" style="width: 40%" />
