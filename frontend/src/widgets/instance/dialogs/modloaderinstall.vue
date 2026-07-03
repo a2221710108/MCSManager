@@ -339,8 +339,8 @@ defineExpose({ openDialog });
                   <a-select-option value="folia">
                     <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/folia.png" alt="folia" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Folia
                   </a-select-option>
-                  <a-select-option value="vanilla (Snapshot可用)">
-                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/minecraft.png" alt="vanilla" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Vanilla
+                  <a-select-option value="vanilla">
+                    <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/minecraft.png" alt="vanilla" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Vanilla (Snapshot可用)
                   </a-select-option>
                 </a-select>
               </a-form-item>
