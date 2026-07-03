@@ -455,7 +455,7 @@ const parseAppData = (item: any) => {
 };
 
 const getPreviewFields = (item: any) => parseAppData(item).slice(0, 3);
-const getDetailFields = (item: any) => parseAppData(item).slice(3);
+const getDetailFields = (item: any) => parseAppData(item);
 
 // 改為控制 expandedIds 陣列，保證雙向綁定響應
 const toggleDetail = (id: number) => {
