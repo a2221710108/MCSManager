@@ -218,6 +218,16 @@ defineExpose({ openDialog });
             </a-input-password>
           </a-form-item>
 -->
+          <a-form-item :label="t('CurseForge API Key')">
+  <a-input-password
+    v-model:value="form.apiKey"
+    placeholder="目前無需填寫該項"
+    disabled
+  >
+    <template #prefix><key-outlined class="input-icon" /></template>
+  </a-input-password>
+</a-form-item>
+          
           <a-row :gutter="12">
             <a-col :span="14">
               <a-form-item :label="t('Project ID')">
