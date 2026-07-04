@@ -95,7 +95,7 @@ const openDialog = async () => {
         uuid: props.instanceId,
         target: "/",
         page: 0,
-        page_size: 200,
+        page_size: 100,
         file_name: ""
       }
     });
