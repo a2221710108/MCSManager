@@ -92,30 +92,38 @@ const openDialog = async () => {
   checkingModServer.value = true;
 
   try {
-    // 僅檢查根目錄下是否存在 mods 目錄或 run.sh 檔案
+    // 檢查實例根目錄（target: "/" 即為實例獨立儲存空間根目錄）
     const rootRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
         uuid: props.instanceId,
         target: "/",
         page: 0,
-        page_size: 100,
+        page_size: 100,   // 提高限制，避免因檔案過多漏掉
         file_name: ""
       }
     });
     const rootItems = rootRes.value?.items || [];
 
+    // 相容兩種 type 格式：數值 (0=檔案, 1=目錄) 或字串 ("file"/"dir")
+    const isDirectory = (item: any) =>
+      String(item.type) === "1" || item.type === "dir";
+    const isFile = (item: any) =>
+      String(item.type) === "0" || item.type === "file";
+
     const hasModsDir = rootItems.some(
-      (item: any) => item.name === "mods" && item.type === "dir"
+      (item: any) => item.name === "mods" && isDirectory(item)
     );
     const hasRunSh = rootItems.some(
-      (item: any) => item.name === "run.sh" && item.type === "file"
+      (item: any) => item.name === "run.sh" && isFile(item)
     );
 
     if (hasModsDir || hasRunSh) {
       isModServer.value = true;
     }
   } catch (e) {
+    console.error("檢查實例環境失敗:", e);
+    // 請求失敗時保守視為非模組伺服器，避免完全無法使用
     isModServer.value = false;
   } finally {
     checkingModServer.value = false;
@@ -215,7 +223,7 @@ defineExpose({ openDialog });
       <p>正在檢查伺服器環境…</p>
     </div>
 
-    <!-- Mod 伺服器提示，僅顯示錯誤訊息 -->
+    <!-- Mod 伺服器提示 -->
     <div v-else-if="isModServer" class="mod-server-notification">
       <a-alert
         type="error"
