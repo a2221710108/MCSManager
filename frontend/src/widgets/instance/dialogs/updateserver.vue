@@ -9,6 +9,7 @@ import {
 import axios from "axios";
 import { fileList, deleteFile } from "@/services/apis/fileManager";
 import { installModLoader } from "@/services/apis/instance";
+
 const PROXY = "https://get-modloader-version.lazycloud.one/?url=";
 const props = defineProps<{
   daemonId: string;
@@ -76,7 +77,7 @@ const fetchMcVersions = async () => {
 };
 const openDialog = async () => {
   if (props.instanceInfo.status !== 0) {
-    return message.error("請先關閉伺服器");
+    return message.error("請先關閉伺服器再進行升級");
   }
   isVisible.value = true;
   agreeDelete.value = false;
@@ -85,79 +86,33 @@ const openDialog = async () => {
   isModServer.value = false;
   baseVersion.value = null;
   checkingModServer.value = true;
+
   try {
-    // 1. 檢查 libraries/net 下的模組目錄
-    const libRes = await fetchFileList({
-      params: {
-        daemonId: props.daemonId,
-        uuid: props.instanceId,
-        target: "/libraries/net",
-        page: 0,
-        page_size: 100,
-        file_name: ""
-      }
-    });
-    const libItems = libRes.value?.items || [];
-    const modFolders = ["minecraftforge", "fabricmc", "forge"];
-    const hasModFolder = libItems.some((item: any) => modFolders.includes(item.name));
-    if (hasModFolder) {
-      isModServer.value = true;
-    }
-    // 2. 額外檢查：若存在 neoforged 目錄，再深入檢查其內部是否有 neoforge 目錄
-    const hasNeoforgedDir = libItems.some(
-      (item: any) => item.name === "neoforged" && item.type === "dir"
-    );
-    if (hasNeoforgedDir && !isModServer.value) {
-      try {
-        const neoforgedRes = await fetchFileList({
-          params: {
-            daemonId: props.daemonId,
-            uuid: props.instanceId,
-            target: "/libraries/net/neoforged",
-            page: 0,
-            page_size: 100,
-            file_name: ""
-          }
-        });
-        const neoforgedItems = neoforgedRes.value?.items || [];
-        const hasNeoforge = neoforgedItems.some(
-          (item: any) => item.name === "neoforge" && item.type === "dir"
-        );
-        if (hasNeoforge) {
-          isModServer.value = true;
-        }
-      } catch (e) {
-        // 忽略
-      }
-    }
-    // 3. 檢查根目錄特殊檔案、mods 資料夾與 versions 目錄
+    // 僅檢查根目錄下的 mods 資料夾或 run.sh 檔案
     const rootRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
         uuid: props.instanceId,
         target: "/",
         page: 0,
-        page_size: 100,
+        page_size: 200,
         file_name: ""
       }
     });
     const rootItems = rootRes.value?.items || [];
-    // 檢查特殊檔案
-    const hasRunOrJvm = rootItems.some(
-      (item: any) =>
-        (item.name === "run.sh" || item.name === "user_jvm_args.txt") && item.type === "file"
-    );
-    if (hasRunOrJvm) {
-      isModServer.value = true;
-    }
-    // 檢查 mods 目錄
+
     const hasModsDir = rootItems.some(
       (item: any) => item.name === "mods" && item.type === "dir"
     );
-    if (hasModsDir) {
+    const hasRunSh = rootItems.some(
+      (item: any) => item.name === "run.sh" && item.type === "file"
+    );
+
+    if (hasModsDir || hasRunSh) {
       isModServer.value = true;
     }
-    // 4. 讀取 versions 目錄中的基底版本號
+
+    // 讀取 versions 目錄中的基底版本號（此功能保留）
     const versionDir = rootItems.find(
       (item: any) => item.name === "versions" && item.type === "dir"
     );
@@ -189,6 +144,7 @@ const openDialog = async () => {
   } finally {
     checkingModServer.value = false;
   }
+
   if (!isModServer.value) {
     await fetchMcVersions();
   } else {
@@ -290,7 +246,7 @@ defineExpose({ openDialog });
         <cloud-download-outlined class="banner-icon" />
         <div class="banner-text">
           <h3>升/降級 Minecraft 版本</h3>
-          <p>請注意：從 Paper / Folia 轉換成 Vanilla 很可能有相容性錯誤</p>
+          <p>升級 Minecraft 版本 / 更換 Server Core。支援 Paper / Folia / Vanilla</p>
         </div>
       </div>
       <div class="step-card config-zone">
@@ -336,7 +292,7 @@ defineExpose({ openDialog });
                 <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/folia.png" alt="folia" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Folia
               </a-select-option>
               <a-select-option value="vanilla">
-                <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/minecraft.png" alt="vanilla" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Vanilla (Snapshot可用)
+                <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/minecraft.png" alt="vanilla" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Vanilla
               </a-select-option>
             </a-select>
           </a-form-item>
