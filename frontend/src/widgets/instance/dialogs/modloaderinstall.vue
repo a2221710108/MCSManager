@@ -58,10 +58,18 @@ const proxyGet = async (targetUrl: string) => {
 const fetchMcVersions = async () => {
   try {
     const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
+    
+    // 1. 檢查抓到的資料結構
+    console.log("📌 取得的原始資料:", data);
+    console.log("📌 data.versions 是否存在:", data?.versions);
+
+    // 2. 加上防呆機制，避免 data.versions 不存在時整頁崩潰
+    const allVersions = data?.versions || [];
+
     if (showSnapshots.value) {
       let snapshotCount = 0;
       const list: string[] = [];
-      for (const v of data.versions) {
+      for (const v of allVersions) {
         if (v.type === 'release') {
           list.push(v.id);
         } else if (v.type === 'snapshot' && snapshotCount < 30) {
@@ -70,16 +78,26 @@ const fetchMcVersions = async () => {
         }
       }
       mcVersions.value = list;
+      console.log("📌 最終快照版本列表:", list);
     } else {
-      mcVersions.value = data.versions
+      mcVersions.value = allVersions
         .filter((v: any) => v.type === "release")
         .map((v: any) => v.id);
+      console.log("📌 最終正式版本列表:", mcVersions.value);
     }
-  } catch (err) {
+  } catch (err: any) {
+    // 3. 把真實的錯誤印出來！
+    console.error("❌ 獲取版本清單失敗，真實錯誤原因:", err);
+    
+    // 如果是 Axios 錯誤，印出具體的 HTTP 狀態碼或回應
+    if (err.response) {
+      console.error("❌ HTTP 狀態碼:", err.response.status);
+      console.error("❌ 伺服器回應內容:", err.response.data);
+    }
+    
     message.error("獲取 Minecraft 版本清單失敗");
   }
 };
-
 /**
  * 打開彈窗並初始化 Minecraft 版本列表
  */
