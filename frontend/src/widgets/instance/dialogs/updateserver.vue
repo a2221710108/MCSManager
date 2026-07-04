@@ -22,34 +22,42 @@ const isDeleting = ref(false);
 const showSnapshots = ref(false);
 const isModServer = ref(false);
 const checkingModServer = ref(false);
-const baseVersion = ref<string | null>(null);
+
 const mcVersions = ref<string[]>([]);
 const loaderVersions = ref<{ version: string; tag?: string }[]>([]);
 const loadingLoaders = ref(false);
+
 const form = reactive({
   mcVersion: "",
   loaderType: "paper",
   loaderVersion: ""
 });
+
 const agreeDelete = ref(false);
 const agreeBackup = ref(false);
 const agreeCompatibility = ref(false);
+
 const isSimpleServer = computed(() => {
   return ["paper", "folia", "vanilla"].includes(form.loaderType);
 });
+
 const allAgreed = computed(() => {
   return agreeDelete.value && agreeBackup.value && agreeCompatibility.value;
 });
+
 const { execute: fetchFileList } = fileList();
 const { execute: executeDelete } = deleteFile();
+
 const proxyGet = async (targetUrl: string) => {
   const res = await axios.get(PROXY + encodeURIComponent(targetUrl));
   return res.data;
 };
+
 const fetchMcVersions = async () => {
   try {
     const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
     let versions: string[] = [];
+
     if (showSnapshots.value) {
       let snapshotCount = 0;
       for (const v of data.versions) {
@@ -65,16 +73,13 @@ const fetchMcVersions = async () => {
         .filter((v: any) => v.type === "release")
         .map((v: any) => v.id);
     }
-    if (baseVersion.value) {
-      versions = versions.filter(v => {
-        return v.localeCompare(baseVersion.value!, undefined, { numeric: true, sensitivity: 'base' }) >= 0;
-      });
-    }
+
     mcVersions.value = versions;
   } catch (err) {
     message.error("獲取 Minecraft 版本清單失敗");
   }
 };
+
 const openDialog = async () => {
   if (props.instanceInfo.status !== 0) {
     return message.error("請先關閉伺服器再進行升級");
@@ -84,18 +89,17 @@ const openDialog = async () => {
   agreeBackup.value = false;
   agreeCompatibility.value = false;
   isModServer.value = false;
-  baseVersion.value = null;
   checkingModServer.value = true;
 
   try {
-    // 僅檢查根目錄下的 mods 資料夾或 run.sh 檔案
+    // 僅檢查根目錄下是否存在 mods 目錄或 run.sh 檔案
     const rootRes = await fetchFileList({
       params: {
         daemonId: props.daemonId,
         uuid: props.instanceId,
         target: "/",
         page: 0,
-        page_size: 100,
+        page_size: 200,
         file_name: ""
       }
     });
@@ -111,34 +115,6 @@ const openDialog = async () => {
     if (hasModsDir || hasRunSh) {
       isModServer.value = true;
     }
-
-    // 讀取 versions 目錄中的基底版本號（此功能保留）
-    const versionDir = rootItems.find(
-      (item: any) => item.name === "versions" && item.type === "dir"
-    );
-    if (versionDir) {
-      try {
-        const versionRes = await fetchFileList({
-          params: {
-            daemonId: props.daemonId,
-            uuid: props.instanceId,
-            target: "/versions",
-            page: 0,
-            page_size: 100,
-            file_name: ""
-          }
-        });
-        const versionItems = versionRes.value?.items || [];
-        const versionSubDir = versionItems.find(
-          (item: any) => item.type === "dir"
-        );
-        if (versionSubDir) {
-          baseVersion.value = versionSubDir.name;
-        }
-      } catch (e) {
-        // 忽略
-      }
-    }
   } catch (e) {
     isModServer.value = false;
   } finally {
@@ -151,9 +127,11 @@ const openDialog = async () => {
     mcVersions.value = [];
   }
 };
+
 watch(showSnapshots, () => {
   fetchMcVersions();
 });
+
 watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) => {
   if (!newMc || !newType) {
     loaderVersions.value = [];
@@ -167,6 +145,7 @@ watch([() => form.mcVersion, () => form.loaderType], async ([newMc, newType]) =>
     return;
   }
 });
+
 const handleUpgrade = async () => {
   if (!form.mcVersion) {
     message.warning("請選擇 Minecraft 版本");
@@ -176,8 +155,10 @@ const handleUpgrade = async () => {
     message.warning("請勾選所有確認項目");
     return;
   }
+
   confirmLoading.value = true;
   isDeleting.value = true;
+
   try {
     const targets = ["/startmc.jar", "/libraries", "/versions"];
     await executeDelete({
@@ -186,9 +167,11 @@ const handleUpgrade = async () => {
     });
     message.success("舊核心檔案清理成功");
     isDeleting.value = false;
+
     const mcV = String(form.mcVersion).trim();
     const lT = String(form.loaderType).trim();
     const lV = isSimpleServer.value ? "NA" : String(form.loaderVersion).trim();
+
     await installModLoader().execute({
       params: {
         daemonId: props.daemonId,
@@ -213,6 +196,7 @@ const handleUpgrade = async () => {
     isDeleting.value = false;
   }
 };
+
 defineExpose({ openDialog });
 </script>
 
