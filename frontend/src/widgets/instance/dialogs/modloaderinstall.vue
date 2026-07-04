@@ -55,15 +55,14 @@ const proxyGet = async (targetUrl: string) => {
 /**
  * 獲取 Minecraft 版本清單（可根據 showSnapshots 決定是否過濾）
  */
+/**
+ * 獲取 Minecraft 版本清單（可根據 showSnapshots 決定是否過濾）
+ */
 const fetchMcVersions = async () => {
   try {
     const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
     
-    // 1. 檢查抓到的資料結構
-    console.log("📌 取得的原始資料:", data);
-    console.log("📌 data.versions 是否存在:", data?.versions);
-
-    // 2. 加上防呆機制，避免 data.versions 不存在時整頁崩潰
+    // 防呆機制：確保 data.versions 存在，避免 API 偶發問題導致整個組件崩潰
     const allVersions = data?.versions || [];
 
     if (showSnapshots.value) {
@@ -78,23 +77,14 @@ const fetchMcVersions = async () => {
         }
       }
       mcVersions.value = list;
-      console.log("📌 最終快照版本列表:", list);
     } else {
       mcVersions.value = allVersions
         .filter((v: any) => v.type === "release")
         .map((v: any) => v.id);
-      console.log("📌 最終正式版本列表:", mcVersions.value);
     }
   } catch (err: any) {
-    // 3. 把真實的錯誤印出來！
-    console.error("❌ 獲取版本清單失敗，真實錯誤原因:", err);
-    
-    // 如果是 Axios 錯誤，印出具體的 HTTP 狀態碼或回應
-    if (err.response) {
-      console.error("❌ HTTP 狀態碼:", err.response.status);
-      console.error("❌ 伺服器回應內容:", err.response.data);
-    }
-    
+    // 保留錯誤追蹤：如果未來真的出錯，F12 Console 能看到詳細原因，而不會只顯示失敗
+    console.error("獲取 Minecraft 版本清單失敗:", err);
     message.error("獲取 Minecraft 版本清單失敗");
   }
 };
