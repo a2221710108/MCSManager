@@ -96,7 +96,8 @@ const handleCleanServer = async () => {
 };
 
 const handleInstall = async () => {
-  if (!form.projectId || !form.apiKey) {
+ // if (!form.projectId || !form.apiKey) {  //原本用於檢查Project ID 與 API Key
+  if (!form.projectId) {
     return message.warning(t("請完整填寫 Project ID 與 API Key"));
   }
 
@@ -117,7 +118,8 @@ const handleInstall = async () => {
           data: {
             projectId: form.projectId,
             versionId: form.versionId,
-            apiKey: form.apiKey
+            //apiKey: form.apiKey  //原本用來回傳API Key 欄位
+            apiKey: "NA"
           }
         });
 
@@ -208,12 +210,14 @@ defineExpose({ openDialog });
 </p>
         
         <a-form layout="vertical" class="mt-4">
+          <!-- 隱藏 API Key 輸入 -->
+<!--
           <a-form-item :label="t('CurseForge API Key')">
             <a-input-password v-model:value="form.apiKey" placeholder="Your API Key">
               <template #prefix><key-outlined class="input-icon" /></template>
             </a-input-password>
           </a-form-item>
-
+-->
           <a-row :gutter="12">
             <a-col :span="14">
               <a-form-item :label="t('Project ID')">
