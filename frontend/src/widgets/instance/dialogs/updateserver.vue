@@ -222,7 +222,7 @@ defineExpose({ openDialog });
         <cloud-download-outlined class="banner-icon" />
         <div class="banner-text">
           <h3>升/降級 Minecraft 版本</h3>
-          <p>升級 Minecraft 版本 / 更換 Server Core。支援 Paper / Folia / Vanilla</p>
+          <p>請注意：從 Paper / Folia 替換成 Vanilla 很可能出現相容性問題</p>
         </div>
       </div>
       <div class="step-card config-zone">
@@ -249,7 +249,7 @@ defineExpose({ openDialog });
             <setting-outlined /> 選擇 Server Core
           </h4>
           <a-checkbox v-model:checked="showSnapshots" class="snapshot-checkbox">
-            顯示最近的快照版本
+            顯示 Snapshot
           </a-checkbox>
         </div>
         <p class="step-desc">請選擇您希望升/降級的 Minecraft 版本與 Server Core 類型</p>
