@@ -65,19 +65,27 @@ const pingConfig = computed(() => ({
 }));
 
 // 取得線上玩家
-const fetchPlayers = async () => {
+const fetchPlayers = async (retryCount = 0) => {
   if (!pingConfig.value.ip) return;
   isLoading.value = true;
+  onlinePlayers.value = []; // 先清空避免顯示舊資料
+  
   try {
     const res = await fetch(
       `https://api.mcstatus.io/v2/status/java/${pingConfig.value.ip}:${pingConfig.value.port}?t=${Date.now()}`
     );
     const data = await res.json();
-    onlinePlayers.value = [];
-    if (data.online && data.players && data.players.list) {
+    
+    // 🔑 關鍵修正：如果 API 回傳 online=false，可能是 ping 尚未完成，自動重試一次
+    if (!data.online && retryCount < 1) {
+      setTimeout(() => fetchPlayers(retryCount + 1), 800);
+      return;
+    }
+    
+    if (data.online && data.players?.list) {
       onlinePlayers.value = data.players.list;
-    } else {
-      if (data.online) message.warning(t("伺服器已開啟但未公開玩家名單"));
+    } else if (data.online) {
+      message.warning(t("伺服器已開啟但未公開玩家名單"));
     }
   } catch (err) {
     console.error("Fetch players error:", err);
