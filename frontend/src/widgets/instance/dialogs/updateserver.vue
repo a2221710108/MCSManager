@@ -213,7 +213,7 @@ defineExpose({ openDialog });
     <div v-else-if="isModServer" class="mod-server-notification">
       <a-alert
         type="error"
-        message="不支持 Mod 伺服器一鍵升級"
+        message="該功能不支持 Mod 伺服器"
         show-icon
       />
     </div>
