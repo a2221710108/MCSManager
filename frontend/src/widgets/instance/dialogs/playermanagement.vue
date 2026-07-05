@@ -508,7 +508,7 @@ defineExpose({ openDialog });
           </a-typography-text>
           <a-tooltip placement="left">
             <template #title>{{ t("數據可能有 1-5 分鐘延遲，取決於 API 緩存時間") }}</template>
-            <a-button type="link" size="small" :loading="isLoading" @click="fetchPlayers">
+            <a-button type="link" size="small" :loading="isLoading" @click="fetchPlayers()">
               <template #icon><ReloadOutlined /></template>
               {{ t("重新整理") }}
             </a-button>
