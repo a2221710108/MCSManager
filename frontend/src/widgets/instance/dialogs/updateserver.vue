@@ -98,7 +98,7 @@ const openDialog = async () => {
         uuid: props.instanceId,
         target: "/",
         page: 0,
-        page_size: 500,
+        page_size: 100,
         file_name: ""
       }
     });
@@ -239,7 +239,7 @@ defineExpose({ openDialog });
             我已進行備份（強烈建議備份）
           </a-checkbox>
           <a-checkbox v-model:checked="agreeCompatibility">
-            我清楚可能出現相容性問題(如：存檔及插件等)
+            我清楚可能出現相容性問題 (如：存檔及插件等)
           </a-checkbox>
         </div>
       </div>
@@ -268,7 +268,7 @@ defineExpose({ openDialog });
                 <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/folia.png" alt="folia" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Folia
               </a-select-option>
               <a-select-option value="vanilla">
-                <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/minecraft.png" alt="vanilla" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Vanilla
+                <img src="https://www.lazycloud.one/wp-content/uploads/2026/06/minecraft.png" alt="vanilla" style="width:14px; height:14px; margin-right:6px; vertical-align:middle;" /> Vanilla (Snapshot 可用)
               </a-select-option>
             </a-select>
           </a-form-item>
