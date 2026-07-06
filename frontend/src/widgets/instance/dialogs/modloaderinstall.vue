@@ -60,7 +60,8 @@ const proxyGet = async (targetUrl: string) => {
  */
 const fetchMcVersions = async () => {
   try {
-    const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
+    //const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
+    const data = await proxyGet("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
     
     // 防呆機制：確保 data.versions 存在，避免 API 偶發問題導致整個組件崩潰
     const allVersions = data?.versions || [];
@@ -315,7 +316,7 @@ defineExpose({ openDialog });
             <setting-outlined /> 第二步：選擇 Server Core
           </h4>
           <a-checkbox v-model:checked="showSnapshots" class="snapshot-checkbox">
-            顯示最近的快照版本
+            顯示 Snapshot
           </a-checkbox>
         </div>
         <p class="step-desc">請選擇您希望安裝的 Minecraft 版本與 Server Core</p>
