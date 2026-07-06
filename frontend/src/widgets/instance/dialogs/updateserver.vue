@@ -55,7 +55,8 @@ const proxyGet = async (targetUrl: string) => {
 
 const fetchMcVersions = async () => {
   try {
-    const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
+    //const data = await proxyGet("https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json");
+    const data = await proxyGet("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
     let versions: string[] = [];
 
     if (showSnapshots.value) {
