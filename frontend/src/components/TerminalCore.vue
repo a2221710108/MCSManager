@@ -14,7 +14,7 @@ import {
 } from "@ant-design/icons-vue";
 import { Terminal } from "@xterm/xterm";
 import { message } from "ant-design-vue";
-import { onMounted, ref } from "vue";
+import { onMounted, ref, onBeforeUnmount } from "vue";
 import { encodeConsoleColor, type UseTerminalHook } from "../hooks/useTerminal";
 import { getRandomId } from "../tools/randId";
 
@@ -32,7 +32,6 @@ const emit = defineEmits<{
 
 const { containerState } = useLayoutContainerStore();
 
-// --- 靜態日誌視圖狀態 ---
 const isStaticView = ref(false);
 const staticLogContent = ref("");
 const isLogLoading = ref(false);
@@ -86,12 +85,12 @@ const initTerminal = async () => {
   throw new Error(t("TXT_CODE_42bcfe0c"));
 };
 
-// --- 公開給父組件的方法 ---
 const showLogView = (content: string, loading: boolean) => {
   isStaticView.value = true;
   staticLogContent.value = content;
   isLogLoading.value = loading;
 };
+
 const showDefaultView = () => {
   isStaticView.value = false;
 };
@@ -110,6 +109,7 @@ events.on("stopped", () => {
 events.on("error", (error: Error) => {
   socketError.value = error;
 });
+
 events.once("detail", async () => {
   try {
     const { value } = await getInstanceOutputLog().execute({
@@ -129,7 +129,6 @@ const refreshPage = () => {
   window.location.reload();
 };
 
-// ---------- 悬浮按钮（鼠标位置右侧 + 边界检查）----------
 const showFloatBtn = ref(false);
 const floatBtnPos = ref({ x: 0, y: 0 });
 const selectedText = ref("");
@@ -155,8 +154,25 @@ const handleAnalyze = () => {
   emit("analyze-log", selectedText.value);
   showFloatBtn.value = false;
   window.getSelection()?.removeAllRanges();
+  term?.clearSelection();
 };
-// ------------------------------------------------
+
+// 新增：給即時視圖 (xterm) 用的 mouseup 處理器
+const handleTerminalMouseUp = (e: MouseEvent) => {
+  if (isStaticView.value) return;
+  const selected = term?.getSelection()?.trim();
+  if (selected) {
+    let x = e.clientX + 8;
+    let y = e.clientY;
+    if (x + 70 > window.innerWidth) x = e.clientX - 70;
+    if (y < 0) y = 4;
+    floatBtnPos.value = { x, y };
+    selectedText.value = selected;
+    showFloatBtn.value = true;
+  } else {
+    showFloatBtn.value = false;
+  }
+};
 
 onMounted(async () => {
   try {
@@ -177,10 +193,24 @@ onMounted(async () => {
           originalTriggerData(data);
         };
       }
+      
+      // ★ 為即時控制台視圖綁定 mouseup 監聯，以捕捉選取文字
+      const terminalDom = document.getElementById(terminalDomId);
+      if (terminalDom) {
+        terminalDom.addEventListener("mouseup", handleTerminalMouseUp);
+      }
     }
   } catch (error: any) {
     console.error(error);
     throw error;
+  }
+});
+
+onBeforeUnmount(() => {
+  // 組件卸載時移除監聽，防止內存洩漏
+  const terminalDom = document.getElementById(terminalDomId);
+  if (terminalDom) {
+    terminalDom.removeEventListener("mouseup", handleTerminalMouseUp);
   }
 });
 </script>
@@ -272,21 +302,21 @@ onMounted(async () => {
           </div>
         </a-spin>
       </div>
-
-      <!-- 悬浮分析按钮（颜色已调整） -->
-      <div
-        v-if="showFloatBtn"
-        class="float-ai-btn"
-        :style="{ left: floatBtnPos.x + 'px', top: floatBtnPos.y + 'px' }"
-        @click.stop="handleAnalyze"
-      >
-        <RobotOutlined />
-        分析
-      </div>
-
+      
       <div class="command-input" style="visibility: hidden">
         <a-input disabled />
       </div>
+    </div>
+
+    <!-- 悬浮分析按钮：移至外層使其在即時與靜態視圖均可顯示 -->
+    <div
+      v-if="showFloatBtn"
+      class="float-ai-btn"
+      :style="{ left: floatBtnPos.x + 'px', top: floatBtnPos.y + 'px' }"
+      @click.stop="handleAnalyze"
+    >
+      <RobotOutlined />
+      分析
     </div>
 
     <!-- 錯誤卡片 -->
@@ -481,7 +511,6 @@ onMounted(async () => {
     box-shadow: 0px 0px 2px var(--color-gray-7);
   }
 }
-
 /* AI 指令按鈕樣式 */
 .ai-suffix-btn {
   background: transparent !important;
@@ -492,8 +521,7 @@ onMounted(async () => {
     color: var(--color-text-disabled) !important;
   }
 }
-
-/* 悬浮分析按钮（默认蓝色，悬停时稍暗） */
+/* 悬浮分析按钮 */
 .float-ai-btn {
   position: fixed;
   z-index: 1000;
@@ -509,7 +537,7 @@ onMounted(async () => {
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   user-select: none;
   &:hover {
-    background: #1677cc;  /* 比默认蓝色稍暗 */
+    background: #1677cc;
   }
 }
 </style>
