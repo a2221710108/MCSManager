@@ -150,14 +150,6 @@ const handleTextSelection = (event: MouseEvent) => {
   }
 };
 
-const handleAnalyze = () => {
-  emit("analyze-log", selectedText.value);
-  showFloatBtn.value = false;
-  window.getSelection()?.removeAllRanges();
-  term?.clearSelection();
-};
-
-// 新增：給即時視圖 (xterm) 用的 mouseup 處理器
 const handleTerminalMouseUp = (e: MouseEvent) => {
   if (isStaticView.value) return;
   const selected = term?.getSelection()?.trim();
@@ -172,6 +164,41 @@ const handleTerminalMouseUp = (e: MouseEvent) => {
   } else {
     showFloatBtn.value = false;
   }
+};
+
+const handleAnalyze = () => {
+  emit("analyze-log", selectedText.value);
+  showFloatBtn.value = false;
+  window.getSelection()?.removeAllRanges();
+  term?.clearSelection();
+};
+
+// ★ 新增：一鍵全選並 AI 分析 (特別適合觸屏用戶)
+const handleAnalyzeAll = () => {
+  let logText = "";
+  if (isStaticView.value) {
+    // 靜態視圖：直接取全部文字
+    logText = staticLogContent.value || "";
+  } else if (term) {
+    // xterm 視圖：全選並取得文字，然後取消選取狀態
+    term.selectAll();
+    logText = term.getSelection() || "";
+    term.clearSelection();
+  }
+  
+  // 處理空字串
+  if (!logText.trim()) {
+    message.warning("目前沒有可分析的日誌");
+    return;
+  }
+  
+  // 日誌太長時只截取最後 3000 行，避免 AI API 超時
+  const lines = logText.split(/\r?\n/);
+  if (lines.length > 3000) {
+    logText = lines.slice(-3000).join("\n");
+  }
+  
+  emit("analyze-log", logText);
 };
 
 onMounted(async () => {
@@ -194,7 +221,6 @@ onMounted(async () => {
         };
       }
       
-      // ★ 為即時控制台視圖綁定 mouseup 監聯，以捕捉選取文字
       const terminalDom = document.getElementById(terminalDomId);
       if (terminalDom) {
         terminalDom.addEventListener("mouseup", handleTerminalMouseUp);
@@ -207,7 +233,6 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  // 組件卸載時移除監聽，防止內存洩漏
   const terminalDom = document.getElementById(terminalDomId);
   if (terminalDom) {
     terminalDom.removeEventListener("mouseup", handleTerminalMouseUp);
@@ -229,6 +254,15 @@ onBeforeUnmount(() => {
                 <span>{{ t("TXT_CODE_b1e2e1b4") }}</span>
               </template>
               <delete-outlined />
+            </a-tooltip>
+          </li>
+          <!-- ★ 新增：一鍵 AI 分析按鈕，觸屏用戶也能輕鬆使用 -->
+          <li @click="handleAnalyzeAll">
+            <a-tooltip placement="top">
+              <template #title>
+                <span>AI 分析當前日誌</span>
+              </template>
+                <RobotOutlined />
             </a-tooltip>
           </li>
         </ul>
@@ -287,6 +321,19 @@ onBeforeUnmount(() => {
 
     <!-- 靜態日誌視圖 -->
     <div v-if="isStaticView" class="static-log-view-wrapper">
+      <div class="terminal-button-group position-absolute-right position-absolute-top">
+        <ul>
+          <!-- 靜態視圖也加上一鍵分析按鈕 -->
+          <li @click="handleAnalyzeAll">
+            <a-tooltip placement="top">
+              <template #title>
+                <span>AI 分析當前日誌</span>
+              </template>
+                <RobotOutlined />
+            </a-tooltip>
+          </li>
+        </ul>
+      </div>
       <div class="terminal-wrapper global-card-container-shadow">
         <a-spin :spinning="isLogLoading">
           <div
@@ -308,7 +355,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 悬浮分析按钮：移至外層使其在即時與靜態視圖均可顯示 -->
+    <!-- 悬浮分析按钮 -->
     <div
       v-if="showFloatBtn"
       class="float-ai-btn"
@@ -344,7 +391,7 @@ onBeforeUnmount(() => {
             <a href="https://news.lazycloud.one/" target="_blank">{{ $t("TXT_CODE_10cc2794") }}</a>
           </div>
         </a-typography-paragraph>
-        <a-typography-title :level="5">{{ $t("TXT_CODE_f1c96d8a") }}</a-typography-title>
+        <a-typography-title :level="5>{{ $t("TXT_CODE_f1c96d8a") }}</a-typography-title>
         <a-typography-paragraph>
           <ul>
             <li>{{ $t("TXT_CODE_ceba9262") }}</li>
