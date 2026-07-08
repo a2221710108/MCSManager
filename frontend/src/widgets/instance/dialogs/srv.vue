@@ -3,54 +3,59 @@ import { ref } from "vue";
 import { t } from "@/lang/i18n";
 import { message, Modal } from "ant-design-vue";
 import { useScreen } from "@/hooks/useScreen";
-import { 
-  GlobalOutlined, 
-  PlusOutlined, 
-  DeleteOutlined, 
-  ReloadOutlined, 
+import { useInstanceInfo } from "@/hooks/useInstance";
+import {
+  GlobalOutlined,
+  PlusOutlined,
+  DeleteOutlined,
+  ReloadOutlined,
   ExclamationCircleOutlined,
   InfoCircleOutlined,
   CopyOutlined
 } from "@ant-design/icons-vue";
 import { createVNode } from "vue";
-
 const props = defineProps<{
   daemonId: string;
   instanceId: string;
 }>();
-
 // --- 配置區 ---
-const API_ENDPOINT = "https://srv.lazycloud.one/srv"; 
+const API_ENDPOINT = "https://srv.lazycloud.one/srv";
 const DOMAIN_SUFFIX = "lazycloud.de";
 // 請確保此 Key 與 Cloudflare Worker 中的 AUTH_KEY 一致
-const AUTH_KEY = ""; 
-
+const AUTH_KEY = "";
 const open = ref(false);
 const isLoading = ref(false);
 const isAdding = ref(false);
 const srvRecords = ref<any[]>([]);
 const { isPhone } = useScreen();
-
+// 獲取實例資訊 (用來取得伺服器預設端口)
+const { instanceInfo, execute } = useInstanceInfo({
+  instanceId: props.instanceId,
+  daemonId: props.daemonId,
+  autoRefresh: false
+});
 // 表單數據
 const newSubdomain = ref("");
 const newPort = ref<number>();
-
 const openDialog = async () => {
+  // 每次打開對話框時，先獲取最新伺服器端口作為預設值
+  await execute({ params: { uuid: props.instanceId, daemonId: props.daemonId } });
+  const port = instanceInfo.value?.config?.pingConfig?.port;
+  newPort.value = port ?? undefined; // 若有端口則設為預設，否則清空
   open.value = true;
   await fetchSRVList();
 };
-
 // 請求封裝
 const apiRequest = async (method: string, body?: any) => {
   const options: RequestInit = {
     method,
     headers: {
       "Content-Type": "application/json",
-      "X-Custom-Auth": AUTH_KEY 
+      "X-Custom-Auth": AUTH_KEY
     }
   };
   if (body) options.body = JSON.stringify(body);
-  
+
   const url = `${API_ENDPOINT}?instanceId=${props.instanceId}`;
   const res = await fetch(url, options);
   if (!res.ok) {
@@ -59,7 +64,6 @@ const apiRequest = async (method: string, body?: any) => {
   }
   return res;
 };
-
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text).then(() => {
     message.success(t("已複製到剪貼簿"));
@@ -67,7 +71,6 @@ const copyToClipboard = (text: string) => {
     message.error(t("複製失敗"));
   });
 };
-
 // 獲取 SRV 列表
 const fetchSRVList = async () => {
   try {
@@ -80,17 +83,14 @@ const fetchSRVList = async () => {
     isLoading.value = false;
   }
 };
-
 // 添加 SRV 記錄
 const handleAddSRV = async () => {
   if (!newSubdomain.value || !newPort.value) {
     return message.warning(t("請填寫完整的子域名與端口"));
   }
-
   if (!/^[a-zA-Z0-9-]+$/.test(newSubdomain.value)) {
     return message.error(t("子域名格式不正確（僅限字母數字）"));
   }
-
   try {
     isAdding.value = true;
     await apiRequest("POST", {
@@ -107,7 +107,6 @@ const handleAddSRV = async () => {
     isAdding.value = false;
   }
 };
-
 // 刪除 SRV 記錄
 const handleDelete = (record: any) => {
   Modal.confirm({
@@ -131,10 +130,8 @@ const handleDelete = (record: any) => {
     }
   });
 };
-
 defineExpose({ openDialog });
 </script>
-
 <template>
   <a-modal
     v-model:open="open"
@@ -148,33 +145,31 @@ defineExpose({ openDialog });
       <a-typography-paragraph type="secondary" class="desc-text">
         {{ t("您可以自定義一個子域名，讓玩家無需輸入端口即可加入 Minecraft Java 伺服器。請輸入您被分配的端口。") }}
       </a-typography-paragraph>
-
       <div class="config-card">
         <div class="section-title">{{ t("新增解析記錄") }}</div>
         <div class="input-row">
-          <a-input 
-            v-model:value="newSubdomain" 
-            :placeholder="t('子域名')" 
+          <a-input
+            v-model:value="newSubdomain"
+            :placeholder="t('子域名')"
             class="input-subdomain"
           >
             <template #addonAfter>.{{ DOMAIN_SUFFIX }}</template>
           </a-input>
-          
-          <a-input-number 
-            v-model:value="newPort" 
-            :placeholder="t('端口')" 
+
+          <a-input-number
+            v-model:value="newPort"
+            :placeholder="t('端口')"
             class="input-port"
-            :min="1" 
-            :max="65535" 
+            :min="1"
+            :max="65535"
           />
-          
+
           <a-button type="primary" :loading="isAdding" @click="handleAddSRV" class="btn-add">
             <template #icon><PlusOutlined /></template>
             {{ t("綁定") }}
           </a-button>
         </div>
       </div>
-
       <div class="list-container">
         <div class="list-header">
           <span class="list-title">{{ t("我的綁定列表") }}</span>
@@ -182,10 +177,9 @@ defineExpose({ openDialog });
     <template #icon><ReloadOutlined /></template>
   </a-button>
         </div>
-
-        <a-list 
-          :loading="isLoading" 
-          :data-source="srvRecords" 
+        <a-list
+          :loading="isLoading"
+          :data-source="srvRecords"
           item-layout="horizontal"
           :locale="{ emptyText: t('目前尚未建立任何域名') }"
         >
@@ -200,10 +194,10 @@ defineExpose({ openDialog });
                 <template #title>
                   <div class="domain-title-wrapper">
                     <span class="domain-text">{{ item.subdomain }}.{{ DOMAIN_SUFFIX }}</span>
-                    <a-button 
-                      type="link" 
-                      size="small" 
-                      class="copy-btn" 
+                    <a-button
+                      type="link"
+                      size="small"
+                      class="copy-btn"
                       @click="copyToClipboard(`${item.subdomain}.${DOMAIN_SUFFIX}`)"
                     >
                       <template #icon><CopyOutlined /></template>
@@ -227,21 +221,18 @@ defineExpose({ openDialog });
     </div>
   </a-modal>
 </template>
-
 <style scoped>
 /* 基礎佈局與文字 */
-.srv-manager-wrapper { 
-  padding: 4px; 
-  color: var(--text-color); 
+.srv-manager-wrapper {
+  padding: 4px;
+  color: var(--text-color);
 }
-
-.desc-text { 
-  margin-bottom: 20px; 
-  font-size: 14px; 
-  opacity: 0.65; 
+.desc-text {
+  margin-bottom: 20px;
+  font-size: 14px;
+  opacity: 0.65;
   color: inherit !important;
 }
-
 /* --- 配置卡片 --- */
 .config-card {
   background: rgba(128, 128, 128, 0.08);
@@ -249,39 +240,33 @@ defineExpose({ openDialog });
   border-radius: 12px;
   margin-bottom: 24px;
 }
-
-.section-title { 
-  font-size: 12px; 
-  font-weight: bold; 
-  margin-bottom: 12px; 
-  opacity: 0.6; 
+.section-title {
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  opacity: 0.6;
 }
-
-.input-row { 
-  display: flex; 
-  gap: 8px; 
+.input-row {
+  display: flex;
+  gap: 8px;
   align-items: stretch;
 }
-
 .input-subdomain { flex: 3; }
-.input-port { 
-  flex: 1.5; 
+.input-port {
+  flex: 1.5;
   display: flex;
   align-items: center;
 }
-
 :deep(.ant-input-number-input) {
   height: 32px;
 }
-
 /* --- 列表區域 --- */
 .list-container {
-  max-height: 480px; 
+  max-height: 480px;
   overflow-y: auto;
   padding: 4px 8px 32px 8px; /* 底部緩衝確保邊框完整 */
   margin-top: 8px;
 }
-
 /* 還原列表標題樣式 */
 .list-header {
   display: flex;
@@ -289,28 +274,24 @@ defineExpose({ openDialog });
   align-items: center;
   margin-bottom: 12px;
 }
-.list-title { 
-  font-weight: 600; 
-  font-size: 14px; 
+.list-title {
+  font-weight: 600;
+  font-size: 14px;
 }
-
 /* 隱藏重新整理按鈕，但保留 DOM 結構以維持邏輯調用（或直接在 Template 刪除） */
 .refresh-btn {
   display: none !important;
 }
-
 /* --- 項目樣式 (srv-item) --- */
 :deep(.ant-list-items) {
   overflow: visible !important;
 }
-
 :deep(.ant-list-item) {
   border: none !important;
   border-bottom: none !important;
   padding: 0 !important;
   margin-bottom: 12px;
 }
-
 .srv-item {
   background: rgba(128, 128, 128, 0.05);
   border: 1px solid rgba(128, 128, 128, 0.15) !important;
@@ -322,25 +303,21 @@ defineExpose({ openDialog });
   box-sizing: border-box !important;
   overflow: visible !important;
 }
-
 .srv-item:hover {
   border-color: #1890ff !important;
   background: rgba(24, 144, 255, 0.05);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
-
 /* --- 內容與複製按鈕 --- */
-.domain-title-wrapper { 
-  display: flex; 
-  align-items: center; 
-  gap: 6px; 
+.domain-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-
-.domain-text { 
-  font-weight: bold; 
-  color: var(--text-color); 
+.domain-text {
+  font-weight: bold;
+  color: var(--text-color);
 }
-
 .copy-btn {
   padding: 0;
   height: auto;
@@ -349,7 +326,6 @@ defineExpose({ openDialog });
   color: #1890ff;
   opacity: 0.6;
 }
-
 .domain-icon {
   width: 36px;
   height: 36px;
@@ -360,32 +336,27 @@ defineExpose({ openDialog });
   align-items: center;
   justify-content: center;
 }
-
-.target-text { 
-  font-size: 12px; 
-  opacity: 0.6; 
-  color: var(--text-color); 
+.target-text {
+  font-size: 12px;
+  opacity: 0.6;
+  color: var(--text-color);
 }
-
 /* --- 移動端適配 --- */
 @media (max-width: 576px) {
-  .input-row { 
-    flex-direction: column; 
+  .input-row {
+    flex-direction: column;
     gap: 12px;
   }
   .btn-add { width: 100%; }
-
   /* 移動端隱藏複製按鈕 */
   .copy-btn {
     display: none !important;
   }
-
-  .list-container { 
+  .list-container {
     max-height: 380px;
-    padding-bottom: 40px; 
+    padding-bottom: 40px;
   }
 }
-
 /* 滾動條 */
 .list-container::-webkit-scrollbar {
   width: 4px;
