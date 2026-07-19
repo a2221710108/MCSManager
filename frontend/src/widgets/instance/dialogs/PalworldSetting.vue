@@ -23,14 +23,12 @@ const isLoading = ref(false);
 const isSaving = ref(false);
 const activeTab = ref("server");
 
-// 修正 1: 確認檔案正確路徑
 const CONFIG_DIR = "LazyCloudGameServer/Pal/Saved/Config/LinuxServer/";
 const CONFIG_FILE_PATH = `${CONFIG_DIR}PalWorldSettings.ini`;
 
 const formData = ref<Record<string, any>>({});
 const rawSettings = ref<Record<string, string>>({});
 
-// 引入讀取與上傳 API
 const { execute: fetchFileContent } = fileContent();
 const { execute: getUploadMissionCfg } = uploadAddress();
 
@@ -41,7 +39,8 @@ interface ConfigField {
   type: "string" | "number" | "boolean" | "select";
   options?: { value: string; label: string }[];
   description?: string;
-  span?: number; // 佈局寬度 1-24
+  span?: number; 
+  disabled?: boolean; // 新增：是否禁用
 }
 
 interface ConfigTab {
@@ -60,8 +59,10 @@ const configTabs = ref<ConfigTab[]>([
       { name: "ServerPassword", display: "伺服器密碼", type: "string", description: "進入伺服器所需的密碼", span: 12 },
       { name: "AdminPassword", display: "管理員密碼", type: "string", description: "伺服器管理員密碼", span: 12 },
       { name: "ServerPlayerMaxNum", display: "最大玩家數量", type: "number", description: "伺服器可容納的最大玩家數量 (1-32)", span: 12 },
-      { name: "PublicPort", display: "公共端口", type: "number", description: "伺服器對外開放的端口號 (1024-65535)", span: 12 },
-      { name: "PublicIP", display: "公共IP地址", type: "string", description: "伺服器的公共IP地址", span: 12 },
+      // 修正 1: 加入 disabled: true
+      { name: "PublicPort", display: "公共端口", type: "number", description: "伺服器對外開放的端口號 (1024-65535)", span: 12, disabled: true },
+      // 修正 1: 加入 disabled: true
+      { name: "PublicIP", display: "公共IP地址", type: "string", description: "伺服器的公共IP地址", span: 12, disabled: true },
       { name: "Region", display: "伺服器區域", type: "string", description: "伺服器所在區域", span: 12 },
     ]
   },
@@ -265,7 +266,7 @@ const loadConfig = async () => {
   }
 };
 
-// ---------- 檔案保存 (透過上傳 API 覆蓋) ----------
+// ---------- 檔案保存 ----------
 const saveConfig = async () => {
   isSaving.value = true;
   try {
@@ -281,14 +282,12 @@ const saveConfig = async () => {
 
     const newContent = `[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(${fieldsStr})\n`;
 
-    // 將字串轉換為實體檔案
     const blob = new Blob([newContent], { type: "text/plain" });
     const file = new File([blob], "PalWorldSettings.ini");
 
-    // 獲取上傳憑證，指定上傳目錄
     const mission = await getUploadMissionCfg({
       params: {
-        upload_dir: CONFIG_DIR, // 使用正確的目標目錄
+        upload_dir: CONFIG_DIR,
         daemonId: props.daemonId!,
         uuid: props.instanceId!,
         file_name: file.name
@@ -298,19 +297,17 @@ const saveConfig = async () => {
     const config = mission.value;
     if (!config?.addr) throw new Error("獲取上傳憑證失敗");
 
-    // 執行上傳覆蓋
     await new Promise<void>((resolve, reject) => {
       uploadService.append(
         file,
         parseForwardAddress(config.addr, "http"),
         config.password,
-        { overwrite: true }, // 指定覆蓋
+        { overwrite: true },
         (task) => {
           task.instanceInfo = { instanceId: props.instanceId!, daemonId: props.daemonId! };
         }
       );
       
-      // 監聽上傳狀態
       const unwatch = watch(() => uploadService.uiData.value.current, (curr) => {
         if (!curr) {
           unwatch();
@@ -382,7 +379,8 @@ defineExpose({ openDialog });
                     <a-input-number 
                       v-if="field.type === 'number'" 
                       v-model:value="formData[field.name]" 
-                      style="width: 100%" 
+                      style="width: 100%"
+                      :disabled="field.disabled" 
                     />
                     <!-- 布林值 -->
                     <a-switch 
@@ -411,13 +409,15 @@ defineExpose({ openDialog });
                       v-model:value="formData[field.name]" 
                       :rows="2" 
                       style="width: 100%"
+                      :disabled="field.disabled"
                     />
                     <!-- 單行文字 -->
                     <a-input 
                       v-else 
                       v-model:value="formData[field.name]" 
                       style="width: 100%" 
-                      allow-clear 
+                      allow-clear
+                      :disabled="field.disabled" 
                     />
                   </a-form-item>
                 </a-col>
@@ -454,30 +454,43 @@ defineExpose({ openDialog });
 .config-form {
   padding: 8px 4px;
   
-  /* 修正 2: 強制對齊輸入框長度 */
+  /* 修正 2: 強制各種輸入元件長寬高與置中完美對齊 */
   :deep(.ant-form-item) {
     margin-bottom: 16px;
   }
   
   :deep(.ant-form-item-control-input) {
-    min-height: 38px; // 統一元件高度
+    min-height: 38px;
   }
   
-  :deep(.ant-input-number),
+  /* 統一基本高度 */
   :deep(.ant-input),
-  :deep(.ant-select) {
-    width: 100% !important;
-  }
-  
-  :deep(.ant-select-selector) {
+  :deep(.ant-input-number),
+  :deep(.ant-select .ant-select-selector) {
     height: 38px !important;
-    border-radius: 4px !important;
+    border-radius: 6px !important; /* 統一圓角 */
   }
-  
-  :deep(.ant-select-selection-item) {
+
+  /* 統一內部文字置中對齊 */
+  :deep(.ant-select-selection-item),
+  :deep(.ant-select-selection-placeholder) {
     line-height: 36px !important;
   }
 
+  :deep(.ant-input-number-input) {
+    height: 36px !important;
+  }
+
+  /* 針對可能出現的密碼輸入框 icon 對齊 */
+  :deep(.ant-input-affix-wrapper) {
+    height: 38px !important;
+    border-radius: 6px !important;
+  }
+
+  :deep(.ant-input-password-icon) {
+    line-height: 38px !important;
+  }
+  
   :deep(.ant-form-item-extra) {
     margin-top: 2px;
     color: rgba(128, 128, 128, 0.7);
