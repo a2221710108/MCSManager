@@ -53,7 +53,7 @@ import modloaderinstall from "./dialogs/modloaderinstall.vue";
 import chart from "./dialogs/chart.vue";
 import updateserver from "./dialogs/updateserver.vue";
 import respack from "./dialogs/respack.vue";
-import palsetting from "./dialogs/Palworldsetting.vue";
+import palsetting from "./dialogs/PalworldSetting.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
