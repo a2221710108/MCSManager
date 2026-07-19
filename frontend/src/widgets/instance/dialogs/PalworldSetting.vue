@@ -2,7 +2,6 @@
 import { ref, computed, watch } from "vue";
 import { t } from "@/lang/i18n";
 import type { InstanceDetail } from "@/types";
-// 引入 UseTerminalHook (路徑請根據你實際的專案結構調整，如果路徑不對可修改 @/hooks/useTerminal)
 import type { UseTerminalHook } from "../../../hooks/useTerminal"; 
 import { message } from "ant-design-vue";
 import { fileContent, uploadAddress } from "@/services/apis/fileManager";
@@ -18,7 +17,7 @@ const props = defineProps<{
   instanceInfo?: InstanceDetail;
   instanceId?: string;
   daemonId?: string;
-  useTerminalHook?: UseTerminalHook; // 加入這行，接收 Hook
+  useTerminalHook?: UseTerminalHook;
 }>();
 
 const open = ref(false);
@@ -29,8 +28,16 @@ const activeTab = ref("server");
 const CONFIG_DIR = "LazyCloudGameServer/Pal/Saved/Config/LinuxServer/";
 const CONFIG_FILE_PATH = `${CONFIG_DIR}PalWorldSettings.ini`;
 
+// 修正：settings.sh 位於根目錄
+const SH_FILE_PATH = "settings.sh";
+const SH_UPLOAD_DIR = "/";
+
 const formData = ref<Record<string, any>>({});
 const rawSettings = ref<Record<string, string>>({});
+
+// settings.sh 狀態
+const settingsShContent = ref<string>("");
+const publicLobbyEnabled = ref<boolean>(false);
 
 const { execute: fetchFileContent } = fileContent();
 const { execute: getUploadMissionCfg } = uploadAddress();
@@ -230,6 +237,7 @@ const formatValue = (field: ConfigField, value: any) => {
 const loadConfig = async () => {
   isLoading.value = true;
   try {
+    // 1. 獲取 PalWorldSettings.ini
     const res: any = await fetchFileContent({
       params: { daemonId: props.daemonId ?? "", uuid: props.instanceId ?? "" },
       data: { target: CONFIG_FILE_PATH }
@@ -247,7 +255,6 @@ const loadConfig = async () => {
     const match = rawText.match(/OptionSettings=\((.*)\)/s);
     if (match && match[1]) {
       rawSettings.value = parseOptionSettings(match[1]);
-      
       const uiData: Record<string, any> = {};
       allFields.value.forEach(field => {
         if (rawSettings.value[field.name] !== undefined) {
@@ -255,10 +262,28 @@ const loadConfig = async () => {
         }
       });
       formData.value = uiData;
-      message.success(t("配置檔案讀取成功"));
     } else {
       message.error(t("無法解析 PalWorldSettings.ini 格式"));
     }
+
+    // 2. 獲取 settings.sh (根目錄)
+    try {
+      const resSh: any = await fetchFileContent({
+        params: { daemonId: props.daemonId ?? "", uuid: props.instanceId ?? "" },
+        data: { target: SH_FILE_PATH }
+      });
+      let shRawText = "";
+      if (typeof resSh === "string") shRawText = resSh;
+      else if (resSh && typeof resSh === "object") shRawText = resSh._value || resSh.value || resSh.data || resSh.content || "";
+      settingsShContent.value = shRawText;
+      publicLobbyEnabled.value = shRawText.includes("-publiclobby");
+    } catch (err) {
+      console.error("Read settings.sh error:", err);
+      settingsShContent.value = "";
+      publicLobbyEnabled.value = false;
+    }
+
+    message.success(t("配置檔案讀取成功"));
   } catch (err) {
     console.error("Load config error:", err);
     message.error(t("讀取配置檔案失敗"));
@@ -271,6 +296,7 @@ const loadConfig = async () => {
 const saveConfig = async () => {
   isSaving.value = true;
   try {
+    // 1. 處理 PalWorldSettings.ini
     allFields.value.forEach(field => {
       if (formData.value[field.name] !== undefined) {
         rawSettings.value[field.name] = formatValue(field, formData.value[field.name]);
@@ -287,35 +313,52 @@ const saveConfig = async () => {
     const file = new File([blob], "PalWorldSettings.ini");
 
     const mission = await getUploadMissionCfg({
-      params: {
-        upload_dir: CONFIG_DIR,
-        daemonId: props.daemonId!,
-        uuid: props.instanceId!,
-        file_name: file.name
-      }
+      params: { upload_dir: CONFIG_DIR, daemonId: props.daemonId!, uuid: props.instanceId!, file_name: file.name }
     });
-
     const config = mission.value;
     if (!config?.addr) throw new Error("獲取上傳憑證失敗");
 
-    await new Promise<void>((resolve, reject) => {
-      uploadService.append(
-        file,
-        parseForwardAddress(config.addr, "http"),
-        config.password,
-        { overwrite: true },
-        (task) => {
-          task.instanceInfo = { instanceId: props.instanceId!, daemonId: props.daemonId! };
-        }
-      );
-      
+    await new Promise<void>((resolve) => {
+      uploadService.append(file, parseForwardAddress(config.addr, "http"), config.password, { overwrite: true }, (task) => {
+        task.instanceInfo = { instanceId: props.instanceId!, daemonId: props.daemonId! };
+      });
       const unwatch = watch(() => uploadService.uiData.value.current, (curr) => {
-        if (!curr) {
-          unwatch();
-          resolve();
-        }
+        if (!curr) { unwatch(); resolve(); }
       });
     });
+
+    // 2. 處理 settings.sh (-publiclobby)
+    let newShContent = settingsShContent.value;
+    const hasFlag = newShContent.includes("-publiclobby");
+    if (publicLobbyEnabled.value && !hasFlag) {
+      // 加入前確保末尾沒有過多空白，並以一個空格分隔
+      newShContent = newShContent.replace(/\s*$/, "") + " -publiclobby";
+    } else if (!publicLobbyEnabled.value && hasFlag) {
+      // 移除時連同前面的空格一起移除
+      newShContent = newShContent.replace(/\s*-publiclobby/g, "");
+    }
+
+    // 如果 settings.sh 有變動，則上傳至根目錄
+    if (newShContent !== settingsShContent.value) {
+      const shBlob = new Blob([newShContent], { type: "text/plain" });
+      const shFile = new File([shBlob], "settings.sh");
+      
+      const shMission = await getUploadMissionCfg({
+        params: { upload_dir: SH_UPLOAD_DIR, daemonId: props.daemonId!, uuid: props.instanceId!, file_name: "settings.sh" }
+      });
+      const shConfig = shMission.value;
+      if (!shConfig?.addr) throw new Error("獲取 settings.sh 上傳憑證失敗");
+
+      await new Promise<void>((resolve) => {
+        uploadService.append(shFile, parseForwardAddress(shConfig.addr, "http"), shConfig.password, { overwrite: true }, (task) => {
+          task.instanceInfo = { instanceId: props.instanceId!, daemonId: props.daemonId! };
+        });
+        const unwatchSh = watch(() => uploadService.uiData.value.current, (curr) => {
+          if (!curr) { unwatchSh(); resolve(); }
+        });
+      });
+      settingsShContent.value = newShContent;
+    }
 
     message.success(t("配置已成功儲存！"));
   } catch (err: any) {
@@ -327,14 +370,10 @@ const saveConfig = async () => {
 };
 
 const openDialog = () => {
-  // 檢查伺服器狀態 (優先使用 useTerminalHook，如果沒有傳入則檢查 instanceInfo 的 status 是否不等於 0)
-  // MCSManager 的 status: -1(未知), 0(停止), 1(停止中), 2(啟動中), 3(運行中)
   const isRunning = props.useTerminalHook?.isRunning.value ?? (props.instanceInfo && (props.instanceInfo as any).status !== 0);
-  
   if (isRunning) {
     return message.error(t("伺服器正在運行中，請先完全關閉伺服器後再打開配置檔案進行修改！"));
   }
-  
   open.value = true;
   activeTab.value = "server";
   loadConfig();
@@ -384,21 +423,18 @@ defineExpose({ openDialog });
                     :name="field.name"
                     :extra="field.description"
                   >
-                    <!-- 數字 -->
                     <a-input-number 
                       v-if="field.type === 'number'" 
                       v-model:value="formData[field.name]" 
                       style="width: 100%"
                       :disabled="field.disabled" 
                     />
-                    <!-- 布林值 -->
                     <a-switch 
                       v-else-if="field.type === 'boolean'" 
                       v-model:checked="formData[field.name]" 
                       :checked-children="'True'" 
                       :un-checked-children="'False'" 
                     />
-                    <!-- 下拉選單 -->
                     <a-select 
                       v-else-if="field.type === 'select'" 
                       v-model:value="formData[field.name]"
@@ -412,7 +448,6 @@ defineExpose({ openDialog });
                         {{ opt.label }}
                       </a-select-option>
                     </a-select>
-                    <!-- 多行文字 (描述) -->
                     <a-textarea 
                       v-else-if="field.type === 'string' && field.span === 24" 
                       v-model:value="formData[field.name]" 
@@ -420,7 +455,6 @@ defineExpose({ openDialog });
                       style="width: 100%"
                       :disabled="field.disabled"
                     />
-                    <!-- 單行文字 -->
                     <a-input 
                       v-else 
                       v-model:value="formData[field.name]" 
@@ -431,6 +465,23 @@ defineExpose({ openDialog });
                   </a-form-item>
                 </a-col>
               </a-row>
+              
+              <!-- 第一個分頁專屬：可被搜索開關 -->
+              <a-row :gutter="16" v-if="tab.key === 'server'">
+                <a-col :span="12">
+                  <a-form-item 
+                    label="可被搜索" 
+                    :extra="t('開啟後可以在大廳搜索到您的伺服器，開啟後必須填寫伺服器名稱')"
+                  >
+                    <a-switch 
+                      v-model:checked="publicLobbyEnabled" 
+                      :checked-children="'開啟'" 
+                      :un-checked-children="'關閉'" 
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+
             </a-form>
           </a-tab-pane>
         </a-tabs>
@@ -463,7 +514,7 @@ defineExpose({ openDialog });
 .config-form {
   padding: 8px 4px;
   
-  /* 統一各個元件的高度與圓角 */
+  /* 徹底修正輸入框錯位問題 */
   :deep(.ant-form-item) {
     margin-bottom: 16px;
   }
@@ -473,28 +524,40 @@ defineExpose({ openDialog });
   }
   
   :deep(.ant-input),
-  :deep(.ant-input-number),
-  :deep(.ant-select .ant-select-selector) {
-    height: 38px !important;
-    border-radius: 6px !important;
-  }
-
-  :deep(.ant-select-selection-item),
-  :deep(.ant-select-selection-placeholder) {
-    line-height: 36px !important;
-  }
-
-  :deep(.ant-input-number-input) {
-    height: 36px !important;
-  }
-
   :deep(.ant-input-affix-wrapper) {
     height: 38px !important;
     border-radius: 6px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    display: flex;
+    align-items: center;
+  }
+  
+  :deep(.ant-input-affix-wrapper > input.ant-input) {
+    height: auto !important;
+    padding: 0 !important;
   }
 
-  :deep(.ant-input-password-icon) {
+  :deep(.ant-input-number) {
+    height: 38px !important;
+    border-radius: 6px !important;
     line-height: 38px !important;
+  }
+
+  :deep(.ant-input-number-input) {
+    height: 38px !important;
+    line-height: 38px !important;
+  }
+
+  :deep(.ant-select .ant-select-selector) {
+    height: 38px !important;
+    border-radius: 6px !important;
+    align-items: center;
+  }
+
+  :deep(.ant-select-single .ant-select-selector .ant-select-selection-item),
+  :deep(.ant-select-single .ant-select-selector .ant-select-selection-placeholder) {
+    line-height: 36px !important;
   }
   
   :deep(.ant-form-item-extra) {
