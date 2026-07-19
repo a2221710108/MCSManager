@@ -141,7 +141,7 @@ const categorizedBtns = computed(() => {
           condition: () => state.settings.canFileManager || isAdmin.value
         },
         {
-          title: t("Palworld 配置"),
+          title: t("Palworld 倍率及進階設定"),
           icon: UsergroupDeleteOutlined,
           click: async () => {
             if (!terminalHook.isConnect.value) {
