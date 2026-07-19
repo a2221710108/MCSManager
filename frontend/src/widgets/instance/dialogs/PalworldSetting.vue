@@ -39,6 +39,9 @@ const publicLobbyEnabled = ref<boolean>(false);
 const { execute: fetchFileContent } = fileContent();
 const { execute: getUploadMissionCfg } = uploadAddress();
 
+// 冷卻工具函數
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // ---------- 配置 Schema 定義 ----------
 interface ConfigField {
   name: string;
@@ -329,6 +332,8 @@ const loadConfig = async () => {
       message.error(t("無法解析 PalWorldSettings.ini 格式"));
     }
 
+    // 讀取 settings.sh 前冷卻 1 秒
+    await sleep(1000);
     try {
       const resSh: any = await fetchFileContent({
         params: { daemonId: props.daemonId ?? "", uuid: props.instanceId ?? "" },
@@ -403,6 +408,8 @@ const saveConfig = async () => {
     }
 
     if (newShContent !== settingsShContent.value) {
+      // 寫入 settings.sh 前冷卻 1 秒
+      await sleep(1000);
       await uploadFileContent(SH_UPLOAD_DIR, "settings.sh", newShContent);
       settingsShContent.value = newShContent;
     }
@@ -420,7 +427,6 @@ const saveConfig = async () => {
 const resetConfig = async () => {
   isSaving.value = true;
   try {
-    // 寫入空的 OptionSettings=()
     const resetContent = `[/Script/Pal.PalGameWorldSettings]\nOptionSettings=()\n`;
     
     Modal.confirm({
@@ -433,7 +439,7 @@ const resetConfig = async () => {
         try {
           await uploadFileContent(CONFIG_DIR, "PalWorldSettings.ini", resetContent);
           message.success(t("已恢復預設值！"));
-          await loadConfig(); // 重新讀取介面
+          await loadConfig();
         } catch (err: any) {
           message.error(t("恢復預設失敗: ") + err.message);
         } finally {
@@ -451,7 +457,6 @@ const resetConfig = async () => {
 };
 
 const openDialog = () => {
-  // 修正 1: 直接讀取 instanceInfo 的 status (0 = 停止, >0 = 運行/忙碌中)
   const status = props.instanceInfo?.status ?? 0;
   if (status > 0) {
     return message.error(t("伺服器正在運行中，請先完全關閉伺服器後再打開配置檔案進行修改！"));
@@ -482,7 +487,6 @@ defineExpose({ openDialog });
         <a-button type="link" size="small" :loading="isLoading" @click="loadConfig">
           <template #icon><ReloadOutlined /></template> {{ t("重新讀取") }}
         </a-button>
-        <!-- 新增：重置預設按鈕 -->
         <a-button danger type="link" size="small" :loading="isSaving" @click="resetConfig">
           <template #icon><UndoOutlined /></template> {{ t("重置預設") }}
         </a-button>
@@ -615,7 +619,6 @@ defineExpose({ openDialog });
     min-height: 38px;
   }
   
-  /* 徹底修正輸入框錯位問題 */
   :deep(.ant-input:not(textarea)),
   :deep(.ant-input-affix-wrapper) {
     height: 38px !important;
@@ -626,7 +629,6 @@ defineExpose({ openDialog });
     align-items: center;
   }
 
-  /* 針對 Textarea 確保高度自適應並置頂 */
   :deep(textarea.ant-input) {
     border-radius: 6px !important;
     padding: 8px 11px !important;
