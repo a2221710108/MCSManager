@@ -2,22 +2,22 @@
 import { ref, computed, watch } from "vue";
 import { t } from "@/lang/i18n";
 import type { InstanceDetail } from "@/types";
-import type { UseTerminalHook } from "../../../hooks/useTerminal"; 
-import { message } from "ant-design-vue";
+import { message, Modal } from "ant-design-vue";
 import { fileContent, uploadAddress } from "@/services/apis/fileManager";
 import uploadService from "@/services/uploadService";
 import { parseForwardAddress } from "@/tools/protocol";
 import {
   SaveOutlined,
   ReloadOutlined,
-  SettingOutlined
+  SettingOutlined,
+  UndoOutlined
 } from "@ant-design/icons-vue";
 
 const props = defineProps<{
   instanceInfo?: InstanceDetail;
   instanceId?: string;
   daemonId?: string;
-  useTerminalHook?: UseTerminalHook;
+  useTerminalHook?: any;
 }>();
 
 const open = ref(false);
@@ -43,7 +43,7 @@ const { execute: getUploadMissionCfg } = uploadAddress();
 interface ConfigField {
   name: string;
   display: string;
-  type: "string" | "number" | "boolean" | "select" | "tuple"; // 新增 tuple 類型處理元組
+  type: "string" | "number" | "boolean" | "select" | "tuple";
   options?: { value: string; label: string }[];
   description?: string;
   span?: number; 
@@ -69,8 +69,6 @@ const configTabs = ref<ConfigTab[]>([
       { name: "PublicPort", display: "公共端口", type: "number", description: "伺服器對外開放的端口號 (1024-65535)", span: 12, disabled: true },
       { name: "PublicIP", display: "公共IP地址", type: "string", description: "伺服器的公共IP地址", span: 12, disabled: true },
       { name: "Region", display: "伺服器區域", type: "string", description: "伺服器所在區域", span: 12 },
-      
-      // 新增：聊天與存檔
       { name: "bShowPlayerList", display: "顯示玩家列表", type: "boolean", description: "是否允許玩家查看在線列表", span: 12 },
       { name: "bIsShowJoinLeftMessage", display: "加入/離開訊息", type: "boolean", description: "是否顯示玩家加入或離開的訊息", span: 12 },
       { name: "ChatPostLimitPerMinute", display: "聊天頻率限制", type: "number", description: "每分鐘允許發送的聊天訊息數量", span: 12 },
@@ -89,8 +87,6 @@ const configTabs = ref<ConfigTab[]>([
       ], span: 12},
       { name: "DayTimeSpeedRate", display: "白天時間加速率", type: "number", description: "控制遊戲中日夜循環的速度 (0.1-5)", span: 12 },
       { name: "NightTimeSpeedRate", display: "夜晚時間加速率", type: "number", description: "控制夜晚時間流逝速度 (0.1-5)", span: 12 },
-      
-      // 新增：隨機化與硬核
       { name: "RandomizerType", display: "隨機化類型", type: "string", description: "帕魯隨機化生成的類型 (None 或其他)", span: 12 },
       { name: "RandomizerSeed", display: "隨機化種子", type: "string", description: "隨機化生成所使用的種子碼", span: 12 },
       { name: "bIsRandomizerPalLevelRandom", display: "隨機帕魯等級", type: "boolean", description: "隨機化模式下帕魯等級是否隨機", span: 12 },
@@ -98,7 +94,6 @@ const configTabs = ref<ConfigTab[]>([
       { name: "bPalLost", display: "帕魯丟失", type: "boolean", description: "硬核模式下帕魯是否會丟失", span: 12 },
       { name: "bCharacterRecreateInHardcore", display: "硬核重生限制", type: "boolean", description: "硬核模式下是否限制角色重建", span: 12 },
       { name: "EnablePredatorBossPal", display: "啟用掠食者頭目", type: "boolean", description: "是否啟用掠食者帕魯的生成", span: 12 },
-      
       { name: "bIsMultiplay", display: "多人遊戲模式", type: "boolean", description: "是否啟用多人遊戲模式", span: 12 },
       { name: "bIsPvP", display: "PVP模式", type: "boolean", description: "是否啟用PVP模式", span: 12 },
       { name: "bEnablePlayerToPlayerDamage", display: "啟用玩家PVP傷害", type: "boolean", description: "是否允許玩家之間造成傷害", span: 12 },
@@ -106,8 +101,6 @@ const configTabs = ref<ConfigTab[]>([
       { name: "DeathPenalty", display: "死亡懲罰", type: "select", description: "玩家死亡時的懲罰類型", options: [
         { value: "None", label: "無懲罰" }, { value: "Item", label: "掉落物品" }, { value: "ItemAndEquipment", label: "掉落物品和裝備" }, { value: "All", label: "掉落所有物品" }
       ], span: 12},
-
-      // 新增：世界細節
       { name: "SupplyDropSpan", display: "空投間隔", type: "number", description: "空投物資的生成間隔時間 (分鐘)", span: 12 },
       { name: "bInvisibleOtherGuildBaseCampAreaFX", display: "隱藏他公會據點特效", type: "boolean", description: "是否隱藏其他公會據點的範圍特效", span: 12 },
       { name: "bBuildAreaLimit", display: "建造區域限制", type: "boolean", description: "是否限制建造區域", span: 12 },
@@ -122,8 +115,6 @@ const configTabs = ref<ConfigTab[]>([
       { name: "PalSpawnNumRate", display: "帕魯出現數量倍率", type: "number", description: "野生帕魯的刷新數量倍率 (0.5-3)", span: 12 },
       { name: "PalEggDefaultHatchingTime", display: "帕魯蛋孵化時間", type: "number", description: "帕魯蛋孵化所需的預設時間(小時) (0-9999)", span: 12 },
       { name: "WorkSpeedRate", display: "工作速度倍率", type: "number", description: "帕魯工作效率的倍率 (0.1-5)", span: 12 },
-      
-      // 新增：農場與帕魯盒子
       { name: "MonsterFarmActionSpeedRate", display: "農場工作速度", type: "number", description: "帕魯在農場的工作速度倍率", span: 12 },
       { name: "bAllowGlobalPalboxExport", display: "允許匯出帕魯", type: "boolean", description: "是否允許將帕魯匯出至全域盒子", span: 12 },
       { name: "bAllowGlobalPalboxImport", display: "允許匯入帕魯", type: "boolean", description: "是否允許從全域盒子匯入帕魯", span: 12 },
@@ -145,8 +136,6 @@ const configTabs = ref<ConfigTab[]>([
       { name: "PalStaminaDecreaceRate", display: "帕魯體力消耗倍率", type: "number", description: "帕魯體力消耗速度 (0.1-5)", span: 12 },
       { name: "PalAutoHPRegeneRate", display: "帕魯生命自動恢復倍率", type: "number", description: "帕魯生命值自動恢復速度 (0.1-5)", span: 12 },
       { name: "PalAutoHpRegeneRateInSleep", display: "帕魯睡眠時生命恢復倍率", type: "number", description: "帕魯睡覺時生命值恢復速度 (0.1-5)", span: 12 },
-      
-      // 新增：裝備與屬性強化
       { name: "ItemWeightRate", display: "物品重量倍率", type: "number", description: "玩家可攜帶物品的重量倍率", span: 12 },
       { name: "EquipmentDurabilityDamageRate", display: "裝備耐久損壞率", type: "number", description: "裝備耐久度消耗的倍率", span: 12 },
       { name: "ItemCorruptionMultiplier", display: "物品腐敗倍率", type: "number", description: "物品腐敗速度的倍率", span: 12 },
@@ -155,8 +144,6 @@ const configTabs = ref<ConfigTab[]>([
       { name: "bAllowEnhanceStat_Stamina", display: "允許強化體力", type: "boolean", description: "是否允許強化帕魯的體力屬性", span: 12 },
       { name: "bAllowEnhanceStat_Weight", display: "允許強化重量", type: "boolean", description: "是否允許強化帕魯的重量屬性", span: 12 },
       { name: "bAllowEnhanceStat_WorkSpeed", display: "允許強化工作速度", type: "boolean", description: "是否允許強化帕魯的工作速度屬性", span: 12 },
-      
-      // 新增：死亡懲罰細節
       { name: "BlockRespawnTime", display: "禁止重生時間", type: "number", description: "玩家死亡後禁止重生的時間 (秒)", span: 12 },
       { name: "RespawnPenaltyDurationThreshold", display: "重生懲罰閾值", type: "number", description: "觸發重生懲罰的時間閾值", span: 12 },
       { name: "RespawnPenaltyTimeScale", display: "重生懲罰時間倍率", type: "number", description: "重生懲罰的時間倍率", span: 12 },
@@ -175,8 +162,6 @@ const configTabs = ref<ConfigTab[]>([
       { name: "BuildObjectHpRate", display: "建築物生命值倍率", type: "number", description: "建築物生命值倍率", span: 12 },
       { name: "BuildObjectDamageRate", display: "建築物受損倍率", type: "number", description: "建築物受到傷害的倍率 (0.5-3)", span: 12 },
       { name: "BuildObjectDeteriorationDamageRate", display: "建築物老化損壞倍率", type: "number", description: "建築物隨時間老化的損壞速度 (0-10)", span: 12 },
-      
-      // 新增：建築細節
       { name: "MaxBuildingLimitNum", display: "建築數量上限", type: "number", description: "伺服器允許的建築總數量上限 (0為不限制)", span: 12 },
       { name: "bEnableBuildingPlayerUIdDisplay", display: "顯示建築建造者", type: "boolean", description: "是否在建築物上顯示建造者的名稱", span: 12 },
       { name: "BuildingNameDisplayCacheTTLSeconds", display: "建築名稱快取時間", type: "number", description: "建築物名稱顯示的快取時間 (秒)", span: 12 },
@@ -192,8 +177,6 @@ const configTabs = ref<ConfigTab[]>([
       { name: "GuildPlayerMaxNum", display: "公會最大玩家數量", type: "number", description: "每個公會可容納的最大玩家數量 (1-100)", span: 12 },
       { name: "bAutoResetGuildNoOnlinePlayers", display: "自動重置無在線玩家的公會", type: "boolean", description: "是否自動重置沒有在線玩家的公會", span: 12 },
       { name: "AutoResetGuildTimeNoOnlinePlayers", display: "無在線玩家公會重置時間", type: "number", description: "公會無在線玩家多少小時後自動重置 (1-9999)", span: 12 },
-      
-      // 新增：公會細節
       { name: "BaseCampMaxNumInGuild", display: "單公會據點上限", type: "number", description: "單個公會可以擁有的據點最大數量", span: 12 },
       { name: "MaxGuildsPerFrame", display: "每幀公會處理數", type: "number", description: "伺服器每幀處理的公會數量上限", span: 12 },
       { name: "GuildRejoinCooldownMinutes", display: "公會重入冷卻", type: "number", description: "退出公會後再次加入的冷卻時間 (分鐘)", span: 12 },
@@ -214,8 +197,6 @@ const configTabs = ref<ConfigTab[]>([
       { name: "BanListURL", display: "封禁列表URL", type: "string", description: "獲取封禁列表的URL地址", span: 24 },
       { name: "bEnableFastTravel", display: "啟用快速旅行", type: "boolean", description: "是否允許快速旅行功能", span: 12 },
       { name: "bIsStartLocationSelectByMap", display: "地圖選擇出生點", type: "boolean", description: "是否允許在地圖上選擇出生點", span: 12 },
-      
-      // 新增：效能與跨平台
       { name: "bEnableFastTravelOnlyBaseCamp", display: "僅據點快速旅行", type: "boolean", description: "是否僅允許在據點之間進行快速旅行", span: 12 },
       { name: "CrossplayPlatforms", display: "跨平台支援", type: "tuple", description: "允許跨平台連線的列表，以逗號分隔 (例如: Steam,Xbox,PS5,Mac)", span: 24 },
       { name: "ServerReplicatePawnCullDistance", display: "伺服器渲染距離", type: "number", description: "伺服器同步角色物件的距離 (UE單位)", span: 12 },
@@ -227,12 +208,9 @@ const configTabs = ref<ConfigTab[]>([
     key: "pvp_voice",
     tab: "PVP與語音系統",
     fields: [
-      // 新增：語音系統
       { name: "bEnableVoiceChat", display: "啟用語音聊天", type: "boolean", description: "是否啟用遊戲內語音聊天功能", span: 12 },
       { name: "VoiceChatMaxVolumeDistance", display: "語音最大音量距離", type: "number", description: "語音可被聽到的最大距離", span: 12 },
       { name: "VoiceChatZeroVolumeDistance", display: "語音無音量距離", type: "number", description: "語音衰減至無聲的距離", span: 12 },
-      
-      // 新增：PVP細節
       { name: "bDisplayPvPItemNumOnWorldMap_BaseCamp", display: "地圖顯示據點PVP物品數", type: "boolean", description: "是否在世界地圖上顯示據點的 PVP 物品數量", span: 12 },
       { name: "bDisplayPvPItemNumOnWorldMap_Player", display: "地圖顯示玩家PVP物品數", type: "boolean", description: "是否在世界地圖上顯示玩家的 PVP 物品數量", span: 12 },
       { name: "AdditionalDropItemWhenPlayerKillingInPvPMode", display: "PVP擊殺掉落物品", type: "string", description: "在 PVP 模式下擊殺玩家時的額外掉落物品代碼", span: 12 },
@@ -334,11 +312,11 @@ const loadConfig = async () => {
 
     if (!rawText) {
       message.warning(t("未找到配置檔案，將載入預設範本"));
-      rawText = `[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(Difficulty=None,DayTimeSpeedRate=1.000000,NightTimeSpeedRate=1.000000,ExpRate=1.000000,PalCaptureRate=1.000000,PalSpawnNumRate=1.000000,PalDamageRateAttack=1.000000,PalDamageRateDefense=1.000000,PlayerDamageRateAttack=1.000000,PlayerDamageRateDefense=1.000000,PlayerStomachDecreaceRate=1.000000,PlayerStaminaDecreaceRate=1.000000,PlayerAutoHPRegeneRate=1.000000,PlayerAutoHpRegeneRateInSleep=1.000000,PalStomachDecreaceRate=1.000000,PalStaminaDecreaceRate=1.000000,PalAutoHPRegeneRate=1.000000,PalAutoHpRegeneRateInSleep=1.000000,BuildObjectDamageRate=1.000000,BuildObjectDeteriorationDamageRate=1.000000,CollectionDropRate=2.000000,CollectionObjectHpRate=1.000000,CollectionObjectRespawnSpeedRate=1.000000,EnemyDropItemRate=1.000000,DeathPenalty=None,bEnablePlayerToPlayerDamage=False,bEnableFriendlyFire=False,bEnableInvaderEnemy=True,bActiveUNKO=False,bEnableAimAssistPad=True,bEnableAimAssistKeyboard=False,DropItemMaxNum=3000,DropItemMaxNum_UNKO=100,BaseCampMaxNum=128,BaseCampWorkerMaxNum=15,DropItemAliveMaxHours=1.000000,bAutoResetGuildNoOnlinePlayers=False,AutoResetGuildTimeNoOnlinePlayers=72.000000,GuildPlayerMaxNum=20,PalEggDefaultHatchingTime=1.000000,WorkSpeedRate=1.500000,bIsMultiplay=False,bIsPvP=False,bCanPickupOtherGuildDeathPenaltyDrop=False,bEnableNonLoginPenalty=True,bEnableFastTravel=True,bIsStartLocationSelectByMap=True,bExistPlayerAfterLogout=False,bEnableDefenseOtherGuildPlayer=False,CoopPlayerMaxNum=4,ServerPlayerMaxNum=32,ServerName="Default Palworld Server",ServerDescription="",AdminPassword="",ServerPassword="",PublicPort=8211,PublicIP="",RCONEnabled=False,RCONPort=25575,Region="",bUseAuth=True,BanListURL="https://api.palworldgame.com/api/banlist.txt")`;
+      rawText = `[/Script/Pal.PalGameWorldSettings]\nOptionSettings=()\n`;
     }
 
     const match = rawText.match(/OptionSettings=\((.*)\)/s);
-    if (match && match[1]) {
+    if (match && match[1] !== null) {
       rawSettings.value = parseOptionSettings(match[1]);
       const uiData: Record<string, any> = {};
       allFields.value.forEach(field => {
@@ -376,6 +354,27 @@ const loadConfig = async () => {
   }
 };
 
+// 通用上傳函數
+const uploadFileContent = async (dir: string, fileName: string, content: string) => {
+  const blob = new Blob([content], { type: "text/plain" });
+  const file = new File([blob], fileName);
+
+  const mission = await getUploadMissionCfg({
+    params: { upload_dir: dir, daemonId: props.daemonId!, uuid: props.instanceId!, file_name: fileName }
+  });
+  const config = mission.value;
+  if (!config?.addr) throw new Error("獲取上傳憑證失敗");
+
+  await new Promise<void>((resolve, reject) => {
+    uploadService.append(file, parseForwardAddress(config.addr, "http"), config.password, { overwrite: true }, (task) => {
+      task.instanceInfo = { instanceId: props.instanceId!, daemonId: props.daemonId! };
+    });
+    const unwatch = watch(() => uploadService.uiData.value.current, (curr) => {
+      if (!curr) { unwatch(); resolve(); }
+    });
+  });
+};
+
 // ---------- 檔案保存 ----------
 const saveConfig = async () => {
   isSaving.value = true;
@@ -392,24 +391,9 @@ const saveConfig = async () => {
 
     const newContent = `[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(${fieldsStr})\n`;
 
-    const blob = new Blob([newContent], { type: "text/plain" });
-    const file = new File([blob], "PalWorldSettings.ini");
+    await uploadFileContent(CONFIG_DIR, "PalWorldSettings.ini", newContent);
 
-    const mission = await getUploadMissionCfg({
-      params: { upload_dir: CONFIG_DIR, daemonId: props.daemonId!, uuid: props.instanceId!, file_name: file.name }
-    });
-    const config = mission.value;
-    if (!config?.addr) throw new Error("獲取上傳憑證失敗");
-
-    await new Promise<void>((resolve) => {
-      uploadService.append(file, parseForwardAddress(config.addr, "http"), config.password, { overwrite: true }, (task) => {
-        task.instanceInfo = { instanceId: props.instanceId!, daemonId: props.daemonId! };
-      });
-      const unwatch = watch(() => uploadService.uiData.value.current, (curr) => {
-        if (!curr) { unwatch(); resolve(); }
-      });
-    });
-
+    // 處理 settings.sh
     let newShContent = settingsShContent.value;
     const hasFlag = newShContent.includes("-publiclobby");
     if (publicLobbyEnabled.value && !hasFlag) {
@@ -419,23 +403,7 @@ const saveConfig = async () => {
     }
 
     if (newShContent !== settingsShContent.value) {
-      const shBlob = new Blob([newShContent], { type: "text/plain" });
-      const shFile = new File([shBlob], "settings.sh");
-      
-      const shMission = await getUploadMissionCfg({
-        params: { upload_dir: SH_UPLOAD_DIR, daemonId: props.daemonId!, uuid: props.instanceId!, file_name: "settings.sh" }
-      });
-      const shConfig = shMission.value;
-      if (!shConfig?.addr) throw new Error("獲取 settings.sh 上傳憑證失敗");
-
-      await new Promise<void>((resolve) => {
-        uploadService.append(shFile, parseForwardAddress(shConfig.addr, "http"), shConfig.password, { overwrite: true }, (task) => {
-          task.instanceInfo = { instanceId: props.instanceId!, daemonId: props.daemonId! };
-        });
-        const unwatchSh = watch(() => uploadService.uiData.value.current, (curr) => {
-          if (!curr) { unwatchSh(); resolve(); }
-        });
-      });
+      await uploadFileContent(SH_UPLOAD_DIR, "settings.sh", newShContent);
       settingsShContent.value = newShContent;
     }
 
@@ -448,11 +416,47 @@ const saveConfig = async () => {
   }
 };
 
+// ---------- 恢復預設值 ----------
+const resetConfig = async () => {
+  isSaving.value = true;
+  try {
+    // 寫入空的 OptionSettings=()
+    const resetContent = `[/Script/Pal.PalGameWorldSettings]\nOptionSettings=()\n`;
+    
+    Modal.confirm({
+      title: t("確認恢復預設值？"),
+      content: t("這將刪除 PalWorldSettings.ini 中的所有參數。伺服器下次啟動時將自動重新生成預設配置。"),
+      okText: t("確定恢復"),
+      okType: "danger",
+      cancelText: t("取消"),
+      async onOk() {
+        try {
+          await uploadFileContent(CONFIG_DIR, "PalWorldSettings.ini", resetContent);
+          message.success(t("已恢復預設值！"));
+          await loadConfig(); // 重新讀取介面
+        } catch (err: any) {
+          message.error(t("恢復預設失敗: ") + err.message);
+        } finally {
+          isSaving.value = false;
+        }
+      },
+      onCancel() {
+        isSaving.value = false;
+      }
+    });
+  } catch (err: any) {
+    isSaving.value = false;
+    message.error(t("發生錯誤: ") + err.message);
+  }
+};
+
 const openDialog = () => {
-  const isRunning = props.useTerminalHook?.isRunning.value ?? (props.instanceInfo && (props.instanceInfo as any).status !== 0);
-  if (isRunning) {
+  // 修正 1: 直接讀取 instanceInfo 的 status (0 = 停止, >0 = 運行/忙碌中)
+  const status = props.instanceInfo?.status ?? 0;
+  if (status > 0) {
     return message.error(t("伺服器正在運行中，請先完全關閉伺服器後再打開配置檔案進行修改！"));
   }
+  
   open.value = true;
   activeTab.value = "server";
   loadConfig();
@@ -477,6 +481,10 @@ defineExpose({ openDialog });
       <div class="header-right-controls">
         <a-button type="link" size="small" :loading="isLoading" @click="loadConfig">
           <template #icon><ReloadOutlined /></template> {{ t("重新讀取") }}
+        </a-button>
+        <!-- 新增：重置預設按鈕 -->
+        <a-button danger type="link" size="small" :loading="isSaving" @click="resetConfig">
+          <template #icon><UndoOutlined /></template> {{ t("重置預設") }}
         </a-button>
         <a-button type="primary" size="small" :loading="isSaving" @click="saveConfig">
           <template #icon><SaveOutlined /></template> {{ t("保存配置") }}
@@ -534,7 +542,6 @@ defineExpose({ openDialog });
                       style="width: 100%"
                       :disabled="field.disabled"
                     />
-                    <!-- 針對 tuple 類型使用寬度 24 的 a-input -->
                     <a-input 
                       v-else-if="field.type === 'tuple'" 
                       v-model:value="formData[field.name]" 
