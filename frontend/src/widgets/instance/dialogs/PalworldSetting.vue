@@ -27,15 +27,12 @@ const activeTab = ref("server");
 
 const CONFIG_DIR = "LazyCloudGameServer/Pal/Saved/Config/LinuxServer/";
 const CONFIG_FILE_PATH = `${CONFIG_DIR}PalWorldSettings.ini`;
-
-// 修正：settings.sh 位於根目錄
 const SH_FILE_PATH = "settings.sh";
 const SH_UPLOAD_DIR = "/";
 
 const formData = ref<Record<string, any>>({});
 const rawSettings = ref<Record<string, string>>({});
 
-// settings.sh 狀態
 const settingsShContent = ref<string>("");
 const publicLobbyEnabled = ref<boolean>(false);
 
@@ -46,7 +43,7 @@ const { execute: getUploadMissionCfg } = uploadAddress();
 interface ConfigField {
   name: string;
   display: string;
-  type: "string" | "number" | "boolean" | "select";
+  type: "string" | "number" | "boolean" | "select" | "tuple"; // 新增 tuple 類型處理元組
   options?: { value: string; label: string }[];
   description?: string;
   span?: number; 
@@ -72,6 +69,15 @@ const configTabs = ref<ConfigTab[]>([
       { name: "PublicPort", display: "公共端口", type: "number", description: "伺服器對外開放的端口號 (1024-65535)", span: 12, disabled: true },
       { name: "PublicIP", display: "公共IP地址", type: "string", description: "伺服器的公共IP地址", span: 12, disabled: true },
       { name: "Region", display: "伺服器區域", type: "string", description: "伺服器所在區域", span: 12 },
+      
+      // 新增：聊天與存檔
+      { name: "bShowPlayerList", display: "顯示玩家列表", type: "boolean", description: "是否允許玩家查看在線列表", span: 12 },
+      { name: "bIsShowJoinLeftMessage", display: "加入/離開訊息", type: "boolean", description: "是否顯示玩家加入或離開的訊息", span: 12 },
+      { name: "ChatPostLimitPerMinute", display: "聊天頻率限制", type: "number", description: "每分鐘允許發送的聊天訊息數量", span: 12 },
+      { name: "bAllowClientMod", display: "允許客戶端Mod", type: "boolean", description: "是否允許玩家使用客戶端 Mod", span: 12 },
+      { name: "AutoSaveSpan", display: "自動存檔頻率", type: "number", description: "伺服器自動存檔的間隔時間 (分鐘)", span: 12 },
+      { name: "bIsUseBackupSaveData", display: "使用備份存檔", type: "boolean", description: "當存檔損壞時是否自動使用備份存檔", span: 12 },
+      { name: "LogFormatType", display: "日誌格式", type: "string", description: "伺服器日誌輸出的格式 (例如: Text)", span: 12 },
     ]
   },
   {
@@ -83,6 +89,16 @@ const configTabs = ref<ConfigTab[]>([
       ], span: 12},
       { name: "DayTimeSpeedRate", display: "白天時間加速率", type: "number", description: "控制遊戲中日夜循環的速度 (0.1-5)", span: 12 },
       { name: "NightTimeSpeedRate", display: "夜晚時間加速率", type: "number", description: "控制夜晚時間流逝速度 (0.1-5)", span: 12 },
+      
+      // 新增：隨機化與硬核
+      { name: "RandomizerType", display: "隨機化類型", type: "string", description: "帕魯隨機化生成的類型 (None 或其他)", span: 12 },
+      { name: "RandomizerSeed", display: "隨機化種子", type: "string", description: "隨機化生成所使用的種子碼", span: 12 },
+      { name: "bIsRandomizerPalLevelRandom", display: "隨機帕魯等級", type: "boolean", description: "隨機化模式下帕魯等級是否隨機", span: 12 },
+      { name: "bHardcore", display: "硬核模式", type: "boolean", description: "啟用後玩家死亡將永久刪除角色", span: 12 },
+      { name: "bPalLost", display: "帕魯丟失", type: "boolean", description: "硬核模式下帕魯是否會丟失", span: 12 },
+      { name: "bCharacterRecreateInHardcore", display: "硬核重生限制", type: "boolean", description: "硬核模式下是否限制角色重建", span: 12 },
+      { name: "EnablePredatorBossPal", display: "啟用掠食者頭目", type: "boolean", description: "是否啟用掠食者帕魯的生成", span: 12 },
+      
       { name: "bIsMultiplay", display: "多人遊戲模式", type: "boolean", description: "是否啟用多人遊戲模式", span: 12 },
       { name: "bIsPvP", display: "PVP模式", type: "boolean", description: "是否啟用PVP模式", span: 12 },
       { name: "bEnablePlayerToPlayerDamage", display: "啟用玩家PVP傷害", type: "boolean", description: "是否允許玩家之間造成傷害", span: 12 },
@@ -90,6 +106,11 @@ const configTabs = ref<ConfigTab[]>([
       { name: "DeathPenalty", display: "死亡懲罰", type: "select", description: "玩家死亡時的懲罰類型", options: [
         { value: "None", label: "無懲罰" }, { value: "Item", label: "掉落物品" }, { value: "ItemAndEquipment", label: "掉落物品和裝備" }, { value: "All", label: "掉落所有物品" }
       ], span: 12},
+
+      // 新增：世界細節
+      { name: "SupplyDropSpan", display: "空投間隔", type: "number", description: "空投物資的生成間隔時間 (分鐘)", span: 12 },
+      { name: "bInvisibleOtherGuildBaseCampAreaFX", display: "隱藏他公會據點特效", type: "boolean", description: "是否隱藏其他公會據點的範圍特效", span: 12 },
+      { name: "bBuildAreaLimit", display: "建造區域限制", type: "boolean", description: "是否限制建造區域", span: 12 },
     ]
   },
   {
@@ -101,6 +122,11 @@ const configTabs = ref<ConfigTab[]>([
       { name: "PalSpawnNumRate", display: "帕魯出現數量倍率", type: "number", description: "野生帕魯的刷新數量倍率 (0.5-3)", span: 12 },
       { name: "PalEggDefaultHatchingTime", display: "帕魯蛋孵化時間", type: "number", description: "帕魯蛋孵化所需的預設時間(小時) (0-9999)", span: 12 },
       { name: "WorkSpeedRate", display: "工作速度倍率", type: "number", description: "帕魯工作效率的倍率 (0.1-5)", span: 12 },
+      
+      // 新增：農場與帕魯盒子
+      { name: "MonsterFarmActionSpeedRate", display: "農場工作速度", type: "number", description: "帕魯在農場的工作速度倍率", span: 12 },
+      { name: "bAllowGlobalPalboxExport", display: "允許匯出帕魯", type: "boolean", description: "是否允許將帕魯匯出至全域盒子", span: 12 },
+      { name: "bAllowGlobalPalboxImport", display: "允許匯入帕魯", type: "boolean", description: "是否允許從全域盒子匯入帕魯", span: 12 },
     ]
   },
   {
@@ -119,6 +145,21 @@ const configTabs = ref<ConfigTab[]>([
       { name: "PalStaminaDecreaceRate", display: "帕魯體力消耗倍率", type: "number", description: "帕魯體力消耗速度 (0.1-5)", span: 12 },
       { name: "PalAutoHPRegeneRate", display: "帕魯生命自動恢復倍率", type: "number", description: "帕魯生命值自動恢復速度 (0.1-5)", span: 12 },
       { name: "PalAutoHpRegeneRateInSleep", display: "帕魯睡眠時生命恢復倍率", type: "number", description: "帕魯睡覺時生命值恢復速度 (0.1-5)", span: 12 },
+      
+      // 新增：裝備與屬性強化
+      { name: "ItemWeightRate", display: "物品重量倍率", type: "number", description: "玩家可攜帶物品的重量倍率", span: 12 },
+      { name: "EquipmentDurabilityDamageRate", display: "裝備耐久損壞率", type: "number", description: "裝備耐久度消耗的倍率", span: 12 },
+      { name: "ItemCorruptionMultiplier", display: "物品腐敗倍率", type: "number", description: "物品腐敗速度的倍率", span: 12 },
+      { name: "bAllowEnhanceStat_Health", display: "允許強化生命", type: "boolean", description: "是否允許強化帕魯的生命屬性", span: 12 },
+      { name: "bAllowEnhanceStat_Attack", display: "允許強化攻擊", type: "boolean", description: "是否允許強化帕魯的攻擊屬性", span: 12 },
+      { name: "bAllowEnhanceStat_Stamina", display: "允許強化體力", type: "boolean", description: "是否允許強化帕魯的體力屬性", span: 12 },
+      { name: "bAllowEnhanceStat_Weight", display: "允許強化重量", type: "boolean", description: "是否允許強化帕魯的重量屬性", span: 12 },
+      { name: "bAllowEnhanceStat_WorkSpeed", display: "允許強化工作速度", type: "boolean", description: "是否允許強化帕魯的工作速度屬性", span: 12 },
+      
+      // 新增：死亡懲罰細節
+      { name: "BlockRespawnTime", display: "禁止重生時間", type: "number", description: "玩家死亡後禁止重生的時間 (秒)", span: 12 },
+      { name: "RespawnPenaltyDurationThreshold", display: "重生懲罰閾值", type: "number", description: "觸發重生懲罰的時間閾值", span: 12 },
+      { name: "RespawnPenaltyTimeScale", display: "重生懲罰時間倍率", type: "number", description: "重生懲罰的時間倍率", span: 12 },
     ]
   },
   {
@@ -134,6 +175,12 @@ const configTabs = ref<ConfigTab[]>([
       { name: "BuildObjectHpRate", display: "建築物生命值倍率", type: "number", description: "建築物生命值倍率", span: 12 },
       { name: "BuildObjectDamageRate", display: "建築物受損倍率", type: "number", description: "建築物受到傷害的倍率 (0.5-3)", span: 12 },
       { name: "BuildObjectDeteriorationDamageRate", display: "建築物老化損壞倍率", type: "number", description: "建築物隨時間老化的損壞速度 (0-10)", span: 12 },
+      
+      // 新增：建築細節
+      { name: "MaxBuildingLimitNum", display: "建築數量上限", type: "number", description: "伺服器允許的建築總數量上限 (0為不限制)", span: 12 },
+      { name: "bEnableBuildingPlayerUIdDisplay", display: "顯示建築建造者", type: "boolean", description: "是否在建築物上顯示建造者的名稱", span: 12 },
+      { name: "BuildingNameDisplayCacheTTLSeconds", display: "建築名稱快取時間", type: "number", description: "建築物名稱顯示的快取時間 (秒)", span: 12 },
+      { name: "PhysicsActiveDropItemMaxNum", display: "物理掉落物上限", type: "number", description: "具有物理碰撞的掉落物品最大數量 (-1為不限制)", span: 12 },
     ]
   },
   {
@@ -145,11 +192,19 @@ const configTabs = ref<ConfigTab[]>([
       { name: "GuildPlayerMaxNum", display: "公會最大玩家數量", type: "number", description: "每個公會可容納的最大玩家數量 (1-100)", span: 12 },
       { name: "bAutoResetGuildNoOnlinePlayers", display: "自動重置無在線玩家的公會", type: "boolean", description: "是否自動重置沒有在線玩家的公會", span: 12 },
       { name: "AutoResetGuildTimeNoOnlinePlayers", display: "無在線玩家公會重置時間", type: "number", description: "公會無在線玩家多少小時後自動重置 (1-9999)", span: 12 },
+      
+      // 新增：公會細節
+      { name: "BaseCampMaxNumInGuild", display: "單公會據點上限", type: "number", description: "單個公會可以擁有的據點最大數量", span: 12 },
+      { name: "MaxGuildsPerFrame", display: "每幀公會處理數", type: "number", description: "伺服器每幀處理的公會數量上限", span: 12 },
+      { name: "GuildRejoinCooldownMinutes", display: "公會重入冷卻", type: "number", description: "退出公會後再次加入的冷卻時間 (分鐘)", span: 12 },
+      { name: "AutoTransferMasterCheckIntervalSeconds", display: "會長轉移檢查間隔", type: "number", description: "自動轉移會長的檢查間隔 (秒)", span: 12 },
+      { name: "AutoTransferMasterThresholdDays", display: "會長轉移離線閾值", type: "number", description: "會長離線多少天後自動轉移會長", span: 12 },
+      { name: "DenyTechnologyList", display: "禁用科技列表", type: "tuple", description: "禁用的科技列表，以逗號分隔 (例如: Tech1,Tech2)", span: 24 },
     ]
   },
   {
     key: "advanced",
-    tab: "高級與RCON",
+    tab: "高級與效能",
     fields: [
       { name: "RCONEnabled", display: "啟用RCON", type: "boolean", description: "是否啟用RCON遠端控制", span: 12 },
       { name: "RCONPort", display: "RCON端口", type: "number", description: "RCON服務的端口號 (1024-65535)", span: 12 },
@@ -159,6 +214,30 @@ const configTabs = ref<ConfigTab[]>([
       { name: "BanListURL", display: "封禁列表URL", type: "string", description: "獲取封禁列表的URL地址", span: 24 },
       { name: "bEnableFastTravel", display: "啟用快速旅行", type: "boolean", description: "是否允許快速旅行功能", span: 12 },
       { name: "bIsStartLocationSelectByMap", display: "地圖選擇出生點", type: "boolean", description: "是否允許在地圖上選擇出生點", span: 12 },
+      
+      // 新增：效能與跨平台
+      { name: "bEnableFastTravelOnlyBaseCamp", display: "僅據點快速旅行", type: "boolean", description: "是否僅允許在據點之間進行快速旅行", span: 12 },
+      { name: "CrossplayPlatforms", display: "跨平台支援", type: "tuple", description: "允許跨平台連線的列表，以逗號分隔 (例如: Steam,Xbox,PS5,Mac)", span: 24 },
+      { name: "ServerReplicatePawnCullDistance", display: "伺服器渲染距離", type: "number", description: "伺服器同步角色物件的距離 (UE單位)", span: 12 },
+      { name: "ItemContainerForceMarkDirtyInterval", display: "容器更新間隔", type: "number", description: "物品容器強制標記為髒的更新間隔 (秒)", span: 12 },
+      { name: "PlayerDataPalStorageUpdateCheckTickInterval", display: "帕魯盒更新頻率", type: "number", description: "玩家帕魯盒數據更新的檢查間隔 (秒)", span: 12 },
+    ]
+  },
+  {
+    key: "pvp_voice",
+    tab: "PVP與語音系統",
+    fields: [
+      // 新增：語音系統
+      { name: "bEnableVoiceChat", display: "啟用語音聊天", type: "boolean", description: "是否啟用遊戲內語音聊天功能", span: 12 },
+      { name: "VoiceChatMaxVolumeDistance", display: "語音最大音量距離", type: "number", description: "語音可被聽到的最大距離", span: 12 },
+      { name: "VoiceChatZeroVolumeDistance", display: "語音無音量距離", type: "number", description: "語音衰減至無聲的距離", span: 12 },
+      
+      // 新增：PVP細節
+      { name: "bDisplayPvPItemNumOnWorldMap_BaseCamp", display: "地圖顯示據點PVP物品數", type: "boolean", description: "是否在世界地圖上顯示據點的 PVP 物品數量", span: 12 },
+      { name: "bDisplayPvPItemNumOnWorldMap_Player", display: "地圖顯示玩家PVP物品數", type: "boolean", description: "是否在世界地圖上顯示玩家的 PVP 物品數量", span: 12 },
+      { name: "AdditionalDropItemWhenPlayerKillingInPvPMode", display: "PVP擊殺掉落物品", type: "string", description: "在 PVP 模式下擊殺玩家時的額外掉落物品代碼", span: 12 },
+      { name: "AdditionalDropItemNumWhenPlayerKillingInPvPMode", display: "PVP擊殺掉落數量", type: "number", description: "PVP 模式下擊殺玩家時額外掉落的物品數量", span: 12 },
+      { name: "bAdditionalDropItemWhenPlayerKillingInPvPMode", display: "啟用PVP擊殺掉落", type: "boolean", description: "是否啟用 PVP 擊殺時的額外物品掉落", span: 12 },
     ]
   }
 ]);
@@ -224,12 +303,19 @@ const convertValue = (field: ConfigField, rawValue: string) => {
     }
     return rawValue;
   }
+  if (field.type === 'tuple') {
+    if (rawValue.startsWith('(') && rawValue.endsWith(')')) {
+      return rawValue.slice(1, -1);
+    }
+    return rawValue;
+  }
   return rawValue;
 };
 
 const formatValue = (field: ConfigField, value: any) => {
   if (field.type === 'boolean') return value ? 'True' : 'False';
   if (field.type === 'string') return `"${String(value).replace(/"/g, '\\"')}"`;
+  if (field.type === 'tuple') return `(${value})`;
   return String(value);
 };
 
@@ -237,7 +323,6 @@ const formatValue = (field: ConfigField, value: any) => {
 const loadConfig = async () => {
   isLoading.value = true;
   try {
-    // 1. 獲取 PalWorldSettings.ini
     const res: any = await fetchFileContent({
       params: { daemonId: props.daemonId ?? "", uuid: props.instanceId ?? "" },
       data: { target: CONFIG_FILE_PATH }
@@ -266,7 +351,6 @@ const loadConfig = async () => {
       message.error(t("無法解析 PalWorldSettings.ini 格式"));
     }
 
-    // 2. 獲取 settings.sh (根目錄)
     try {
       const resSh: any = await fetchFileContent({
         params: { daemonId: props.daemonId ?? "", uuid: props.instanceId ?? "" },
@@ -296,7 +380,6 @@ const loadConfig = async () => {
 const saveConfig = async () => {
   isSaving.value = true;
   try {
-    // 1. 處理 PalWorldSettings.ini
     allFields.value.forEach(field => {
       if (formData.value[field.name] !== undefined) {
         rawSettings.value[field.name] = formatValue(field, formData.value[field.name]);
@@ -327,18 +410,14 @@ const saveConfig = async () => {
       });
     });
 
-    // 2. 處理 settings.sh (-publiclobby)
     let newShContent = settingsShContent.value;
     const hasFlag = newShContent.includes("-publiclobby");
     if (publicLobbyEnabled.value && !hasFlag) {
-      // 加入前確保末尾沒有過多空白，並以一個空格分隔
       newShContent = newShContent.replace(/\s*$/, "") + " -publiclobby";
     } else if (!publicLobbyEnabled.value && hasFlag) {
-      // 移除時連同前面的空格一起移除
       newShContent = newShContent.replace(/\s*-publiclobby/g, "");
     }
 
-    // 如果 settings.sh 有變動，則上傳至根目錄
     if (newShContent !== settingsShContent.value) {
       const shBlob = new Blob([newShContent], { type: "text/plain" });
       const shFile = new File([shBlob], "settings.sh");
@@ -455,6 +534,14 @@ defineExpose({ openDialog });
                       style="width: 100%"
                       :disabled="field.disabled"
                     />
+                    <!-- 針對 tuple 類型使用寬度 24 的 a-input -->
+                    <a-input 
+                      v-else-if="field.type === 'tuple'" 
+                      v-model:value="formData[field.name]" 
+                      style="width: 100%" 
+                      allow-clear
+                      :disabled="field.disabled" 
+                    />
                     <a-input 
                       v-else 
                       v-model:value="formData[field.name]" 
@@ -466,7 +553,6 @@ defineExpose({ openDialog });
                 </a-col>
               </a-row>
               
-              <!-- 第一個分頁專屬：可被搜索開關 -->
               <a-row :gutter="16" v-if="tab.key === 'server'">
                 <a-col :span="12">
                   <a-form-item 
@@ -514,7 +600,6 @@ defineExpose({ openDialog });
 .config-form {
   padding: 8px 4px;
   
-  /* 徹底修正輸入框錯位問題 */
   :deep(.ant-form-item) {
     margin-bottom: 16px;
   }
@@ -523,7 +608,8 @@ defineExpose({ openDialog });
     min-height: 38px;
   }
   
-  :deep(.ant-input),
+  /* 徹底修正輸入框錯位問題 */
+  :deep(.ant-input:not(textarea)),
   :deep(.ant-input-affix-wrapper) {
     height: 38px !important;
     border-radius: 6px !important;
@@ -531,6 +617,14 @@ defineExpose({ openDialog });
     padding-bottom: 0 !important;
     display: flex;
     align-items: center;
+  }
+
+  /* 針對 Textarea 確保高度自適應並置頂 */
+  :deep(textarea.ant-input) {
+    border-radius: 6px !important;
+    padding: 8px 11px !important;
+    min-height: 38px !important;
+    align-items: flex-start;
   }
   
   :deep(.ant-input-affix-wrapper > input.ant-input) {
