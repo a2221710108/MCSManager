@@ -329,7 +329,7 @@ const loadConfig = async () => {
       });
       formData.value = uiData;
     } else {
-      message.error(t("無法解析 PalWorldSettings.ini 格式，可能是您當前的設定檔格式不規範"));
+      message.error(t("無法解析 PalWorldSettings.ini 格式"));
     }
 
     // 讀取 settings.sh 前冷卻 1 秒
@@ -385,11 +385,18 @@ const saveConfig = async () => {
   isSaving.value = true;
   try {
     allFields.value.forEach(field => {
-      if (formData.value[field.name] !== undefined) {
-        rawSettings.value[field.name] = formatValue(field, formData.value[field.name]);
+      const val = formData.value[field.name];
+      if (val !== undefined) {
+        // 關鍵修正：如果字串或元組被清空，直接從 rawSettings 刪除該鍵，避免產生空值
+        if ((field.type === 'string' || field.type === 'tuple') && val === '') {
+          delete rawSettings.value[field.name];
+        } else {
+          rawSettings.value[field.name] = formatValue(field, val);
+        }
       }
     });
 
+    // 重新組裝字串，因為刪除了鍵，所以不會有連續逗號或多餘逗號的問題
     const fieldsStr = Object.keys(rawSettings.value).map(key => {
       return `${key}=${rawSettings.value[key]}`;
     }).join(',');
@@ -430,9 +437,9 @@ const resetConfig = async () => {
     const resetContent = `[/Script/Pal.PalGameWorldSettings]\nOptionSettings=()\n`;
     
     Modal.confirm({
-      title: t("確認還原預設值？"),
+      title: t("確認恢復預設值？"),
       content: t("這將刪除 PalWorldSettings.ini 中的所有參數。伺服器下次啟動時將自動重新生成預設配置。"),
-      okText: t("確定還原"),
+      okText: t("確定恢復"),
       okType: "danger",
       cancelText: t("取消"),
       async onOk() {
@@ -473,7 +480,7 @@ defineExpose({ openDialog });
 <template>
   <a-modal
     v-model:open="open"
-    :title="t('Palworld 配置管理')"
+    :title="t('幻獸帕魯配置管理')"
     :footer="null"
     :width="850"
     centered
@@ -488,10 +495,10 @@ defineExpose({ openDialog });
           <template #icon><ReloadOutlined /></template> {{ t("重新讀取") }}
         </a-button>
         <a-button danger type="link" size="small" :loading="isSaving" @click="resetConfig">
-          <template #icon><UndoOutlined /></template> {{ t("重置為預設值") }}
+          <template #icon><UndoOutlined /></template> {{ t("重置預設") }}
         </a-button>
         <a-button type="primary" size="small" :loading="isSaving" @click="saveConfig">
-          <template #icon><SaveOutlined /></template> {{ t("儲存配置") }}
+          <template #icon><SaveOutlined /></template> {{ t("保存配置") }}
         </a-button>
       </div>
     </div>
@@ -567,8 +574,8 @@ defineExpose({ openDialog });
               <a-row :gutter="16" v-if="tab.key === 'server'">
                 <a-col :span="12">
                   <a-form-item 
-                    label="公開伺服器" 
-                    :extra="t('開啟後可以在大廳搜索到您的伺服器。此為非 PC 玩家進入伺服器的唯一方式，請務必填寫伺服器名稱')"
+                    label="可被搜索" 
+                    :extra="t('開啟後可以在大廳搜索到您的伺服器，開啟後必須填寫伺服器名稱')"
                   >
                     <a-switch 
                       v-model:checked="publicLobbyEnabled" 
