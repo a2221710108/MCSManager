@@ -495,7 +495,7 @@ defineExpose({ openDialog });
 <template>
   <a-modal
     v-model:open="open"
-    :title="t('幻獸帕魯配置管理')"
+    :title="t('Palworld 配置管理')"
     :footer="null"
     :width="850"
     centered
@@ -510,10 +510,10 @@ defineExpose({ openDialog });
           <template #icon><ReloadOutlined /></template> {{ t("重新讀取") }}
         </a-button>
         <a-button danger type="link" size="small" :loading="isSaving" @click="resetConfig">
-          <template #icon><UndoOutlined /></template> {{ t("重置預設") }}
+          <template #icon><UndoOutlined /></template> {{ t("重置為預設值") }}
         </a-button>
         <a-button type="primary" size="small" :loading="isSaving" @click="saveConfig">
-          <template #icon><SaveOutlined /></template> {{ t("保存配置") }}
+          <template #icon><SaveOutlined /></template> {{ t("儲存配置") }}
         </a-button>
       </div>
     </div>
@@ -589,8 +589,8 @@ defineExpose({ openDialog });
               <a-row :gutter="16" v-if="tab.key === 'server'">
                 <a-col :span="12">
                   <a-form-item 
-                    label="可被搜索" 
-                    :extra="t('開啟後可以在大廳搜索到您的伺服器，開啟後必須填寫伺服器名稱')"
+                    label="公開伺服器" 
+                    :extra="t('此為非 PC 玩家進入伺服器的唯一方式。開啟後可以在大廳搜索到您的伺服器，請務必填寫伺服器名稱')"
                   >
                     <a-switch 
                       v-model:checked="publicLobbyEnabled" 
