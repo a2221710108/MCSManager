@@ -277,7 +277,10 @@ const parseOptionSettings = (content: string): Record<string, string> => {
 
 const convertValue = (field: ConfigField, rawValue: string) => {
   if (field.type === 'boolean') return rawValue === 'True';
-  if (field.type === 'number') return Number(rawValue) || 0;
+  if (field.type === 'number') {
+    const num = Number(rawValue);
+    return isNaN(num) ? null : num;
+  }
   if (field.type === 'string') {
     if (rawValue.startsWith('"') && rawValue.endsWith('"')) {
       return rawValue.slice(1, -1).replace(/\\"/g, '"');
@@ -386,17 +389,29 @@ const saveConfig = async () => {
   try {
     allFields.value.forEach(field => {
       const val = formData.value[field.name];
-      if (val !== undefined) {
-        // 關鍵修正：如果字串或元組被清空，直接從 rawSettings 刪除該鍵，避免產生空值
-        if ((field.type === 'string' || field.type === 'tuple') && val === '') {
-          delete rawSettings.value[field.name];
-        } else {
-          rawSettings.value[field.name] = formatValue(field, val);
+      
+      // 如果介面上沒有這個值，不處理
+      if (val === undefined) return;
+      
+      // 判斷是否為空值 (字串空、元組空、數字 null 或 空字串)
+      const isEmpty = (field.type === 'string' && val === '') || 
+                      (field.type === 'tuple' && val === '') || 
+                      (field.type === 'number' && (val === null || val === ''));
+                      
+      if (isEmpty) {
+        // 如果是空值，從 rawSettings 刪除該鍵，避免產生空值參數
+        delete rawSettings.value[field.name];
+      } else {
+        // 防呆：如果是數字且值為 0，中斷保存並報錯
+        if (field.type === 'number' && Number(val) === 0) {
+          throw new Error(t("參數「") + field.display + t("」不能為 0，請填入大於 0 的數值（如 0.0001），或留空使用預設值"));
         }
+        // 如果有值，格式化並更新
+        rawSettings.value[field.name] = formatValue(field, val);
       }
     });
 
-    // 重新組裝字串，因為刪除了鍵，所以不會有連續逗號或多餘逗號的問題
+    // 重新組裝字串
     const fieldsStr = Object.keys(rawSettings.value).map(key => {
       return `${key}=${rawSettings.value[key]}`;
     }).join(',');
@@ -424,7 +439,7 @@ const saveConfig = async () => {
     message.success(t("配置已成功儲存！"));
   } catch (err: any) {
     console.error("Save config error:", err);
-    message.error(t("保存配置檔案失敗: ") + err.message);
+    message.error(t("保存失敗: ") + err.message);
   } finally {
     isSaving.value = false;
   }
