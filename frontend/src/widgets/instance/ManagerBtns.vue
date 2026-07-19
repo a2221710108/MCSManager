@@ -141,14 +141,6 @@ const categorizedBtns = computed(() => {
           condition: () => state.settings.canFileManager || isAdmin.value
         },
         {
-          title: t("統計圖表"),
-          icon: BarChartOutlined,
-          click: () => { chartDialog.value?.openDialog(); },
-          condition: () => state.settings.canFileManager || isAdmin.value
-        }
-      ])
-    },
-    {
           title: t("Palworld 配置"),
           icon: UsergroupDeleteOutlined,
           click: async () => {
@@ -164,6 +156,14 @@ const categorizedBtns = computed(() => {
           },
           condition: () => instanceInfo.value?.config.type.includes(TYPE_STEAM_SERVER_UNIVERSAL) ?? false
         },
+        {
+          title: t("統計圖表"),
+          icon: BarChartOutlined,
+          click: () => { chartDialog.value?.openDialog(); },
+          condition: () => state.settings.canFileManager || isAdmin.value
+        }
+      ])
+    },
     {
       groupName: t("Minecraft 專區"),
       items: arrayFilter([
