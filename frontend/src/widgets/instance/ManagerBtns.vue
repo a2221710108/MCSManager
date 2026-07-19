@@ -53,6 +53,7 @@ import modloaderinstall from "./dialogs/modloaderinstall.vue";
 import chart from "./dialogs/chart.vue";
 import updateserver from "./dialogs/updateserver.vue";
 import respack from "./dialogs/respack.vue";
+import palsetting from "./dialogs/Palworldsetting.vue";
   
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
@@ -72,6 +73,7 @@ const modloaderinstallDialog = ref<InstanceType<typeof modloaderinstall>>();
 const chartDialog = ref<InstanceType<typeof chart>>();
 const updateserverDialog = ref<InstanceType<typeof updateserver>>();
 const respackDialog = ref<InstanceType<typeof respack>>();
+const palsettingDialog = ref<InstanceType<typeof palsetting>>();
 const terminalHook = useTerminal();
 
 const { toPage: toOtherPager } = useAppRouters();
@@ -146,6 +148,22 @@ const categorizedBtns = computed(() => {
         }
       ])
     },
+    {
+          title: t("Palworld 配置"),
+          icon: UsergroupDeleteOutlined,
+          click: async () => {
+            if (!terminalHook.isConnect.value) {
+              try {
+                await terminalHook.execute({ instanceId: instanceId!, daemonId: daemonId! });
+              } catch (err) {
+                console.error("PlayerManager Connection Failed:", err);
+                return;
+              }
+            }
+            palsettingDialog.value?.openDialog();
+          },
+          condition: () => instanceInfo.value?.config.type.includes(TYPE_STEAM_SERVER_UNIVERSAL) ?? false
+        },
     {
       groupName: t("Minecraft 專區"),
       items: arrayFilter([
@@ -342,6 +360,7 @@ watch(instanceInfo, (cfg, oldCfg) => {
   <chart ref="chartDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
   <respack ref="respackDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
   <updateserver ref="updateserverDialog" :instance-id="instanceId ?? ''" :daemon-id="daemonId ?? ''" :instance-info="instanceInfo" />
+  <palsetting ref="palsettingDialog" :instance-info="instanceInfo" :instance-id="instanceId" :daemon-id="daemonId" :use-terminal-hook="terminalHook" @update="refreshInstanceInfo" />
 </template>
 
 <style lang="scss" scoped>
