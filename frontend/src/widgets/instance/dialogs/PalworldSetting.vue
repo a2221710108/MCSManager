@@ -2,6 +2,8 @@
 import { ref, computed, watch } from "vue";
 import { t } from "@/lang/i18n";
 import type { InstanceDetail } from "@/types";
+// 引入 UseTerminalHook (路徑請根據你實際的專案結構調整，如果路徑不對可修改 @/hooks/useTerminal)
+import type { UseTerminalHook } from "../../../hooks/useTerminal"; 
 import { message } from "ant-design-vue";
 import { fileContent, uploadAddress } from "@/services/apis/fileManager";
 import uploadService from "@/services/uploadService";
@@ -16,6 +18,7 @@ const props = defineProps<{
   instanceInfo?: InstanceDetail;
   instanceId?: string;
   daemonId?: string;
+  useTerminalHook?: UseTerminalHook; // 加入這行，接收 Hook
 }>();
 
 const open = ref(false);
@@ -40,7 +43,7 @@ interface ConfigField {
   options?: { value: string; label: string }[];
   description?: string;
   span?: number; 
-  disabled?: boolean; // 新增：是否禁用
+  disabled?: boolean;
 }
 
 interface ConfigTab {
@@ -59,9 +62,7 @@ const configTabs = ref<ConfigTab[]>([
       { name: "ServerPassword", display: "伺服器密碼", type: "string", description: "進入伺服器所需的密碼", span: 12 },
       { name: "AdminPassword", display: "管理員密碼", type: "string", description: "伺服器管理員密碼", span: 12 },
       { name: "ServerPlayerMaxNum", display: "最大玩家數量", type: "number", description: "伺服器可容納的最大玩家數量 (1-32)", span: 12 },
-      // 修正 1: 加入 disabled: true
       { name: "PublicPort", display: "公共端口", type: "number", description: "伺服器對外開放的端口號 (1024-65535)", span: 12, disabled: true },
-      // 修正 1: 加入 disabled: true
       { name: "PublicIP", display: "公共IP地址", type: "string", description: "伺服器的公共IP地址", span: 12, disabled: true },
       { name: "Region", display: "伺服器區域", type: "string", description: "伺服器所在區域", span: 12 },
     ]
@@ -326,6 +327,14 @@ const saveConfig = async () => {
 };
 
 const openDialog = () => {
+  // 檢查伺服器狀態 (優先使用 useTerminalHook，如果沒有傳入則檢查 instanceInfo 的 status 是否不等於 0)
+  // MCSManager 的 status: -1(未知), 0(停止), 1(停止中), 2(啟動中), 3(運行中)
+  const isRunning = props.useTerminalHook?.isRunning.value ?? (props.instanceInfo && (props.instanceInfo as any).status !== 0);
+  
+  if (isRunning) {
+    return message.error(t("伺服器正在運行中，請先完全關閉伺服器後再打開配置檔案進行修改！"));
+  }
+  
   open.value = true;
   activeTab.value = "server";
   loadConfig();
@@ -454,7 +463,7 @@ defineExpose({ openDialog });
 .config-form {
   padding: 8px 4px;
   
-  /* 修正 2: 強制各種輸入元件長寬高與置中完美對齊 */
+  /* 統一各個元件的高度與圓角 */
   :deep(.ant-form-item) {
     margin-bottom: 16px;
   }
@@ -463,15 +472,13 @@ defineExpose({ openDialog });
     min-height: 38px;
   }
   
-  /* 統一基本高度 */
   :deep(.ant-input),
   :deep(.ant-input-number),
   :deep(.ant-select .ant-select-selector) {
     height: 38px !important;
-    border-radius: 6px !important; /* 統一圓角 */
+    border-radius: 6px !important;
   }
 
-  /* 統一內部文字置中對齊 */
   :deep(.ant-select-selection-item),
   :deep(.ant-select-selection-placeholder) {
     line-height: 36px !important;
@@ -481,7 +488,6 @@ defineExpose({ openDialog });
     height: 36px !important;
   }
 
-  /* 針對可能出現的密碼輸入框 icon 對齊 */
   :deep(.ant-input-affix-wrapper) {
     height: 38px !important;
     border-radius: 6px !important;
