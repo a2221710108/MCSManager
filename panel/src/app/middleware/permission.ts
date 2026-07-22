@@ -45,6 +45,13 @@ function apiError(ctx: Koa.ParameterizedContext) {
   ctx.body = `[Forbidden] ${$t("TXT_CODE_permission.apiError")}`;
 }
 
+function disabledApiKey(ctx: Koa.ParameterizedContext) {
+  ctx.status = 403;
+  ctx.body = `The administrator has disabled the use of the API key. 
+Please contact the administrator and set "enableApiKey" to "true" in the configuration file to enable normal use of the API endpoints.`;
+}
+
+
 function tooFast(ctx: Koa.ParameterizedContext) {
   ctx.status = 500;
   ctx.body = `[TooFast] ${$t("TXT_CODE_permission.tooFast")}`;
@@ -72,7 +79,15 @@ export default (parameter: IPermissionCfg) => {
     // If it is an API request, perform API-level permission judgment
     const key = ctx.request?.header["x-request-api-key"] || ctx.query.apikey;
     if (key) {
+      const enableApiKey = systemConfig?.enableApiKey || false;
+      if (!enableApiKey) return disabledApiKey(ctx);
+
+      // Validate apiKey: only A-Z, a-z, 0-9 are allowed
       const apiKey = String(key);
+      if (!checkSafeName(apiKey)) {
+        return apiError(ctx);
+      }
+
       const user = getUuidByApiKey(apiKey);
       if (user && user.permission >= Number(parameter.level)) {
         return await next();
