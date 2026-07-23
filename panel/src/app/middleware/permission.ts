@@ -3,6 +3,7 @@ import { GlobalVariable } from "mcsmanager-common";
 import { $t } from "../i18n";
 import { getUuidByApiKey, ILLEGAL_ACCESS_KEY, isAjax, logout } from "../service/passport_service";
 import { systemConfig } from "../setting";
+import { checkSafeName } from "../utils/safe";
 import userSystem from "../service/user_service";
 
 /**
