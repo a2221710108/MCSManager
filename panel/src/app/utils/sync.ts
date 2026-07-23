@@ -1,11 +1,5 @@
 import { Mutex } from "async-mutex";
 
-export function checkSafeName(name: string) {
-  if (name === undefined || name === null || name.length === 0) return false;
-  name = String(name).trim();
-  if (name.length === 0) return false;
-  return /^[A-Za-z0-9-_]+$/.test(name);
-}
 export const mutexMap = new WeakMap<Function, Mutex>();
 export const mutexIdMap = new Map<string, Mutex>();
 
